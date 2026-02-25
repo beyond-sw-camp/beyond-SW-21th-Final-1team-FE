@@ -687,6 +687,7 @@ const approvalMenus = computed(() => {
     { label: '보류/반려 문서함', route: '/approval/box/issue', routePrefix: '/approval/box/issue', isSub: true },
     { label: '완료 문서함', route: '/approval/box/completed', routePrefix: '/approval/box/completed', isSub: true },
     { label: '임시 보관함', route: '/approval/box/temp', routePrefix: '/approval/box/temp', isSub: true },
+    { label: '참조 문서함', route: '/approval/box/reference', routePrefix: '/approval/box/reference', isSub: true },
   ]
 
   return [...topMenus, boxMenu, ...boxSubMenus]

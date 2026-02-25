@@ -28,7 +28,7 @@
 
       <div class="approval-line-container">
         <div
-          v-for="(step, index) in (item.approvalLine || [])"
+          v-for="(step, index) in normalizedApprovalLine"
           :key="index"
           class="approval-box"
         >
@@ -46,7 +46,33 @@
               </div>
             </div>
           </div>
-          <div class="box-date">{{ step.date && step.date !== '-' ? formatShortDate(step.date) : '' }}</div>
+          <div class="box-date">{{ shouldShowApprovalDate(step) ? formatShortDate(step.date) : '' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="normalizedReviewerLine.length > 0" class="reviewer-line-section">
+      <div class="approval-line-container reviewer-line-container">
+        <div
+          v-for="(step, index) in normalizedReviewerLine"
+          :key="`review-${index}`"
+          class="approval-box reviewer-approval-box"
+        >
+          <div class="box-header">검토자 {{ index + 1 }}</div>
+          <div class="box-content">
+            <div class="signature">
+              <div v-if="step.status === '확인'" class="real-stamp">
+                <div class="stamp-inner" :class="{ 'vertical': (step.name || '').length === 3, 'grid-2x2': (step.name || '').length === 4 }">
+                  <span class="char" v-for="(c, idx) in (step.name || '')" :key="idx">{{ c }}</span>
+                </div>
+              </div>
+              <div class="signature-text">
+                <span class="name">{{ step.name }}</span>
+                <span class="position">{{ step.position }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="box-date">{{ shouldShowApprovalDate(step) ? formatShortDate(step.date) : '' }}</div>
         </div>
       </div>
     </div>
@@ -110,19 +136,79 @@ const props = defineProps({
 });
 
 const isRejectedStatus = computed(() => {
-  return props.item.status === '반려' || props.item.status === '諛섎젮';
+  return props.item.status === '반려';
 });
 
 const formalTitle = computed(() => {
   const category = props.item.category || props.item.templateName || '기안서';
   let title = category;
   if (category === '휴가 신청서') title = '연가 신청서';
+  else if (category === '유연근무 신청서') title = '유연근무 신청서';
+  else if (category === '외근/출장 신청서') title = '외근/출장 신청서';
+  else if (category === '연장근무 신청서') title = '연장근무 신청서';
+  else if (category === '휴직신청서') title = '휴직신청서';
+  else if (category === '복직신청서') title = '복직신청서';
   else if (category === '기안서') title = '기안서';
   else if (category === '품의서') title = '품의서';
   else if (category === '보고서') title = '보고서';
 
   return title.split('').join('  ');
 });
+
+const normalizedReviewers = computed(() => {
+  const reviewers = props.item.reviewers;
+  if (!Array.isArray(reviewers)) return [];
+  return reviewers.map((reviewer) => {
+    if (typeof reviewer === 'string') return reviewer;
+    if (reviewer && reviewer.name) return `${reviewer.name}${reviewer.position ? ` (${reviewer.position})` : ''}`;
+    return '';
+  }).filter(Boolean);
+});
+
+const normalizedReviewerLine = computed(() => {
+  if (!Array.isArray(props.item.reviewers)) return [];
+  const reviewerDefaultDate = (props.item.reviewDate || props.item.reviewedDate || props.item.date || props.item.draftDate || '').split(' ')[0] || '';
+
+  return props.item.reviewers
+    .map((reviewer) => {
+      if (typeof reviewer === 'object' && reviewer !== null) {
+        return {
+          name: reviewer.name || '',
+          position: reviewer.position || '',
+          status: reviewer.status || '대기',
+          date: reviewer.date || reviewerDefaultDate
+        };
+      }
+
+      const normalized = String(reviewer).replace(/[()]/g, '').trim();
+      const [name, position] = normalized.split(' ');
+      return { name: name || '', position: position || '', status: '대기', date: '' };
+    })
+    .filter((step) => step.name);
+});
+
+const normalizedApprovalLine = computed(() => {
+  const baseLine = Array.isArray(props.item.approvalLine) ? [...props.item.approvalLine] : [];
+  const firstStep = baseLine[0];
+  const drafterName = props.item.drafter || '';
+  const drafterDate = (props.item.date || props.item.draftDate || '').split(' ')[0] || '';
+
+  if (!drafterName) return baseLine;
+
+  if (!firstStep || firstStep.status !== '기안') {
+    return [
+      { name: drafterName, position: props.item.position || '기안자', status: '기안', date: drafterDate },
+      ...baseLine
+    ];
+  }
+
+  return baseLine;
+});
+
+const shouldShowApprovalDate = (step) => {
+  if (!step?.date || step.date === '-') return false;
+  return ['기안', '승인', '확인', '전결'].includes(step.status);
+};
 
 const formatShortDate = (dateStr) => {
   if (!dateStr) return '';
@@ -138,18 +224,18 @@ const formatShortDate = (dateStr) => {
 .paper {
   width: 100%;
   background: white;
-  padding: 40px;
+  padding: 24px;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
 .doc-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 
 .doc-header h1 {
   font-family: serif;
-  font-size: 2rem;
+  font-size: 1.7rem;
   font-weight: 700;
   color: #111;
   text-decoration: underline;
@@ -162,8 +248,8 @@ const formatShortDate = (dateStr) => {
 .info-section {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 30px;
-  gap: 20px;
+  margin-bottom: 14px;
+  gap: 12px;
 }
 
 .info-table {
@@ -174,7 +260,7 @@ const formatShortDate = (dateStr) => {
 
 .info-table td {
   border: 1px solid #ccc;
-  padding: 8px;
+  padding: 6px;
   text-align: center;
 }
 
@@ -191,6 +277,21 @@ const formatShortDate = (dateStr) => {
 .approval-line-container {
   display: flex;
   gap: 4px;
+}
+
+.reviewer-line-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.reviewer-line-container {
+  justify-content: flex-end;
+}
+
+.reviewer-approval-box .box-header {
+  background: #eef8ff;
+  color: #1e4e7a;
 }
 
 .approval-box {
@@ -211,7 +312,7 @@ const formatShortDate = (dateStr) => {
 
 .box-content {
   flex: 1;
-  min-height: 70px;
+  min-height: 62px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,7 +325,7 @@ const formatShortDate = (dateStr) => {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 70px;
+  height: 62px;
 }
 
 .signature-text {
@@ -301,7 +402,7 @@ const formatShortDate = (dateStr) => {
 }
 
 .referrer-section {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   font-size: 0.85rem;
   display: flex;
   align-items: center;
@@ -325,13 +426,13 @@ const formatShortDate = (dateStr) => {
 .form-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   font-size: 0.9rem;
 }
 
 .form-table td {
   border: 1px solid #ccc;
-  padding: 10px 15px;
+  padding: 8px 12px;
 }
 
 .form-table .label {
@@ -346,7 +447,7 @@ const formatShortDate = (dateStr) => {
 }
 
 .content-cell {
-  height: 300px;
+  height: 180px;
   vertical-align: top;
 }
 
@@ -359,7 +460,7 @@ const formatShortDate = (dateStr) => {
 .attachments-area {
   border: 1px solid #ccc;
   background: #f9f9f9;
-  padding: 10px 15px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 12px;

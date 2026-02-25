@@ -1,7 +1,14 @@
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { templates, mockUsers, mockApprovalLine, mockReferrers, mockApprovalBox } from '@/utils/approvalData';
+import {
+  templates,
+  mockUsers,
+  mockApprovalLine,
+  mockReferrers,
+  mockReviewers,
+  findApprovalDocument
+} from '@/utils/approvalData';
 import OrgChartModal from './components/OrgChartModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import { useRoute } from 'vue-router';
@@ -13,7 +20,7 @@ const activeTemplate = ref('vacation');
 const showTemplateMenu = ref(false);
 const isModalOpen = ref(false);
 const isConfirmModalOpen = ref(false);
-const modalMode = ref('approval'); // 'approval' | 'referrer'
+const modalMode = ref('approval'); // 'approval' | 'reviewer' | 'referrer'
 const templateSelectorRef = ref(null);
 
 // Current User Mock
@@ -32,6 +39,7 @@ const docInfo = reactive({
 });
 
 const approvalLine = ref([]);
+const reviewers = ref([]);
 const referrers = ref([]);
 
 // Derived State
@@ -51,6 +59,8 @@ const currentDateShort = now.toLocaleDateString('ko-KR', { month: '2-digit', day
 const contentPlaceholder = computed(() => {
   if (activeTemplate.value === 'reinstatement') return '복직 사유 및 계획을 입력하세요.';
   if (activeTemplate.value === 'leave') return '휴직 사유 및 연락처를 입력하세요.';
+  if (activeTemplate.value === 'businessTrip') return '외근/출장 목적, 방문처, 이동수단, 소요비용을 입력하세요.';
+  if (activeTemplate.value === 'overtime') return '연장근무 사유, 예상 작업시간, 완료 목표를 입력하세요.';
   return '내용을 입력하세요.\n\n1. 사유:\n2. 비상 연락망:\n3. 인수인계 사항:';
 });
 
@@ -65,36 +75,80 @@ const calculateDays = computed(() => {
     return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
 });
 
+const isReviewerStamped = (reviewer) => ['확인', '승인', '전결'].includes(reviewer?.status);
+const reviewerStampDate = (reviewer) => {
+  if (!isReviewerStamped(reviewer)) return '';
+  const date = reviewer?.reviewedAt || reviewer?.date || currentDate;
+  return new Date(date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+};
+
+const templateByCategory = {
+  '휴가 신청서': 'vacation',
+  '유연근무 신청서': 'flexible',
+  '외근/출장 신청서': 'businessTrip',
+  '연장근무 신청서': 'overtime',
+  '휴직신청서': 'leave',
+  '복직신청서': 'reinstatement',
+  // Legacy categories for old mock documents
+  '품의서': 'overtime',
+  '보고서': 'businessTrip',
+  '기안서': 'businessTrip'
+};
+
 // Methods
 const loadTestData = () => {
     approvalLine.value = activeTemplate.value === 'vacation' ? [] : [...mockApprovalLine];
+    reviewers.value = [...mockReviewers];
     referrers.value = [...mockReferrers];
     docInfo.title = `${currentTemplateName.value} - ${currentUser.name}`;
-    if(['vacation', 'flexible', 'leave'].includes(activeTemplate.value)) {
-        docInfo.startDate = currentDate;
-        docInfo.endDate = currentDate;
+    docInfo.content = '';
+    docInfo.attachments = [];
+
+    if (['vacation', 'flexible', 'businessTrip', 'overtime', 'leave'].includes(activeTemplate.value)) {
+      docInfo.startDate = currentDate;
+      docInfo.endDate = currentDate;
+    } else {
+      docInfo.startDate = '';
+      docInfo.endDate = '';
     }
 };
 
-const loadFromData = (id) => {
-    const doc = mockApprovalBox.find(d => d.id === id);
-    if (!doc) return;
+const loadFromData = (id, source) => {
+    const doc = findApprovalDocument(id, source);
+    if (!doc) {
+      loadTestData();
+      return;
+    }
 
+    const category = doc.category || doc.templateName;
+    activeTemplate.value = templateByCategory[category] || 'businessTrip';
     docInfo.title = `[재상신] ${doc.title}`;
-    docInfo.content = doc.content;
-    if (doc.category === '기안서') activeTemplate.value = 'vacation'; // Default to vacation template for demo
-    else if (doc.category === '품의서') activeTemplate.value = 'expense';
-    else if (doc.category === '보고서') activeTemplate.value = 'report';
+    docInfo.content = doc.content || '';
+    docInfo.startDate = doc.startDate || '';
+    docInfo.endDate = doc.endDate || '';
+    docInfo.startTime = doc.startTime || '09:00';
+    docInfo.endTime = doc.endTime || '18:00';
 
     if (doc.approvalLine) {
       // Re-map approval line (original line minus current status)
-      approvalLine.value = doc.approvalLine.map(a => ({
+      approvalLine.value = doc.approvalLine
+      .filter((a) => a.status !== '기안')
+      .map(a => ({
         id: Math.random().toString(36).substr(2, 9),
         name: a.name,
         position: a.position,
         department: '소속팀' // Mock
       }));
     }
+
+    reviewers.value = Array.isArray(doc.reviewers)
+      ? doc.reviewers.map((r, idx) => {
+          const matched = mockUsers.find((u) => `${u.name} ${u.position}` === r || u.name === r);
+          if (matched) return matched;
+          const [name, position] = String(r).split(' ');
+          return { id: `rv-${idx}`, name: name || '검토자', position: position || '', department: '' };
+        })
+      : [];
     
     if (doc.referrers) {
       referrers.value = doc.referrers.map(r => ({
@@ -115,8 +169,9 @@ const handleClickOutside = (event) => {
 // Initialize with test data
 onMounted(() => {
     const fromId = route.query.from;
+    const source = route.query.source || 'box';
     if (fromId) {
-      loadFromData(fromId);
+      loadFromData(fromId, source);
     } else {
       loadTestData();
     }
@@ -146,6 +201,8 @@ const closeModal = () => {
 const handleModalConfirm = (selectedUsers) => {
   if (modalMode.value === 'approval') {
     approvalLine.value = selectedUsers;
+  } else if (modalMode.value === 'reviewer') {
+    reviewers.value = selectedUsers;
   } else {
     referrers.value = selectedUsers;
   }
@@ -166,7 +223,7 @@ const submitApproval = () => {
 
 const finalizeSubmission = () => {
   alert(`[${currentTemplateName.value}] 기안이 상신되었습니다.\n결재 현황 페이지로 이동합니다.`);
-  router.push('/approval');
+  router.push('/approval/status');
 };
 
 </script>
@@ -238,6 +295,9 @@ const finalizeSubmission = () => {
           <div class="approval-line-panel">
             <div class="approval-line-header">
               <button type="button" class="btn-xs" @click="openModal('approval')">결재선 수정</button>
+              <button type="button" class="btn-xs" @click="openModal('reviewer')">
+                {{ reviewers.length > 0 ? '검토선 수정' : '검토선 추가' }}
+              </button>
             </div>
 
             <div class="approval-line-container">
@@ -274,6 +334,42 @@ const finalizeSubmission = () => {
               <div class="box-date"></div> <!-- Empty for pending approvers -->
             </div>
             </div>
+
+            <div v-if="reviewers.length > 0" class="review-line-container">
+              <div
+                v-for="(reviewer, index) in reviewers"
+                :key="`reviewer-${reviewer.id}`"
+                class="approval-box reviewer-box"
+              >
+                <div class="box-header">검토자 {{ index + 1 }}</div>
+                <div class="box-content">
+                  <div class="signature">
+                    <div v-if="isReviewerStamped(reviewer)" class="real-stamp">
+                      <div
+                        class="stamp-inner"
+                        :class="{
+                          'vertical': (reviewer.name || '').length === 3,
+                          'grid-2x2': (reviewer.name || '').length === 4
+                        }"
+                      >
+                        <span
+                          class="char"
+                          v-for="(c, cIdx) in (reviewer.name || '')"
+                          :key="cIdx"
+                        >
+                          {{ c }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="signature-text">
+                      <span class="name">{{ reviewer.name }}</span>
+                      <span class="position">{{ reviewer.position }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="box-date">{{ reviewerStampDate(reviewer) }}</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -306,7 +402,7 @@ const finalizeSubmission = () => {
                 />
               </td>
             </tr>
-            <tr v-if="['vacation', 'leave', 'reinstatement'].includes(activeTemplate)">
+            <tr v-if="['vacation', 'businessTrip', 'overtime', 'leave', 'reinstatement'].includes(activeTemplate)">
               <td class="label">기간</td>
               <td class="date-range">
                 <div class="datetime-input">
@@ -360,7 +456,7 @@ const finalizeSubmission = () => {
     <OrgChartModal 
       :is-open="isModalOpen"
       :mode="modalMode"
-      :initial-selection="modalMode === 'approval' ? approvalLine : referrers"
+      :initial-selection="modalMode === 'approval' ? approvalLine : modalMode === 'reviewer' ? reviewers : referrers"
       @close="closeModal"
       @confirm="handleModalConfirm"
     />
@@ -369,7 +465,7 @@ const finalizeSubmission = () => {
     <ConfirmModal
       :is-open="isConfirmModalOpen"
       title="상신 확인"
-      message="선택하신 결재선으로 기안서를 상신하시겠습니까?"
+      message="선택하신 결재선/검토자 정보로 기안서를 상신하시겠습니까?"
       confirm-text="상신"
       @close="isConfirmModalOpen = false"
       @confirm="finalizeSubmission"
@@ -556,6 +652,7 @@ const finalizeSubmission = () => {
 .info-section {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 40px;
   gap: 20px;
 }
@@ -593,6 +690,7 @@ const finalizeSubmission = () => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 6px;
   padding: 0 2px;
 }
 
@@ -602,11 +700,31 @@ const finalizeSubmission = () => {
   gap: 4px;
 }
 
+.review-line-container {
+  display: flex;
+  gap: 4px;
+}
+
 .approval-box {
   border: 1px solid #ccc;
   display: flex;
   flex-direction: column;
   width: 90px;
+}
+
+.reviewer-box .box-header {
+  background: #eef8ff;
+  color: #1e4e7a;
+}
+
+.placeholder-box .box-content {
+  background: #fafcff;
+}
+
+.empty-box-text {
+  font-size: 0.74rem;
+  color: #8aa7c4;
+  text-align: center;
 }
 
 .box-header {
@@ -895,6 +1013,87 @@ const finalizeSubmission = () => {
 
 .btn-sm:hover {
   background: #eee;
+}
+
+@media (max-width: 1200px) {
+  .content-area {
+    padding: 20px;
+  }
+
+  .paper {
+    width: 100%;
+    min-height: auto;
+    padding: 36px 28px;
+  }
+
+  .info-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .info-table {
+    width: 100%;
+  }
+
+  .approval-line-container {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    height: auto;
+    padding: 10px 14px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .toolbar-left, .toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .content-area {
+    padding: 12px;
+  }
+
+  .paper {
+    padding: 20px 14px;
+  }
+
+  .date-range {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .toolbar-left {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .template-btn {
+    font-size: 0.82rem;
+    padding: 6px 8px;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+
+  .reviewer-section,
+  .referrer-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .content-cell {
+    height: 280px;
+  }
 }
 
 </style>

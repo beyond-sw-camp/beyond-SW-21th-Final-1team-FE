@@ -70,8 +70,10 @@
 import { ref } from 'vue';
 import { mockReviewList } from '@/utils/approvalData';
 import ReviewModal from './components/ReviewModal.vue';
+import { getCurrentApprovalUser, isUserRelatedApprovalDocument } from './utils/approvalVisibility';
 
-const reviewList = ref([...mockReviewList]);
+const currentUser = getCurrentApprovalUser();
+const reviewList = ref(mockReviewList.filter((item) => isUserRelatedApprovalDocument(item, currentUser)));
 const isModalOpen = ref(false);
 const selectedItem = ref({});
 
@@ -96,7 +98,7 @@ const handleReviewAction = (data) => {
 <style scoped>
 .review-container {
   padding: 32px;
-  min-height: 100vh;
+  min-height: 100%;
   background: var(--gray50);
   border-radius: 14px;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
@@ -164,8 +166,8 @@ const handleReviewAction = (data) => {
   background-color: #f8f9fa;
 }
 
-.w-10 { width: 60px; }
-.w-category { width: 100px; }
+.w-10 { width: 84px; min-width: 84px; white-space: nowrap; text-align: center !important; }
+.w-category { width: 190px; min-width: 190px; text-align: center !important; }
 .w-drafter { width: 180px; }
 .w-date { width: 120px; }
 .w-actions { width: 100px; }
@@ -184,11 +186,20 @@ const handleReviewAction = (data) => {
 }
 
 .category-tag {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.74rem;
   padding: 4px 8px;
   background: #f1f3f5;
   color: #868e96;
   border-radius: 6px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.review-table td:nth-child(2) {
+  white-space: nowrap;
+  text-align: center;
 }
 
 .title-cell {
