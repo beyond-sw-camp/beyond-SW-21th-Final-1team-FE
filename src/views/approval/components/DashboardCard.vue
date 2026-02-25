@@ -1,5 +1,5 @@
 <template>
-  <div class="card">
+  <div class="card" :class="`card--${variant}`">
     <div class="card-header">
       <h3 class="card-title">{{ title }}</h3>
       <button class="more-btn" @click="goToList">
@@ -55,7 +55,11 @@ const props = defineProps({
   items: Array,
   countLabel: String,
   linkType: String,
-  isTemp: Boolean
+  isTemp: Boolean,
+  variant: {
+    type: String,
+    default: 'default'
+  }
 });
 
 const emit = defineEmits(['click-item']);
@@ -215,6 +219,25 @@ const goToList = () => {
   padding: 12px 20px;
   background: #f8f9fa;
   border-top: 1px solid #f1f3f5;
+}
+
+.card--reference {
+  border-color: #dbeafe;
+  box-shadow: 0 2px 10px rgba(59, 130, 246, 0.08);
+}
+
+.card--reference .card-header {
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border-bottom-color: #e2ecff;
+}
+
+.card--reference .card-title {
+  color: #1d4ed8;
+}
+
+.card--reference .card-footer {
+  background: #f8fbff;
+  border-top-color: #e2ecff;
 }
 
 .total-count {

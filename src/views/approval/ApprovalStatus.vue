@@ -3,27 +3,30 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { mockApprovalStatusList } from '@/utils/approvalData';
 import ApprovalDetailModal from './components/ApprovalDetailModal.vue';
+import { getCurrentApprovalUser, isUserRelatedApprovalDocument } from './utils/approvalVisibility';
 
 const router = useRouter();
 const searchQuery = ref('');
 const activeTab = ref('all'); // 'all', 'drafting', 'pending', 'rejected'
 const isModalOpen = ref(false);
 const selectedItem = ref({});
+const currentUser = getCurrentApprovalUser();
+const visibleStatusDocs = computed(() => mockApprovalStatusList.filter((item) => isUserRelatedApprovalDocument(item, currentUser)));
 
-const isDrafting = (status) => status === '기안중' || status === '湲곗븞以?';
-const isPending = (status) => status === '진행중' || status === '吏꾪뻾以?';
-const isRejected = (status) => status === '반려' || status === '諛섎젮';
-const isCompleted = (status) => status === '완료' || status === '?꾨즺';
+const isDrafting = (status) => status === '기안중';
+const isPending = (status) => status === '진행중';
+const isRejected = (status) => status === '반려';
+const isCompleted = (status) => status === '완료';
 
 const tabs = computed(() => [
-  { id: 'all', label: '전체', count: mockApprovalStatusList.length },
-  { id: 'drafting', label: '기안중', count: mockApprovalStatusList.filter(i => isDrafting(i.status)).length },
-  { id: 'pending', label: '진행중', count: mockApprovalStatusList.filter(i => isPending(i.status)).length },
-  { id: 'rejected', label: '반려', count: mockApprovalStatusList.filter(i => isRejected(i.status)).length }
+  { id: 'all', label: '전체', count: visibleStatusDocs.value.length },
+  { id: 'drafting', label: '기안중', count: visibleStatusDocs.value.filter(i => isDrafting(i.status)).length },
+  { id: 'pending', label: '진행중', count: visibleStatusDocs.value.filter(i => isPending(i.status)).length },
+  { id: 'rejected', label: '반려', count: visibleStatusDocs.value.filter(i => isRejected(i.status)).length }
 ]);
 
 const filteredList = computed(() => {
-  return mockApprovalStatusList.filter(item => {
+  return visibleStatusDocs.value.filter(item => {
     const matchesTab = activeTab.value === 'all' ||
       (activeTab.value === 'drafting' && isDrafting(item.status)) ||
       (activeTab.value === 'pending' && isPending(item.status)) ||
@@ -52,8 +55,10 @@ const openModal = (item) => {
     content: item.content || '상세 본문 데이터가 없습니다.',
     attachments: Array.isArray(item.attachments) ? item.attachments : [],
     referrers: Array.isArray(item.referrers) ? item.referrers : [],
+    reviewers: Array.isArray(item.reviewers) ? item.reviewers : [],
     department: item.department || '-',
     isDrafter: true,
+    canReview: false,
     statusClass: getStatusClass(item.status)
   };
   isModalOpen.value = true;
@@ -65,13 +70,15 @@ const closeModal = () => {
 
 const handleModalAction = (action) => {
   if (action.type === 'redraft') {
-    router.push({ name: 'approval-draft', query: { from: action.id } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
+  } else if (action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
   }
   isModalOpen.value = false;
 };
 
 const handleRedraft = (item) => {
-  router.push({ name: 'approval-draft', query: { from: item.id } });
+  router.push({ name: 'approval-draft', query: { from: item.id, source: 'status' } });
 };
 </script>
 
@@ -80,7 +87,7 @@ const handleRedraft = (item) => {
     <header class="page-header">
       <div class="header-content">
         <h1 class="page-title">전자 결재 현황</h1>
-        <p class="page-subtitle">본인이 기안한 문서의 실시간 결재 진행 상태를 확인합니다.</p>
+        <p class="page-subtitle">본인이 기안자/결재자/검토자로 포함된 문서의 결재 진행 상태를 확인합니다.</p>
       </div>
 
       <div class="search-box">
@@ -190,7 +197,7 @@ const handleRedraft = (item) => {
 <style scoped>
 .status-container {
   padding: 32px;
-  min-height: 100vh;
+  min-height: 100%;
   background: var(--gray50);
   border-radius: 14px;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;

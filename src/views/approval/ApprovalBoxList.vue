@@ -6,7 +6,10 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         </button>
         <div>
-          <h2>{{ pageTitle }}</h2>
+          <div class="title-row">
+            <h2>{{ pageTitle }}</h2>
+            <span v-if="currentType === 'reference'" class="reference-badge">참조</span>
+          </div>
           <p class="subtitle">{{ pageSubtitle }}</p>
         </div>
       </div>
@@ -92,6 +95,12 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { mockApprovalBox } from '@/utils/approvalData';
 import ApprovalDetailModal from './components/ApprovalDetailModal.vue';
+import {
+  getCurrentApprovalUser,
+  isUserRelatedApprovalDocument,
+  matchesCurrentApprovalUser,
+  isCurrentUserDrafterDocument
+} from './utils/approvalVisibility';
 
 const route = useRoute();
 const router = useRouter();
@@ -101,9 +110,19 @@ const allDocuments = ref([...mockApprovalBox]);
 const searchQuery = ref('');
 const currentFilter = ref('전체');
 const sortBy = ref('date-desc');
+const currentUser = getCurrentApprovalUser();
 
 const isDetailOpen = ref(false);
 const selectedItem = ref({});
+
+const visibleDocuments = computed(() => allDocuments.value.filter((doc) => isUserRelatedApprovalDocument(doc, currentUser)));
+const drafterDocuments = computed(() => allDocuments.value.filter((doc) => isCurrentUserDrafterDocument(doc, currentUser)));
+
+const isReferenceDocumentForCurrentUser = (doc) => {
+  if (doc?.status !== '완료') return false;
+  if (!Array.isArray(doc?.referrers) || doc.referrers.length === 0) return false;
+  return doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser));
+};
 
 const pageTitle = computed(() => {
   switch (currentType.value) {
@@ -112,17 +131,26 @@ const pageTitle = computed(() => {
     case 'issue': return '보류/반려 문서함';
     case 'completed': return '완료 문서함';
     case 'temp': return '임시 보관함';
+    case 'reference': return '참조 문서함';
     default: return '문서함';
   }
 });
 
-const pageSubtitle = computed(() => `${pageTitle.value}의 모든 문서를 조회합니다.`);
+const pageSubtitle = computed(() => {
+  if (currentType.value === 'reference') {
+    return '참조자로 지정된 문서를 빠르게 확인할 수 있습니다.';
+  }
+  return `${pageTitle.value}의 모든 문서를 조회합니다.`;
+});
 
 const filterOptions = [
   { label: '전체', value: '전체' },
-  { label: '기안', value: '기안서' },
-  { label: '품의', value: '품의서' },
-  { label: '보고', value: '보고서' }
+  { label: '휴가', value: '휴가 신청서' },
+  { label: '유연근무', value: '유연근무 신청서' },
+  { label: '외근/출장', value: '외근/출장 신청서' },
+  { label: '연장근무', value: '연장근무 신청서' },
+  { label: '휴직', value: '휴직신청서' },
+  { label: '복직', value: '복직신청서' }
 ];
 
 const getStatusClass = (status) => {
@@ -137,13 +165,14 @@ const getStatusClass = (status) => {
 };
 
 const baseList = computed(() => {
-  let list = [...allDocuments.value];
+  let list = [...visibleDocuments.value];
   
   // Type filtering
-  if (currentType.value === 'ing') list = list.filter(d => d.status === '진행중');
+  if (currentType.value === 'ing') list = drafterDocuments.value.filter(d => d.status === '진행중');
   else if (currentType.value === 'issue') list = list.filter(d => d.status === '반려' || d.status === '보류');
   else if (currentType.value === 'completed') list = list.filter(d => d.status === '완료');
-  else if (currentType.value === 'temp') list = list.filter(d => d.status === '임시저장');
+  else if (currentType.value === 'temp') list = drafterDocuments.value.filter(d => d.status === '임시저장');
+  else if (currentType.value === 'reference') list = list.filter(isReferenceDocumentForCurrentUser);
   
   return list;
 });
@@ -187,7 +216,9 @@ const openDetail = (item) => {
 
 const handleModalAction = (action) => {
   if (action.type === 'redraft') {
-    router.push({ name: 'approval-draft', query: { from: action.id } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
+  } else if (action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
   } else if (action.type === 'delete' || action.type === 'cancel') {
     allDocuments.value = allDocuments.value.filter(d => d.id !== action.id);
   } else if (action.type === 'review') {
@@ -204,7 +235,7 @@ watch(() => route.params.type, (newType) => {
 <style scoped>
 .list-container {
   padding: 32px;
-  min-height: 100vh;
+  min-height: 100%;
   background: var(--gray50);
   border-radius: 14px;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
@@ -241,6 +272,25 @@ watch(() => route.params.type, (newType) => {
 
 .page-header h2 { font-size: 1.6rem; font-weight: 800; color: #212529; margin-bottom: 6px; }
 .subtitle { color: #868e96; font-size: 0.92rem; }
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reference-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid #dbeafe;
+}
 
 .search-bar {
   position: relative;
@@ -314,7 +364,7 @@ watch(() => route.params.type, (newType) => {
 .clickable-row:hover { background: #f8f9fa; }
 
 .w-status { width: 100px; }
-.w-category { width: 120px; }
+.w-category { width: 190px; min-width: 190px; }
 .w-drafter { width: 220px; }
 .w-date { width: 180px; }
 
@@ -335,7 +385,22 @@ watch(() => route.params.type, (newType) => {
 .status-hold { background: #fff9db; color: #f08c00; border: 1px solid #ffec99; }
 .status-temp { background: #f1f3f5; color: #495057; border: 1px solid #e9ecef; }
 
-.category-text { font-size: 0.82rem; font-weight: 600; color: #868e96; background: #f1f3f5; padding: 4px 8px; border-radius: 6px; }
+.category-text {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #868e96;
+  background: #f1f3f5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.box-table td:nth-child(2) {
+  white-space: nowrap;
+}
 
 .title-cell { max-width: 500px; }
 .unread-style { font-weight: 800; color: #212529; font-size: 1rem; }

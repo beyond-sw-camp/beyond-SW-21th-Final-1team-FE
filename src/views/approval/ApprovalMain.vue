@@ -11,7 +11,7 @@
           <div class="stat-value">3<span class="unit">건</span></div>
         </div>
         <div class="card-footer red-text">
-          <span class="icon">⚠️</span> 처리 필요
+          <span class="status-marker danger"></span> 처리 필요
         </div>
       </div>
 
@@ -23,7 +23,7 @@
           <div class="stat-value">8<span class="unit">건</span></div>
         </div>
         <div class="card-footer blue-text">
-          <span class="icon">🕒</span> 진행 중
+          <span class="status-marker progress"></span> 진행 중
         </div>
       </div>
 
@@ -35,7 +35,7 @@
           <div class="stat-value">152<span class="unit">건</span></div>
         </div>
         <div class="card-footer green-text">
-          <span class="icon">✅</span> 이번 달
+          <span class="status-marker complete"></span> 이번 달
         </div>
       </div>
 
@@ -295,6 +295,17 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
   z-index: 1;
 }
 
+.status-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.status-marker.danger { background: #fa5252; }
+.status-marker.progress { background: #339af0; }
+.status-marker.complete { background: #40c057; }
+
 .red-text { color: #fa5252; }
 .blue-text { color: #339af0; }
 .green-text { color: #40c057; }
@@ -524,4 +535,3 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
   .stats-grid { grid-template-columns: 1fr; }
 }
 </style>
-

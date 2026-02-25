@@ -41,6 +41,7 @@
 <script setup>
 import { computed } from 'vue';
 import ApprovalDocumentPaper from './ApprovalDocumentPaper.vue';
+import { mockUsers } from '@/utils/approvalData';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -52,14 +53,15 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'action']);
 
-// For demo, assume current user matches drafter if 'isDrafter' flag is true or by name
+const currentUser = mockUsers.find((user) => user.id === 'u1') || { name: '' };
+
 const isDrafter = computed(() => {
-  // Mock logic: assume '최지훈' is current user for demo
-  return props.item.drafter === '최지훈' || props.item.status === '임시저장';
+  if (typeof props.item.isDrafter === 'boolean') return props.item.isDrafter;
+  return props.item.drafter === currentUser.name || props.item.status === '임시저장';
 });
 
 const canReview = computed(() => {
-  // Mock logic: if status is '진행중' and not drafter, assume reviewer
+  if (typeof props.item.canReview === 'boolean') return props.item.canReview;
   return props.item.status === '진행중' && !isDrafter.value;
 });
 
@@ -96,7 +98,7 @@ const handleAction = (type) => {
 
 .modal-content {
   background: white;
-  width: 800px; max-width: 95%;
+  width: 860px; max-width: 95%;
   max-height: 90vh;
   border-radius: 24px;
   display: flex; flex-direction: column;
@@ -144,8 +146,9 @@ const handleAction = (type) => {
 .icon-btn:hover { background: #f1f5f9; color: #0f172a; transform: rotate(90deg); }
 
 .modal-body {
-  padding: 32px 40px;
-  overflow-y: auto; flex: 1;
+  padding: 24px 28px;
+  overflow: hidden;
+  flex: 1;
 }
 
 .info-grid {
