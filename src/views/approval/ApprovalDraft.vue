@@ -12,6 +12,7 @@ import {
 import OrgChartModal from './components/OrgChartModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import { useRoute } from 'vue-router';
+import { REVIEW_FLOW_ENABLED } from './utils/featureFlags';
 
 // State
 const router = useRouter();
@@ -41,6 +42,7 @@ const docInfo = reactive({
 const approvalLine = ref([]);
 const reviewers = ref([]);
 const referrers = ref([]);
+const isReviewFlowEnabled = REVIEW_FLOW_ENABLED;
 
 // Derived State
 const currentTemplateName = computed(() => {
@@ -98,7 +100,7 @@ const templateByCategory = {
 // Methods
 const loadTestData = () => {
     approvalLine.value = activeTemplate.value === 'vacation' ? [] : [...mockApprovalLine];
-    reviewers.value = [...mockReviewers];
+    reviewers.value = isReviewFlowEnabled ? [...mockReviewers] : [];
     referrers.value = [...mockReferrers];
     docInfo.title = `${currentTemplateName.value} - ${currentUser.name}`;
     docInfo.content = '';
@@ -134,14 +136,15 @@ const loadFromData = (id, source) => {
       approvalLine.value = doc.approvalLine
       .filter((a) => a.status !== '기안')
       .map(a => ({
-        id: Math.random().toString(36).substr(2, 9),
+        ...(mockUsers.find((u) => u.name === a.name && u.position === a.position) || {}),
+        id: mockUsers.find((u) => u.name === a.name && u.position === a.position)?.id || '',
         name: a.name,
         position: a.position,
-        department: '소속팀' // Mock
+        department: mockUsers.find((u) => u.name === a.name && u.position === a.position)?.department || '소속팀'
       }));
     }
 
-    reviewers.value = Array.isArray(doc.reviewers)
+    reviewers.value = isReviewFlowEnabled && Array.isArray(doc.reviewers)
       ? doc.reviewers.map((r, idx) => {
           const matched = mockUsers.find((u) => `${u.name} ${u.position}` === r || u.name === r);
           if (matched) return matched;
@@ -190,6 +193,7 @@ const selectTemplate = (id) => {
 };
 
 const openModal = (mode) => {
+  if (!isReviewFlowEnabled && mode === 'reviewer') return;
   modalMode.value = mode;
   isModalOpen.value = true;
 };
@@ -198,10 +202,38 @@ const closeModal = () => {
   isModalOpen.value = false;
 };
 
+const getEmployeeNumber = (user) => {
+  if (!user) return '';
+  return String(user.employeeNo || user.empNo || user.id || '').trim();
+};
+
+const getDuplicateUsers = (approvers, reviewerList) => {
+  const reviewerEmpNoSet = new Set((reviewerList || []).map(getEmployeeNumber).filter(Boolean));
+  return (approvers || []).filter((approver) => reviewerEmpNoSet.has(getEmployeeNumber(approver)));
+};
+
+const hasApprovalReviewerConflict = computed(() => {
+  if (!isReviewFlowEnabled) return false;
+  return getDuplicateUsers(approvalLine.value, reviewers.value).length > 0;
+});
+
 const handleModalConfirm = (selectedUsers) => {
   if (modalMode.value === 'approval') {
+    const duplicates = getDuplicateUsers(selectedUsers, reviewers.value);
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map((user) => `${user.name}${user.position ? ` ${user.position}` : ''}`).join(', ');
+      alert(`결재자와 검토자는 동일할 수 없습니다.\n중복 인원: ${duplicateNames}`);
+      return;
+    }
     approvalLine.value = selectedUsers;
   } else if (modalMode.value === 'reviewer') {
+    if (!isReviewFlowEnabled) return;
+    const duplicates = getDuplicateUsers(approvalLine.value, selectedUsers);
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map((user) => `${user.name}${user.position ? ` ${user.position}` : ''}`).join(', ');
+      alert(`결재자와 검토자는 동일할 수 없습니다.\n중복 인원: ${duplicateNames}`);
+      return;
+    }
     reviewers.value = selectedUsers;
   } else {
     referrers.value = selectedUsers;
@@ -214,6 +246,12 @@ const tempSave = () => {
 
 const submitApproval = () => {
   if (!docInfo.title) return alert('제목을 입력해주세요.');
+  if (hasApprovalReviewerConflict.value) {
+    const duplicateNames = getDuplicateUsers(approvalLine.value, reviewers.value)
+      .map((user) => `${user.name}${user.position ? ` ${user.position}` : ''}`)
+      .join(', ');
+    return alert(`결재자와 검토자가 중복되어 상신할 수 없습니다.\n중복 인원: ${duplicateNames}`);
+  }
   if (approvalLine.value.length === 0) {
       if(!confirm('결재선이 지정되지 않았습니다. 계속 진행하시겠습니까?')) return;
   }
@@ -225,6 +263,11 @@ const finalizeSubmission = () => {
   alert(`[${currentTemplateName.value}] 기안이 상신되었습니다.\n결재 현황 페이지로 이동합니다.`);
   router.push('/approval/status');
 };
+
+const confirmMessage = computed(() => {
+  if (isReviewFlowEnabled) return '선택하신 결재선/검토자 정보로 기안서를 상신하시겠습니까?';
+  return '선택하신 결재선 정보로 기안서를 상신하시겠습니까?';
+});
 
 </script>
 
@@ -295,7 +338,7 @@ const finalizeSubmission = () => {
           <div class="approval-line-panel">
             <div class="approval-line-header">
               <button type="button" class="btn-xs" @click="openModal('approval')">결재선 수정</button>
-              <button type="button" class="btn-xs" @click="openModal('reviewer')">
+              <button v-if="isReviewFlowEnabled" type="button" class="btn-xs" @click="openModal('reviewer')">
                 {{ reviewers.length > 0 ? '검토선 수정' : '검토선 추가' }}
               </button>
             </div>
@@ -335,7 +378,7 @@ const finalizeSubmission = () => {
             </div>
             </div>
 
-            <div v-if="reviewers.length > 0" class="review-line-container">
+            <div v-if="isReviewFlowEnabled && reviewers.length > 0" class="review-line-container">
               <div
                 v-for="(reviewer, index) in reviewers"
                 :key="`reviewer-${reviewer.id}`"
@@ -456,7 +499,7 @@ const finalizeSubmission = () => {
     <OrgChartModal 
       :is-open="isModalOpen"
       :mode="modalMode"
-      :initial-selection="modalMode === 'approval' ? approvalLine : modalMode === 'reviewer' ? reviewers : referrers"
+      :initial-selection="modalMode === 'approval' ? approvalLine : (isReviewFlowEnabled && modalMode === 'reviewer' ? reviewers : referrers)"
       @close="closeModal"
       @confirm="handleModalConfirm"
     />
@@ -465,7 +508,7 @@ const finalizeSubmission = () => {
     <ConfirmModal
       :is-open="isConfirmModalOpen"
       title="상신 확인"
-      message="선택하신 결재선/검토자 정보로 기안서를 상신하시겠습니까?"
+      :message="confirmMessage"
       confirm-text="상신"
       @close="isConfirmModalOpen = false"
       @confirm="finalizeSubmission"

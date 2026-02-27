@@ -153,7 +153,7 @@ const handleAction = (type) => {
   background: white;
   width: 860px;
   max-width: 95%;
-  max-height: 90vh;
+  max-height: calc(100vh - 24px);
   border-radius: 24px;
   display: flex;
   flex-direction: column;
@@ -223,8 +223,31 @@ const handleAction = (type) => {
 
 .modal-body {
   padding: 0 28px 20px;
-  overflow: hidden;
+  overflow-y: auto;
+  min-height: 0;
   flex: 1;
+  border-top: 1px solid #e5e7eb;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .info-grid {
@@ -368,6 +391,20 @@ const handleAction = (type) => {
   font-size: 0.95rem;
   transition: all 0.2s;
   background: #fffafa;
+}
+
+@media (max-height: 900px) {
+  .modal-header {
+    padding: 24px 28px 16px;
+  }
+
+  .modal-footer {
+    padding: 16px 28px;
+  }
+
+  .t-btn {
+    padding: 10px 16px;
+  }
 }
 
 .trendy-textarea:focus {

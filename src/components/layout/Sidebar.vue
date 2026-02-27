@@ -319,6 +319,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePerformanceStore } from '@/store/performance'
 import { AUTH_KEYS } from '@/utils/auth'
 import BaseModal from '@/components/common/BaseModal.vue'
+import { REVIEW_FLOW_ENABLED } from '@/views/approval/utils/featureFlags'
 
 const router = useRouter()
 const route = useRoute()
@@ -676,9 +677,11 @@ const salaryMenus = [
 const approvalMenus = computed(() => {
   const topMenus = [
     { label: '전자 결재 기안', icon: PlusIcon, route: '/approval/draft' },
-    { label: '전자 결재 현황', icon: SearchIcon, route: '/approval/status' },
-    { label: '전자 결재 검토', icon: CheckIcon, route: '/approval/review' }
+    { label: '전자 결재 현황', icon: SearchIcon, route: '/approval/status' }
   ]
+  if (REVIEW_FLOW_ENABLED) {
+    topMenus.push({ label: '전자 결재 검토', icon: CheckIcon, route: '/approval/review' })
+  }
 
   const boxMenu = { label: '전자 결재 문서함', icon: FolderIcon, route: '/approval/box' }
   const boxSubMenus = [

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { AUTH_KEYS, USER_ROLES } from '@/utils/auth'
+import { REVIEW_FLOW_ENABLED } from '@/views/approval/utils/featureFlags'
 
 const routes = [
   {
@@ -209,6 +210,8 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/login')
+  } else if (!REVIEW_FLOW_ENABLED && to.name === 'approval-review') {
+    next('/approval/status')
   } else if (to.meta.requiresAdmin && userRole !== USER_ROLES.admin) {
     next('/')
   } else if (to.path === '/login' && isLoggedIn) {

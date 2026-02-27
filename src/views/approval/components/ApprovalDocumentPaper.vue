@@ -51,7 +51,7 @@
       </div>
     </div>
 
-    <div v-if="normalizedReviewerLine.length > 0" class="reviewer-line-section">
+    <div v-if="showReviewerLine" class="reviewer-line-section">
       <div class="approval-line-container reviewer-line-container">
         <div
           v-for="(step, index) in normalizedReviewerLine"
@@ -114,7 +114,15 @@
     <div v-if="item.attachments && item.attachments.length > 0" class="attachments-area">
       <span class="label">첨부파일</span>
       <div class="file-list">
-        <span v-for="file in item.attachments" :key="file" class="file-tag">📄 {{ file }}</span>
+        <button
+          v-for="file in item.attachments"
+          :key="file"
+          type="button"
+          class="file-tag"
+          @click="downloadAttachment(file)"
+        >
+          📄 {{ typeof file === 'string' ? file : (file?.name || '첨부파일') }}
+        </button>
       </div>
     </div>
 
@@ -127,6 +135,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { REVIEW_FLOW_ENABLED } from '../utils/featureFlags';
 
 const props = defineProps({
   item: {
@@ -187,6 +196,8 @@ const normalizedReviewerLine = computed(() => {
     .filter((step) => step.name);
 });
 
+const showReviewerLine = computed(() => REVIEW_FLOW_ENABLED && normalizedReviewerLine.value.length > 0);
+
 const normalizedApprovalLine = computed(() => {
   const baseLine = Array.isArray(props.item.approvalLine) ? [...props.item.approvalLine] : [];
   const firstStep = baseLine[0];
@@ -212,11 +223,46 @@ const shouldShowApprovalDate = (step) => {
 
 const formatShortDate = (dateStr) => {
   if (!dateStr) return '';
-  const parts = dateStr.split('-');
+  const dateOnly = String(dateStr).split(' ')[0].split('T')[0];
+  const parts = dateOnly.split('-');
   if (parts.length === 3) {
     return `${parts[1]}. ${parts[2]}.`;
   }
-  return dateStr;
+  return dateOnly;
+};
+
+const triggerDownload = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || 'attachment';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const downloadAttachment = async (file) => {
+  const fileName = typeof file === 'string' ? file : (file?.name || 'attachment.txt');
+  const rawUrl = typeof file === 'object' ? (file?.url || file?.path || '') : '';
+  const encodedName = encodeURIComponent(fileName);
+  const candidates = [rawUrl, `/attachments/${encodedName}`, `/files/${encodedName}`].filter(Boolean);
+
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      triggerDownload(blob, fileName);
+      return;
+    } catch (error) {
+      // Fallback to mock download below.
+    }
+  }
+
+  const fallbackText = `첨부파일: ${fileName}\n실서버 연동 전 목데이터 다운로드입니다.`;
+  const blob = new Blob([fallbackText], { type: 'text/plain;charset=utf-8' });
+  triggerDownload(blob, fileName.endsWith('.txt') ? fileName : `${fileName}.txt`);
 };
 </script>
 
@@ -483,6 +529,15 @@ const formatShortDate = (dateStr) => {
   border: 1px solid #ddd;
   padding: 2px 8px;
   border-radius: 4px;
+  cursor: pointer;
+  color: #334155;
+  font-size: 0.82rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.file-tag:hover {
+  background: #eef6ff;
+  border-color: #cdddf6;
 }
 
 .reject-display {
