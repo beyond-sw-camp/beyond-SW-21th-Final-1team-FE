@@ -26,10 +26,9 @@
           <template v-if="isDrafter">
             <button v-if="item.status === '진행중'" class="btn btn-danger-ghost" @click="handleAction('cancel')">기안 취소</button>
             <button v-if="item.status === '반려'" class="btn btn-primary" @click="handleAction('redraft')">재상신 하기</button>
-            <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>
             <button v-if="item.status === '임시저장'" class="btn btn-primary" @click="handleAction('draft')">상신</button>
+            <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>
           </template>
-          <!-- If logic to check if user is approver exists, show Review button -->
           <button v-if="canReview" class="btn btn-indigo" @click="handleAction('review')">결재 검토</button>
         </div>
         <button class="btn btn-secondary" @click="close">닫기</button>
@@ -99,7 +98,7 @@ const handleAction = (type) => {
 .modal-content {
   background: white;
   width: 860px; max-width: 95%;
-  max-height: 90vh;
+  max-height: calc(100vh - 24px);
   border-radius: 24px;
   display: flex; flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -147,8 +146,31 @@ const handleAction = (type) => {
 
 .modal-body {
   padding: 24px 28px;
-  overflow: hidden;
+  overflow-y: auto;
+  min-height: 0;
   flex: 1;
+  border-top: 1px solid #e5e7eb;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .info-grid {
@@ -246,4 +268,18 @@ const handleAction = (type) => {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+@media (max-height: 900px) {
+  .modal-header {
+    padding: 24px 28px 16px;
+  }
+
+  .modal-footer {
+    padding: 16px 28px;
+  }
+
+  .btn {
+    padding: 10px 18px;
+  }
+}
 </style>

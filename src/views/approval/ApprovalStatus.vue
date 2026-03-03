@@ -55,10 +55,8 @@ const openModal = (item) => {
     content: item.content || '상세 본문 데이터가 없습니다.',
     attachments: Array.isArray(item.attachments) ? item.attachments : [],
     referrers: Array.isArray(item.referrers) ? item.referrers : [],
-    reviewers: Array.isArray(item.reviewers) ? item.reviewers : [],
     department: item.department || '-',
     isDrafter: true,
-    canReview: false,
     statusClass: getStatusClass(item.status)
   };
   isModalOpen.value = true;
@@ -87,7 +85,7 @@ const handleRedraft = (item) => {
     <header class="page-header">
       <div class="header-content">
         <h1 class="page-title">전자 결재 현황</h1>
-        <p class="page-subtitle">본인이 기안자/결재자/검토자로 포함된 문서의 결재 진행 상태를 확인합니다.</p>
+        <p class="page-subtitle">본인이 기안자/결재자로 포함된 문서의 결재 진행 상태를 확인합니다.</p>
       </div>
 
       <div class="search-box">

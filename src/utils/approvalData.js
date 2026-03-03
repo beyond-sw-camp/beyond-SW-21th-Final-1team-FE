@@ -177,7 +177,7 @@ export const mockApprovalStatusList = [
         approvalLine: [
             { name: '윤도현', position: '대리', status: '기안', date: '2026-02-21' },
             { name: '최유진', position: '과장', status: '승인', date: '2026-02-21' },
-            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '민윤기', position: '과장', status: '대기', date: '' },
             { name: '정수진', position: '이사', status: '대기', date: '' }
         ]
     },
@@ -228,6 +228,19 @@ export const mockPendingApprovals = [
     { id: 5, title: '긴급 서버대응 연장근무 신청', templateName: '연장근무', drafter: '김철수', draftDate: '02-24', isNew: false, currentStep: 1, currentApprover: '홍길동 사원' }
 ];
 
+export const mockMainApprovalDocuments = [
+    { id: 'MAIN-001', docId: 'ING-2026-003', type: 'pending', title: 'QA 배포 지원 연장근무 신청', who: '윤도현', date: '2026-02-22' },
+    { id: 'MAIN-002', docId: 'ING-2026-005', type: 'pending', title: '월말 점검 외근 신청', who: '박민수', date: '2026-02-20' },
+    { id: 'MAIN-003', docId: 'ING-2026-004', type: 'pending', title: '개발2팀 유연근무 검토 요청', who: '민윤기', date: '2026-02-21' },
+    { id: 'MAIN-004', docId: 'ISS-2026-002', type: 'pending', title: '긴급 서버대응 연장근무 신청', who: '김철수', date: '2026-02-18' },
+    { id: 'MAIN-005', docId: 'ISS-2026-004', type: 'pending', title: '복직 후 근무전환 신청', who: '홍길동', date: '2026-02-16' },
+    { id: 'MAIN-006', docId: 'ING-2026-001', type: 'progress', title: '3월 1주차 재택 유연근무 신청', who: '홍길동', date: '2026-02-24' },
+    { id: 'MAIN-007', docId: 'ING-2026-002', type: 'progress', title: '부산 고객사 방문 출장 신청', who: '홍길동', date: '2026-02-23' },
+    { id: 'MAIN-008', docId: 'CMP-2026-001', type: 'progress', title: '상반기 교육 참석 출장 신청', who: '박민수', date: '2026-02-14' },
+    { id: 'MAIN-009', docId: 'CMP-2026-002', type: 'progress', title: '복직 후 근무전환 신청', who: '홍길동', date: '2026-02-13' },
+    { id: 'MAIN-010', docId: 'CMP-2026-005', type: 'progress', title: '3월 연차 사용 계획', who: '이영희', date: '2026-02-10' }
+];
+
 export const mockMyDrafts = [
     { id: 1, title: '3월 1주차 재택 유연근무 신청', currentApprover: '최유진 과장', status: '진행', approverInitial: '최' },
     { id: 2, title: '부산 고객사 방문 출장 신청', currentApprover: '박민수 차장', status: '진행', approverInitial: '박' },
@@ -256,7 +269,7 @@ export const mockReviewList = [
         approvalLine: [
             { name: '윤도현', position: '대리', status: '기안', date: '2026-02-24' },
             { name: '최유진', position: '과장', status: '승인', date: '2026-02-24' },
-            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '민윤기', position: '과장', status: '대기', date: '' },
             { name: '정수진', position: '이사', status: '대기', date: '' }
         ]
     },
@@ -412,7 +425,7 @@ export const mockApprovalBox = [
         approvalLine: [
             { name: '윤도현', position: '대리', status: '기안', date: '2026-02-22' },
             { name: '최유진', position: '과장', status: '승인', date: '2026-02-22' },
-            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '민윤기', position: '과장', status: '대기', date: '' },
             { name: '정수진', position: '이사', status: '대기', date: '' }
         ]
     },

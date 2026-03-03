@@ -51,32 +51,6 @@
       </div>
     </div>
 
-    <div v-if="normalizedReviewerLine.length > 0" class="reviewer-line-section">
-      <div class="approval-line-container reviewer-line-container">
-        <div
-          v-for="(step, index) in normalizedReviewerLine"
-          :key="`review-${index}`"
-          class="approval-box reviewer-approval-box"
-        >
-          <div class="box-header">검토자 {{ index + 1 }}</div>
-          <div class="box-content">
-            <div class="signature">
-              <div v-if="step.status === '확인'" class="real-stamp">
-                <div class="stamp-inner" :class="{ 'vertical': (step.name || '').length === 3, 'grid-2x2': (step.name || '').length === 4 }">
-                  <span class="char" v-for="(c, idx) in (step.name || '')" :key="idx">{{ c }}</span>
-                </div>
-              </div>
-              <div class="signature-text">
-                <span class="name">{{ step.name }}</span>
-                <span class="position">{{ step.position }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="box-date">{{ shouldShowApprovalDate(step) ? formatShortDate(step.date) : '' }}</div>
-        </div>
-      </div>
-    </div>
-
     <div v-if="item.referrers && item.referrers.length > 0" class="referrer-section">
       <span class="section-label">참조:</span>
       <div class="referrer-list">
@@ -114,7 +88,15 @@
     <div v-if="item.attachments && item.attachments.length > 0" class="attachments-area">
       <span class="label">첨부파일</span>
       <div class="file-list">
-        <span v-for="file in item.attachments" :key="file" class="file-tag">📄 {{ file }}</span>
+        <button
+          v-for="file in item.attachments"
+          :key="file"
+          type="button"
+          class="file-tag"
+          @click="downloadAttachment(file)"
+        >
+          📄 {{ typeof file === 'string' ? file : (file?.name || '첨부파일') }}
+        </button>
       </div>
     </div>
 
@@ -155,38 +137,6 @@ const formalTitle = computed(() => {
   return title.split('').join('  ');
 });
 
-const normalizedReviewers = computed(() => {
-  const reviewers = props.item.reviewers;
-  if (!Array.isArray(reviewers)) return [];
-  return reviewers.map((reviewer) => {
-    if (typeof reviewer === 'string') return reviewer;
-    if (reviewer && reviewer.name) return `${reviewer.name}${reviewer.position ? ` (${reviewer.position})` : ''}`;
-    return '';
-  }).filter(Boolean);
-});
-
-const normalizedReviewerLine = computed(() => {
-  if (!Array.isArray(props.item.reviewers)) return [];
-  const reviewerDefaultDate = (props.item.reviewDate || props.item.reviewedDate || props.item.date || props.item.draftDate || '').split(' ')[0] || '';
-
-  return props.item.reviewers
-    .map((reviewer) => {
-      if (typeof reviewer === 'object' && reviewer !== null) {
-        return {
-          name: reviewer.name || '',
-          position: reviewer.position || '',
-          status: reviewer.status || '대기',
-          date: reviewer.date || reviewerDefaultDate
-        };
-      }
-
-      const normalized = String(reviewer).replace(/[()]/g, '').trim();
-      const [name, position] = normalized.split(' ');
-      return { name: name || '', position: position || '', status: '대기', date: '' };
-    })
-    .filter((step) => step.name);
-});
-
 const normalizedApprovalLine = computed(() => {
   const baseLine = Array.isArray(props.item.approvalLine) ? [...props.item.approvalLine] : [];
   const firstStep = baseLine[0];
@@ -212,11 +162,46 @@ const shouldShowApprovalDate = (step) => {
 
 const formatShortDate = (dateStr) => {
   if (!dateStr) return '';
-  const parts = dateStr.split('-');
+  const dateOnly = String(dateStr).split(' ')[0].split('T')[0];
+  const parts = dateOnly.split('-');
   if (parts.length === 3) {
     return `${parts[1]}. ${parts[2]}.`;
   }
-  return dateStr;
+  return dateOnly;
+};
+
+const triggerDownload = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || 'attachment';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const downloadAttachment = async (file) => {
+  const fileName = typeof file === 'string' ? file : (file?.name || 'attachment.txt');
+  const rawUrl = typeof file === 'object' ? (file?.url || file?.path || '') : '';
+  const encodedName = encodeURIComponent(fileName);
+  const candidates = [rawUrl, `/attachments/${encodedName}`, `/files/${encodedName}`].filter(Boolean);
+
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      triggerDownload(blob, fileName);
+      return;
+    } catch (error) {
+      // Fallback to mock download below.
+    }
+  }
+
+  const fallbackText = `첨부파일: ${fileName}\n실서버 연동 전 목데이터 다운로드입니다.`;
+  const blob = new Blob([fallbackText], { type: 'text/plain;charset=utf-8' });
+  triggerDownload(blob, fileName.endsWith('.txt') ? fileName : `${fileName}.txt`);
 };
 </script>
 
@@ -277,21 +262,6 @@ const formatShortDate = (dateStr) => {
 .approval-line-container {
   display: flex;
   gap: 4px;
-}
-
-.reviewer-line-section {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
-}
-
-.reviewer-line-container {
-  justify-content: flex-end;
-}
-
-.reviewer-approval-box .box-header {
-  background: #eef8ff;
-  color: #1e4e7a;
 }
 
 .approval-box {
@@ -483,6 +453,15 @@ const formatShortDate = (dateStr) => {
   border: 1px solid #ddd;
   padding: 2px 8px;
   border-radius: 4px;
+  cursor: pointer;
+  color: #334155;
+  font-size: 0.82rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.file-tag:hover {
+  background: #eef6ff;
+  border-color: #cdddf6;
 }
 
 .reject-display {

@@ -15,12 +15,12 @@
         @click-item="openDetail"
       />
       
-      <!-- In Progress -->
+      <!-- Received -->
       <DashboardCard 
-        title="처리중인 문서함" 
-        :items="inProgressItems" 
+        title="수신 문서함" 
+        :items="receivedItems" 
         count-label="건"
-        link-type="ing"
+        link-type="received"
         @click-item="openDetail"
       />
 
@@ -91,7 +91,6 @@ const currentUser = getCurrentApprovalUser();
 const visibleDocuments = computed(() => allDocuments.value.filter((doc) => isUserRelatedApprovalDocument(doc, currentUser)));
 const drafterDocuments = computed(() => allDocuments.value.filter((doc) => isCurrentUserDrafterDocument(doc, currentUser)));
 const totalItems = computed(() => visibleDocuments.value.slice(0, 10));
-const inProgressItems = computed(() => drafterDocuments.value.filter(d => d.status === '진행중').slice(0, 10));
 const issueItems = computed(() => visibleDocuments.value.filter(d => d.status === '반려' || d.status === '보류').slice(0, 10));
 const completedItems = computed(() => visibleDocuments.value.filter(d => d.status === '완료').slice(0, 10));
 const tempItems = computed(() => drafterDocuments.value.filter(d => d.status === '임시저장').slice(0, 10));
@@ -102,7 +101,27 @@ const isReferenceDocumentForCurrentUser = (doc) => {
   return doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser));
 };
 
+const isReceivedDocumentForCurrentUser = (doc) => {
+  if (isCurrentUserDrafterDocument(doc, currentUser)) return false;
+  if (matchesCurrentApprovalUser(doc?.currentApprover, currentUser)) return true;
+
+  if (Array.isArray(doc?.approvalLine) && doc.approvalLine.some((line) => {
+    if (!line) return false;
+    return matchesCurrentApprovalUser(`${line.name || ''} ${line.position || ''}`, currentUser)
+      || matchesCurrentApprovalUser(line.name, currentUser);
+  })) {
+    return true;
+  }
+
+  if (Array.isArray(doc?.referrers) && doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser))) {
+    return true;
+  }
+
+  return false;
+};
+
 const referenceItems = computed(() => visibleDocuments.value.filter(isReferenceDocumentForCurrentUser).slice(0, 10));
+const receivedItems = computed(() => visibleDocuments.value.filter(isReceivedDocumentForCurrentUser).slice(0, 10));
 
 const isDetailOpen = ref(false);
 const selectedItem = ref({});

@@ -9,14 +9,20 @@
         >{{ tab.label }}</div>
       </div>
       <div class="icon-actions">
-        <span title="필터"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></span>
-        <span title="새로고침"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></span>
-        <span title="추가"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
+        <button type="button" class="icon-btn" :title="sortButtonTitle" @click="toggleSortOrder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        </button>
+        <button type="button" class="icon-btn" title="새로고침" @click="refreshItems">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        </button>
+        <button type="button" class="icon-btn" title="추가" @click="goToDraft">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </button>
       </div>
     </div>
     <div class="card-body" style="display:flex;flex-direction:column;flex:1">
       <div style="flex:1">
-        <div v-for="(item, i) in items" :key="i" class="approval-item">
+        <div v-for="item in visibleItems" :key="item.id" class="approval-item" @click="openDetail(item)">
           <div class="approval-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
@@ -30,28 +36,88 @@
         </div>
       </div>
       <div class="approval-footer">
-        <a href="#">전체보기 →</a>
+        <button type="button" class="all-view-btn" @click="goToStatus">전체보기 →</button>
       </div>
     </div>
   </div>
+  <ApprovalDetailModal
+    :is-open="isDetailOpen"
+    :item="selectedItem"
+    @close="isDetailOpen = false"
+    @action="handleModalAction"
+  />
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router';
+import ApprovalDetailModal from '@/views/approval/components/ApprovalDetailModal.vue';
+import { findApprovalDocument, mockMainApprovalDocuments } from '@/utils/approvalData';
 
-const activeTab = ref('pending')
-const tabs = [
-  { key: 'pending', label: '미결문서 18건' },
-  { key: 'progress', label: '진행문서 8건' },
-]
+const router = useRouter();
+const activeTab = ref('pending');
+const sortOrder = ref('desc');
+const sourceItems = ref([...mockMainApprovalDocuments]);
+const isDetailOpen = ref(false);
+const selectedItem = ref({});
 
-// 더미 데이터 (추후 API 연결)
-const items = [
-  { title: '휴가 신청서 이연 월차 외', who: '김서연', date: '2023.03.03' },
-  { title: '출장 보고서 (해외)', who: 'Steve', date: '2023.03.03' },
-  { title: '출장 보고서 (해외)', who: 'Kalan', date: '2023.03.03' },
-  { title: '법인카드 상신', who: '강민준', date: '2023.03.02' },
-]
+const pendingCount = computed(() => sourceItems.value.filter((item) => item.type === 'pending').length);
+const progressCount = computed(() => sourceItems.value.filter((item) => item.type === 'progress').length);
+const tabs = computed(() => ([
+  { key: 'pending', label: `결재 대기 문서 ${pendingCount.value}건` },
+  { key: 'progress', label: `결재 진행 문서 ${progressCount.value}건` },
+]));
+
+const sortButtonTitle = computed(() => sortOrder.value === 'desc' ? '정렬: 최신순' : '정렬: 오래된순');
+
+const visibleItems = computed(() => {
+  const filtered = sourceItems.value.filter((item) => item.type === activeTab.value);
+  return [...filtered].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return sortOrder.value === 'desc' ? dateB - dateA : dateA - dateB;
+  });
+});
+
+const toggleSortOrder = () => {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc';
+};
+
+const refreshItems = () => {
+  sourceItems.value = [...mockMainApprovalDocuments];
+};
+
+const goToDraft = () => {
+  router.push('/approval/draft');
+};
+
+const goToStatus = () => {
+  router.push('/approval/status');
+};
+
+const openDetail = (item) => {
+  const matched = findApprovalDocument(item.docId, 'box');
+  selectedItem.value = matched || {
+    id: item.docId || item.id,
+    title: item.title,
+    drafter: item.who,
+    date: item.date,
+    status: item.type === 'pending' ? '진행중' : '완료',
+    category: '-',
+    content: '상세 본문 데이터가 없습니다.',
+    attachments: []
+  };
+  isDetailOpen.value = true;
+};
+
+const handleModalAction = (action) => {
+  if (action.type === 'redraft' || action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
+  } else if (action.type === 'review') {
+    router.push({ name: 'approval-review' });
+  }
+  isDetailOpen.value = false;
+};
 </script>
 
 <style scoped>
@@ -59,6 +125,7 @@ const items = [
 .approval-item{
   display:flex;align-items:center;gap:10px;
   padding:10px 0;border-bottom:1px solid var(--gray100);
+  cursor:pointer;
 }
 .approval-item:last-child{border-bottom:none}
 .approval-icon{
@@ -70,6 +137,17 @@ const items = [
 .approval-footer{
   text-align:center;padding-top:10px;border-top:1px solid var(--gray100);margin-top:4px;
 }
-.approval-footer a{font-size:0.8rem;color:var(--gray500)}
-.approval-footer a:hover{color:var(--primary)}
+.all-view-btn{
+  border:none;background:transparent;cursor:pointer;
+  font-size:0.8rem;color:var(--gray500)
+}
+.all-view-btn:hover{color:var(--primary)}
+.icon-btn{
+  border:none;background:transparent;cursor:pointer;padding:2px;
+  display:inline-flex;align-items:center;justify-content:center;color:inherit;
+}
+.icon-btn:hover{color:var(--primary)}
+.tab-pill{
+  cursor:pointer;
+}
 </style>

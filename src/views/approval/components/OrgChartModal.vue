@@ -61,9 +61,8 @@
         <div class="panel selection-panel">
           <div class="panel-header">
             <h4>
-              {{ mode === 'approval' ? '결재선' : mode === 'reviewer' ? '검토자' : '참조자' }}
-              <span class="count" v-if="mode === 'referrer'">({{ localSelection.length }}/10)</span>
-              <span class="count" v-if="mode === 'reviewer'">({{ localSelection.length }}/5)</span>
+              {{ mode === 'approval' ? '결재선' : mode === 'receiver' ? '수신자' : '참조자' }}
+              <span class="count" v-if="mode === 'receiver' || mode === 'referrer'">({{ localSelection.length }}/10)</span>
             </h4>
             <button class="clear-all" @click="localSelection = []">전체 해제</button>
           </div>
@@ -146,7 +145,7 @@ watch(() => props.isOpen, (newVal) => {
 
 const title = computed(() => {
   if (props.mode === 'approval') return '결재선 설정';
-  if (props.mode === 'reviewer') return '검토자 설정';
+  if (props.mode === 'receiver') return '수신자 설정';
   return '참조자 설정';
 });
 
@@ -158,12 +157,8 @@ const selectUser = (user) => {
   if (index !== -1) {
     removeUser(index);
   } else {
-    if (props.mode === 'referrer' && localSelection.value.length >= 10) {
-      alert('참조자는 최대 10명까지 지정할 수 있습니다.');
-      return;
-    }
-    if (props.mode === 'reviewer' && localSelection.value.length >= 5) {
-      alert('검토자는 최대 5명까지 지정할 수 있습니다.');
+    if ((props.mode === 'receiver' || props.mode === 'referrer') && localSelection.value.length >= 10) {
+      alert(props.mode === 'receiver' ? '수신자는 최대 10명까지 지정할 수 있습니다.' : '참조자는 최대 10명까지 지정할 수 있습니다.');
       return;
     }
     localSelection.value.push(user);

@@ -218,6 +218,10 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
   flex: 1;
 }
 
+.main-grid.single-section {
+  grid-template-columns: 1fr;
+}
+
 /* Stat Cards */
 .stat-card {
   background: white;

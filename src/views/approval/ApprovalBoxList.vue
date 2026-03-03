@@ -124,10 +124,30 @@ const isReferenceDocumentForCurrentUser = (doc) => {
   return doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser));
 };
 
+const isReceivedDocumentForCurrentUser = (doc) => {
+  if (isCurrentUserDrafterDocument(doc, currentUser)) return false;
+  if (matchesCurrentApprovalUser(doc?.currentApprover, currentUser)) return true;
+
+  if (Array.isArray(doc?.approvalLine) && doc.approvalLine.some((line) => {
+    if (!line) return false;
+    return matchesCurrentApprovalUser(`${line.name || ''} ${line.position || ''}`, currentUser)
+      || matchesCurrentApprovalUser(line.name, currentUser);
+  })) {
+    return true;
+  }
+
+  if (Array.isArray(doc?.referrers) && doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser))) {
+    return true;
+  }
+
+  return false;
+};
+
 const pageTitle = computed(() => {
   switch (currentType.value) {
     case 'all': return '전체 문서함';
-    case 'ing': return '처리중인 문서함';
+    case 'received': return '수신 문서함';
+    case 'ing': return '수신 문서함';
     case 'issue': return '보류/반려 문서함';
     case 'completed': return '완료 문서함';
     case 'temp': return '임시 보관함';
@@ -139,6 +159,9 @@ const pageTitle = computed(() => {
 const pageSubtitle = computed(() => {
   if (currentType.value === 'reference') {
     return '참조자로 지정된 문서를 빠르게 확인할 수 있습니다.';
+  }
+  if (currentType.value === 'received' || currentType.value === 'ing') {
+    return '내가 결재/참조로 수신한 문서를 확인할 수 있습니다.';
   }
   return `${pageTitle.value}의 모든 문서를 조회합니다.`;
 });
@@ -168,7 +191,7 @@ const baseList = computed(() => {
   let list = [...visibleDocuments.value];
   
   // Type filtering
-  if (currentType.value === 'ing') list = drafterDocuments.value.filter(d => d.status === '진행중');
+  if (currentType.value === 'received' || currentType.value === 'ing') list = list.filter(isReceivedDocumentForCurrentUser);
   else if (currentType.value === 'issue') list = list.filter(d => d.status === '반려' || d.status === '보류');
   else if (currentType.value === 'completed') list = list.filter(d => d.status === '완료');
   else if (currentType.value === 'temp') list = drafterDocuments.value.filter(d => d.status === '임시저장');
