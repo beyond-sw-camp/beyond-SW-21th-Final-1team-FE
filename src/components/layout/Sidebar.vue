@@ -319,7 +319,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePerformanceStore } from '@/store/performance'
 import { AUTH_KEYS } from '@/utils/auth'
 import BaseModal from '@/components/common/BaseModal.vue'
-import { REVIEW_FLOW_ENABLED } from '@/views/approval/utils/featureFlags'
 
 const router = useRouter()
 const route = useRoute()
@@ -677,16 +676,14 @@ const salaryMenus = [
 const approvalMenus = computed(() => {
   const topMenus = [
     { label: '전자 결재 기안', icon: PlusIcon, route: '/approval/draft' },
-    { label: '전자 결재 현황', icon: SearchIcon, route: '/approval/status' }
+    { label: '전자 결재 현황', icon: SearchIcon, route: '/approval/status' },
+    { label: '전자 결재 검토', icon: CheckIcon, route: '/approval/review' }
   ]
-  if (REVIEW_FLOW_ENABLED) {
-    topMenus.push({ label: '전자 결재 검토', icon: CheckIcon, route: '/approval/review' })
-  }
 
   const boxMenu = { label: '전자 결재 문서함', icon: FolderIcon, route: '/approval/box' }
   const boxSubMenus = [
     { label: '전체 문서함', route: '/approval/box/all', routePrefix: '/approval/box/all', isSub: true },
-    { label: '처리중인 문서함', route: '/approval/box/ing', routePrefix: '/approval/box/ing', isSub: true },
+    { label: '수신 문서함', route: '/approval/box/received', routePrefix: '/approval/box/received', isSub: true },
     { label: '보류/반려 문서함', route: '/approval/box/issue', routePrefix: '/approval/box/issue', isSub: true },
     { label: '완료 문서함', route: '/approval/box/completed', routePrefix: '/approval/box/completed', isSub: true },
     { label: '임시 보관함', route: '/approval/box/temp', routePrefix: '/approval/box/temp', isSub: true },

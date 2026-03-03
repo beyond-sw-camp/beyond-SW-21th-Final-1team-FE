@@ -114,7 +114,7 @@ const handleModalAction = (action) => {
   if (action.type === 'redraft' || action.type === 'draft') {
     router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
   } else if (action.type === 'review') {
-    router.push('/approval/status');
+    router.push({ name: 'approval-review' });
   }
   isDetailOpen.value = false;
 };

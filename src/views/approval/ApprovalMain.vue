@@ -4,7 +4,7 @@
     <!-- Top Summary Cards -->
     <div class="stats-grid">
       <!-- 결재 대기 -->
-      <div v-if="isReviewFlowEnabled" class="stat-card group" @click="$router.push('/approval/review')">
+      <div class="stat-card group" @click="$router.push('/approval/review')">
         <div class="card-bg red-bg"></div>
         <div class="card-content">
           <h3 class="stat-label">결재 대기</h3>
@@ -52,9 +52,9 @@
     </div>
 
     <!-- Main Content Grid -->
-    <div class="main-grid" :class="{ 'single-section': !isReviewFlowEnabled }">
+    <div class="main-grid">
       <!-- Recent Pending List -->
-      <section v-if="isReviewFlowEnabled" class="grid-section">
+      <section class="grid-section">
         <div class="section-header">
           <h3 class="section-title">
             <span class="dot red-dot"></span> 결재 대기 문서
@@ -130,10 +130,7 @@
 </template>
 
 <script setup>
-import { REVIEW_FLOW_ENABLED } from './utils/featureFlags';
 import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
-
-const isReviewFlowEnabled = REVIEW_FLOW_ENABLED;
 </script>
 
 <style scoped>

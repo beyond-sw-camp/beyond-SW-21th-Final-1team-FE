@@ -29,16 +29,16 @@
         <div v-if="!showRejectReason" class="footer-actions">
           <div class="primary-actions">
             <button class="t-btn t-btn-primary" @click="handleAction('approve')">
-              <span class="btn-icon">✓</span> {{ isReviewerMode ? '검토 승인' : '승인 처리' }}
+              <span class="btn-icon">✓</span> 승인
             </button>
-            <button v-if="!isReviewerMode" class="t-btn t-btn-danger-ghost" @click="showRejectReason = true">
+            <button class="t-btn t-btn-danger-ghost" @click="showRejectReason = true">
               반려
             </button>
-            <button v-if="!isReviewerMode" class="t-btn t-btn-warning-ghost" @click="handleAction('hold')">
-              보류
-            </button>
-            <button v-if="!isReviewerMode && item.canFinalize" class="t-btn t-btn-purple-ghost" @click="handleAction('finalize')">
+            <button class="t-btn t-btn-purple-ghost" @click="handleAction('finalize')">
               전결
+            </button>
+            <button class="t-btn t-btn-warning-ghost" @click="handleAction('hold')">
+              보류
             </button>
           </div>
           <button class="t-btn t-btn-secondary" @click="close">창 닫기</button>
@@ -49,7 +49,7 @@
             <button class="t-btn t-btn-danger" @click="handleAction('reject')">
               반려 완료
             </button>
-            <button class="t-btn t-btn-secondary" @click="showRejectReason = false">
+            <button class="t-btn t-btn-secondary" @click="cancelReject">
               취소
             </button>
           </div>
@@ -60,9 +60,8 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch } from 'vue';
 import ApprovalDocumentPaper from './ApprovalDocumentPaper.vue';
-import { mockUsers } from '@/utils/approvalData';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -76,17 +75,6 @@ const emit = defineEmits(['close', 'action']);
 
 const showRejectReason = ref(false);
 const rejectReason = ref('');
-const currentUser = mockUsers.find((user) => user.id === 'u1') || { name: '' };
-
-const isReviewerMode = computed(() => {
-  if (!Array.isArray(props.item?.reviewers)) return false;
-  return props.item.reviewers.some((reviewer) => {
-    if (typeof reviewer === 'string') {
-      return reviewer.includes(currentUser.name);
-    }
-    return reviewer?.name === currentUser.name;
-  });
-});
 
 watch(() => props.isOpen, (newVal) => {
   if (!newVal) {
@@ -97,6 +85,11 @@ watch(() => props.isOpen, (newVal) => {
 
 const close = () => {
   emit('close');
+};
+
+const cancelReject = () => {
+  showRejectReason.value = false;
+  rejectReason.value = '';
 };
 
 const handleAction = (type) => {
@@ -111,11 +104,7 @@ const handleAction = (type) => {
   
   switch(type) {
     case 'approve':
-      if (isReviewerMode.value) {
-        message = `검토 승인 처리되었습니다. 결재선으로 전달됩니다. (${reviewerName} ${reviewerPos})`;
-      } else {
-        message = props.item.step === 3 ? `해당 결재건이 최종 승인되었습니다. (${reviewerName} ${reviewerPos})` : `${props.item.step}차 승인 되었습니다. (${reviewerName} ${reviewerPos})`;
-      }
+      message = props.item.step === 3 ? `해당 결재건이 최종 승인되었습니다. (${reviewerName} ${reviewerPos})` : `${props.item.step}차 승인 되었습니다. (${reviewerName} ${reviewerPos})`;
       break;
     case 'reject':
       message = `반려 되었습니다. 사유 : ${rejectReason.value} (${reviewerName} ${reviewerPos})`;

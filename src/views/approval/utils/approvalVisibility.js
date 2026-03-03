@@ -43,15 +43,15 @@ export const isUserRelatedApprovalDocument = (doc, currentUser) => {
   if (matchesCurrentApprovalUser(doc.drafter, currentUser)) return true;
   if (matchesCurrentApprovalUser(doc.currentApprover, currentUser)) return true;
 
-  if (Array.isArray(doc.reviewers) && doc.reviewers.some((reviewer) => matchesCurrentApprovalUser(reviewer, currentUser))) {
-    return true;
-  }
-
   if (Array.isArray(doc.approvalLine) && doc.approvalLine.some((line) => {
     if (!line) return false;
     if (matchesCurrentApprovalUser(line.name, currentUser)) return true;
     return matchesCurrentApprovalUser(`${line.name} ${line.position || ''}`, currentUser);
   })) {
+    return true;
+  }
+
+  if (Array.isArray(doc.referrers) && doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser))) {
     return true;
   }
 

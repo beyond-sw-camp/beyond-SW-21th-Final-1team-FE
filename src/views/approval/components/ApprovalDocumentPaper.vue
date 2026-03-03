@@ -51,32 +51,6 @@
       </div>
     </div>
 
-    <div v-if="showReviewerLine" class="reviewer-line-section">
-      <div class="approval-line-container reviewer-line-container">
-        <div
-          v-for="(step, index) in normalizedReviewerLine"
-          :key="`review-${index}`"
-          class="approval-box reviewer-approval-box"
-        >
-          <div class="box-header">검토자 {{ index + 1 }}</div>
-          <div class="box-content">
-            <div class="signature">
-              <div v-if="step.status === '확인'" class="real-stamp">
-                <div class="stamp-inner" :class="{ 'vertical': (step.name || '').length === 3, 'grid-2x2': (step.name || '').length === 4 }">
-                  <span class="char" v-for="(c, idx) in (step.name || '')" :key="idx">{{ c }}</span>
-                </div>
-              </div>
-              <div class="signature-text">
-                <span class="name">{{ step.name }}</span>
-                <span class="position">{{ step.position }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="box-date">{{ shouldShowApprovalDate(step) ? formatShortDate(step.date) : '' }}</div>
-        </div>
-      </div>
-    </div>
-
     <div v-if="item.referrers && item.referrers.length > 0" class="referrer-section">
       <span class="section-label">참조:</span>
       <div class="referrer-list">
@@ -135,7 +109,6 @@
 
 <script setup>
 import { computed } from 'vue';
-import { REVIEW_FLOW_ENABLED } from '../utils/featureFlags';
 
 const props = defineProps({
   item: {
@@ -163,40 +136,6 @@ const formalTitle = computed(() => {
 
   return title.split('').join('  ');
 });
-
-const normalizedReviewers = computed(() => {
-  const reviewers = props.item.reviewers;
-  if (!Array.isArray(reviewers)) return [];
-  return reviewers.map((reviewer) => {
-    if (typeof reviewer === 'string') return reviewer;
-    if (reviewer && reviewer.name) return `${reviewer.name}${reviewer.position ? ` (${reviewer.position})` : ''}`;
-    return '';
-  }).filter(Boolean);
-});
-
-const normalizedReviewerLine = computed(() => {
-  if (!Array.isArray(props.item.reviewers)) return [];
-  const reviewerDefaultDate = (props.item.reviewDate || props.item.reviewedDate || props.item.date || props.item.draftDate || '').split(' ')[0] || '';
-
-  return props.item.reviewers
-    .map((reviewer) => {
-      if (typeof reviewer === 'object' && reviewer !== null) {
-        return {
-          name: reviewer.name || '',
-          position: reviewer.position || '',
-          status: reviewer.status || '대기',
-          date: reviewer.date || reviewerDefaultDate
-        };
-      }
-
-      const normalized = String(reviewer).replace(/[()]/g, '').trim();
-      const [name, position] = normalized.split(' ');
-      return { name: name || '', position: position || '', status: '대기', date: '' };
-    })
-    .filter((step) => step.name);
-});
-
-const showReviewerLine = computed(() => REVIEW_FLOW_ENABLED && normalizedReviewerLine.value.length > 0);
 
 const normalizedApprovalLine = computed(() => {
   const baseLine = Array.isArray(props.item.approvalLine) ? [...props.item.approvalLine] : [];
@@ -323,21 +262,6 @@ const downloadAttachment = async (file) => {
 .approval-line-container {
   display: flex;
   gap: 4px;
-}
-
-.reviewer-line-section {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
-}
-
-.reviewer-line-container {
-  justify-content: flex-end;
-}
-
-.reviewer-approval-box .box-header {
-  background: #eef8ff;
-  color: #1e4e7a;
 }
 
 .approval-box {

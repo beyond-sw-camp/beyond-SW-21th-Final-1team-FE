@@ -26,10 +26,9 @@
           <template v-if="isDrafter">
             <button v-if="item.status === '진행중'" class="btn btn-danger-ghost" @click="handleAction('cancel')">기안 취소</button>
             <button v-if="item.status === '반려'" class="btn btn-primary" @click="handleAction('redraft')">재상신 하기</button>
-            <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>
             <button v-if="item.status === '임시저장'" class="btn btn-primary" @click="handleAction('draft')">상신</button>
+            <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>
           </template>
-          <!-- If logic to check if user is approver exists, show Review button -->
           <button v-if="canReview" class="btn btn-indigo" @click="handleAction('review')">결재 검토</button>
         </div>
         <button class="btn btn-secondary" @click="close">닫기</button>
@@ -42,7 +41,6 @@
 import { computed } from 'vue';
 import ApprovalDocumentPaper from './ApprovalDocumentPaper.vue';
 import { mockUsers } from '@/utils/approvalData';
-import { REVIEW_FLOW_ENABLED } from '../utils/featureFlags';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -62,7 +60,6 @@ const isDrafter = computed(() => {
 });
 
 const canReview = computed(() => {
-  if (!REVIEW_FLOW_ENABLED) return false;
   if (typeof props.item.canReview === 'boolean') return props.item.canReview;
   return props.item.status === '진행중' && !isDrafter.value;
 });
