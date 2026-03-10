@@ -36,11 +36,11 @@ const makeMember = (payload) => ({
 const mobile1Members = [
   makeMember({
     employeeId: '2402040001',
-    profileInitial: '세현',
-    name: '김세현',
+    profileInitial: '봉식',
+    name: '김봉식',
     extension: '1042',
     phone: '010-1234-5678',
-    email: 'sehyun.kim@rhight.co.kr',
+    email: 'bong@rhight.co.kr',
     duty: '팀장',
     job: '백엔드 개발자',
     position: '모바일1팀',
@@ -154,7 +154,7 @@ const mobile1Members = [
 
 export const hrCurrentUserMock = {
   employeeId: '2402040001',
-  name: '김세현',
+  name: '김봉식',
   role: 'TEAM_LEADER',
   teamNodeId: 'TEAM-MOBILE-1',
   teamName: '모바일1팀'

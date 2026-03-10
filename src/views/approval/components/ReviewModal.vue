@@ -29,16 +29,16 @@
         <div v-if="!showRejectReason" class="footer-actions">
           <div class="primary-actions">
             <button class="t-btn t-btn-primary" @click="handleAction('approve')">
-              <span class="btn-icon">✓</span> 승인 처리
+              <span class="btn-icon">✓</span> 승인
             </button>
             <button class="t-btn t-btn-danger-ghost" @click="showRejectReason = true">
               반려
             </button>
+            <button class="t-btn t-btn-purple-ghost" @click="handleAction('finalize')">
+              전결
+            </button>
             <button class="t-btn t-btn-warning-ghost" @click="handleAction('hold')">
               보류
-            </button>
-            <button v-if="item.canFinalize" class="t-btn t-btn-purple-ghost" @click="handleAction('finalize')">
-              전결
             </button>
           </div>
           <button class="t-btn t-btn-secondary" @click="close">창 닫기</button>
@@ -49,7 +49,7 @@
             <button class="t-btn t-btn-danger" @click="handleAction('reject')">
               반려 완료
             </button>
-            <button class="t-btn t-btn-secondary" @click="showRejectReason = false">
+            <button class="t-btn t-btn-secondary" @click="cancelReject">
               취소
             </button>
           </div>
@@ -85,6 +85,11 @@ watch(() => props.isOpen, (newVal) => {
 
 const close = () => {
   emit('close');
+};
+
+const cancelReject = () => {
+  showRejectReason.value = false;
+  rejectReason.value = '';
 };
 
 const handleAction = (type) => {
@@ -135,9 +140,9 @@ const handleAction = (type) => {
 
 .modal-content {
   background: white;
-  width: 720px;
+  width: 860px;
   max-width: 95%;
-  max-height: 90vh;
+  max-height: calc(100vh - 24px);
   border-radius: 24px;
   display: flex;
   flex-direction: column;
@@ -206,9 +211,32 @@ const handleAction = (type) => {
 }
 
 .modal-body {
-  padding: 0 40px 40px;
+  padding: 0 28px 20px;
   overflow-y: auto;
+  min-height: 0;
   flex: 1;
+  border-top: 1px solid #e5e7eb;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .info-grid {
@@ -352,6 +380,20 @@ const handleAction = (type) => {
   font-size: 0.95rem;
   transition: all 0.2s;
   background: #fffafa;
+}
+
+@media (max-height: 900px) {
+  .modal-header {
+    padding: 24px 28px 16px;
+  }
+
+  .modal-footer {
+    padding: 16px 28px;
+  }
+
+  .t-btn {
+    padding: 10px 16px;
+  }
 }
 
 .trendy-textarea:focus {

@@ -23,7 +23,7 @@ const employeeId = computed(() => route.params.employeeId || '-')
 </script>
 
 <style scoped>
-.manager-page { max-width: 1200px; }
+.manager-page { width: 100%; max-width: none; min-width: 0; }
 .breadcrumb { font-size: .78rem; color: var(--gray400); margin-bottom: 4px; }
 .page-card {
   margin-top: 12px;

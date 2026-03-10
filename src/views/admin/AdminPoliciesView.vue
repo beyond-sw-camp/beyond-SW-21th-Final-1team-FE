@@ -424,6 +424,7 @@ const savePolicy = () => {
 const removePolicy = (policyId) => {
   const target = hrPolicies.value.find((item) => item.id === policyId)
   if (!target) return
+  if (!window.confirm(`"${target.name}" 정책을 삭제하시겠습니까?`)) return
 
   appendHistory({
     policyType: target.policyType,
@@ -437,7 +438,7 @@ const removePolicy = (policyId) => {
 </script>
 
 <style scoped>
-.admin-page { max-width: 1200px; }
+.admin-page { width: 100%; max-width: none; min-width: 0; }
 
 .card {
   margin-top: 12px;

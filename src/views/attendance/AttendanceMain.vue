@@ -9,7 +9,7 @@
             <span class="icon-calendar">📅</span>
             <span>{{ currentDate }}</span>
           </div>
-          <span class="status-badge">근무 중</span>
+          <span class="status-badge" :class="workStatusClass">{{ workStatusLabel }}</span>
         </div>
         
         <div class="clock-display">
@@ -74,7 +74,7 @@
       <div class="card monthly-card" @click="$router.push('/attendance/record')">
         <div class="card-header-row">
           <span class="card-title">이번 달 근태 현황</span>
-          <span class="icon-arrow-right">
+          <span class="icon-arrow-right" @click.stop="$router.push('/attendance/vacation')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
           </span>
         </div>
@@ -146,14 +146,13 @@
             </div>
           </div>
 
-          <!-- Simple Calendar Grid (Mock) -->
           <div class="calendar-grid">
             <div class="cal-head">
               <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
             </div>
-            <!-- Week 1 -->
+            <!-- Week 1: Feb 1 is Sunday -->
             <div class="cal-week week-flex">
-              <div class="day other-month">1</div>
+              <div class="day sun">1</div>
               <div class="day">2</div>
               <div class="day">3</div>
               <div class="day">4</div>
@@ -167,17 +166,17 @@
               <div class="day">9</div>
               <div class="day has-schedule">
                 10
-                <div class="bar-blue">8h 15m</div>
+                <div class="bar-blue">8h 00m</div>
               </div>
               <div class="day has-schedule">
                 11
-                <div class="bar-blue">8h 15m</div>
+                <div class="bar-blue">8h 10m</div>
               </div>
               <div class="day has-schedule">
                 12
-                <div class="bar-blue">8h 15m</div>
+                <div class="bar-blue">8h 05m</div>
               </div>
-              <div class="day today">
+              <div class="day has-schedule">
                 13
                 <div class="bar-blue">8h 15m</div>
               </div>
@@ -188,22 +187,38 @@
               <div class="day sun">15</div>
               <div class="day has-schedule">
                 16
-                <div class="bar-blue">8h 15m</div>
+                <div class="bar-blue">8h 30m</div>
               </div>
               <div class="day has-schedule">
                 17
-                <div class="bar-blue">8h 15m</div>
+                <div class="bar-blue">8h 20m</div>
               </div>
-              <div class="day has-schedule">
+              <div class="day today has-schedule">
                 18
-                <div class="bar-orange">9h 28m</div>
+                <div class="bar-blue">Working</div>
               </div>
               <div class="day has-schedule">
                 19
-                 <div class="bar-blue">8h 15m</div>
+                <div class="bar-blue">Plan</div>
               </div>
               <div class="day">20</div>
               <div class="day sat">21</div>
+            </div>
+            <!-- Week 4 -->
+            <div class="cal-week week-flex">
+              <div class="day sun">22</div>
+              <div class="day">23</div>
+              <div class="day has-schedule">
+                24
+                <div class="bar-orange">Meeting</div>
+              </div>
+              <div class="day">25</div>
+              <div class="day">26</div>
+              <div class="day has-schedule">
+                27
+                <div class="bar-blue">Wrap-up</div>
+              </div>
+              <div class="day sat">28</div>
             </div>
           </div>
         </div>
@@ -215,6 +230,7 @@
         <div class="card quick-card">
           <div class="card-header-row mb-4">
             <span class="card-title">휴가 신청</span>
+            <span class="more-link" @click="$router.push('/attendance/vacation')">더보기</span>
           </div>
           <div class="quick-list">
             <div class="quick-item" @click="$router.push('/approval/draft')">
@@ -278,6 +294,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
+import { storeToRefs } from 'pinia'
 
 const store = useAttendanceStore()
 
@@ -294,24 +311,54 @@ const getApprStatusClass = (s) => ({ pending: 'warning', approved: 'success', re
 // -- Clock Logic --
 const currentDate = ref('')
 const currentTime = ref('')
-const checkInTime = ref('--:--')
-const checkOutTime = ref('--:--')
-const isCheckedIn = ref(false)
+const { checkInTime, checkOutTime } = storeToRefs(store)
+
+const isCheckedIn = computed(() => {
+  return !!checkInTime.value && !checkOutTime.value
+})
+
+const workStatusLabel = computed(() => {
+  if (isCheckedIn.value) return '근무 중'
+  if (checkOutTime.value) return '퇴근 완료'
+  return '출근 전'
+})
+
+const workStatusClass = computed(() => {
+  if (isCheckedIn.value) return 'working'
+  if (checkOutTime.value) return 'done'
+  return 'before'
+})
+
+const isLateCheckIn = (timeText) => {
+  if (!timeText) return false
+  const [h, m] = timeText.split(':').map(Number)
+  return h > 9 || (h === 9 && m > 0)
+}
 
 const handleCheckIn = () => {
   const now = new Date()
   const h = String(now.getHours()).padStart(2, '0')
   const m = String(now.getMinutes()).padStart(2, '0')
-  checkInTime.value = `${h}:${m}`
-  isCheckedIn.value = true
+  const checkIn = `${h}:${m}`
+  const status = isLateCheckIn(checkIn) ? 'late' : 'normal'
+  // New check-in should start a fresh work session.
+  store.setCheckOutTime(null)
+  store.setCheckInTime(checkIn)
+  store.upsertMyDailyAttendance({ date: now, checkIn, checkOut: null, status })
 }
 
 const handleCheckOut = () => {
   const now = new Date()
   const h = String(now.getHours()).padStart(2, '0')
   const m = String(now.getMinutes()).padStart(2, '0')
-  checkOutTime.value = `${h}:${m}`
-  isCheckedIn.value = false
+  const checkOut = `${h}:${m}`
+  store.setCheckOutTime(checkOut)
+  store.upsertMyDailyAttendance({
+    date: now,
+    checkIn: checkInTime.value,
+    checkOut,
+    status: isLateCheckIn(checkInTime.value) ? 'late' : 'normal'
+  })
 }
 
 const updateTime = () => {
@@ -397,13 +444,14 @@ onUnmounted(() => {
   color: var(--gray600);
 }
 .status-badge {
-  background: #E6F7ED; 
-  color: #00C853; 
   font-size: 0.9rem; 
   font-weight: 700; 
   padding: 4px 10px; 
   border-radius: 20px;
 }
+.status-badge.working { background: #E6F7ED; color: #00C853; }
+.status-badge.done { background: #E0E7FF; color: #3730A3; }
+.status-badge.before { background: #F3F4F6; color: #4B5563; }
 .clock-display {
   text-align: center;
   margin: 16px 0;
@@ -590,11 +638,13 @@ onUnmounted(() => {
 }
 .col-left {
   flex: 2;
+  order: 2; /* Move to right */
   display: flex;
   flex-direction: column;
 }
 .col-right {
   flex: 1;
+  order: 1; /* Move to left */
   display: flex;
   flex-direction: column;
   gap: 16px;

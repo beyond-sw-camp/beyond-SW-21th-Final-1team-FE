@@ -1,7 +1,12 @@
-<script setup>
-import { ref, computed, reactive, onMounted, onUnmounted } from 'vue';
+﻿<script setup>
+import { ref, computed, reactive, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { templates, mockUsers, mockApprovalLine, mockReferrers, mockApprovalBox } from '@/utils/approvalData';
+import {
+  templates,
+  mockUsers,
+  mockApprovalLine,
+  findApprovalDocument
+} from '@/utils/approvalData';
 import OrgChartModal from './components/OrgChartModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import { useRoute } from 'vue-router';
@@ -13,7 +18,7 @@ const activeTemplate = ref('vacation');
 const showTemplateMenu = ref(false);
 const isModalOpen = ref(false);
 const isConfirmModalOpen = ref(false);
-const modalMode = ref('approval'); // 'approval' | 'referrer'
+const modalMode = ref('approval'); // 'approval' | 'receiver' | 'referrer'
 const templateSelectorRef = ref(null);
 
 // Current User Mock
@@ -27,11 +32,17 @@ const docInfo = reactive({
   endDate: '',
   startTime: '09:00',
   endTime: '18:00',
+  workDate: '',
+  tripType: '외근',
+  destination: '',
+  leaveType: '육아휴직',
+  rtwDate: '',
   vacationType: '연차',
   attachments: []
 });
 
 const approvalLine = ref([]);
+const receivers = ref([]);
 const referrers = ref([]);
 
 // Derived State
@@ -51,10 +62,14 @@ const currentDateShort = now.toLocaleDateString('ko-KR', { month: '2-digit', day
 const contentPlaceholder = computed(() => {
   if (activeTemplate.value === 'reinstatement') return '복직 사유 및 계획을 입력하세요.';
   if (activeTemplate.value === 'leave') return '휴직 사유 및 연락처를 입력하세요.';
+  if (activeTemplate.value === 'businessTrip') return '외근/출장 목적, 방문처, 이동수단, 소요비용을 입력하세요.';
+  if (activeTemplate.value === 'overtime') return '연장근무 사유, 예상 작업시간, 완료 목표를 입력하세요.';
   return '내용을 입력하세요.\n\n1. 사유:\n2. 비상 연락망:\n3. 인수인계 사항:';
 });
 
 const vacationTypes = ['연차', '반차', '병가', '기타'];
+const leaveTypes = ['육아휴직', '질병휴직', '가족돌봄휴직'];
+const tripTypes = ['외근', '출장'];
 
 const calculateDays = computed(() => {
     if (!docInfo.startDate || !docInfo.endDate) return 0;
@@ -65,42 +80,91 @@ const calculateDays = computed(() => {
     return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
 });
 
+const templateByCategory = {
+  '휴가 신청서': 'vacation',
+  '유연근무 신청서': 'flexible',
+  '외근/출장 신청서': 'businessTrip',
+  '연장근무 신청서': 'overtime',
+  '휴직신청서': 'leave',
+  '복직신청서': 'reinstatement',
+  // Legacy categories for old mock documents
+  '품의서': 'overtime',
+  '보고서': 'businessTrip',
+  '기안서': 'businessTrip'
+};
+
 // Methods
 const loadTestData = () => {
-    approvalLine.value = [...mockApprovalLine];
-    referrers.value = [...mockReferrers];
+    approvalLine.value = activeTemplate.value === 'vacation' ? [] : [...mockApprovalLine];
+    receivers.value = [];
+    referrers.value = [];
     docInfo.title = `${currentTemplateName.value} - ${currentUser.name}`;
-    if(['vacation', 'flexible', 'leave'].includes(activeTemplate.value)) {
-        docInfo.startDate = currentDate;
-        docInfo.endDate = currentDate;
+    docInfo.content = '';
+    docInfo.attachments = [];
+
+    docInfo.workDate = currentDate;
+    docInfo.tripType = '외근';
+    docInfo.destination = '';
+    docInfo.leaveType = '육아휴직';
+    docInfo.rtwDate = currentDate;
+
+    if (['vacation', 'flexible', 'businessTrip', 'overtime', 'leave'].includes(activeTemplate.value)) {
+      docInfo.startDate = currentDate;
+      docInfo.endDate = currentDate;
+    } else {
+      docInfo.startDate = '';
+      docInfo.endDate = '';
     }
 };
 
-const loadFromData = (id) => {
-    const doc = mockApprovalBox.find(d => d.id === id);
-    if (!doc) return;
+const loadFromData = (id, source) => {
+    const doc = findApprovalDocument(id, source);
+    if (!doc) {
+      loadTestData();
+      return;
+    }
 
+    const category = doc.category || doc.templateName;
+    activeTemplate.value = templateByCategory[category] || 'businessTrip';
     docInfo.title = `[재상신] ${doc.title}`;
-    docInfo.content = doc.content;
-    if (doc.category === '기안서') activeTemplate.value = 'vacation'; // Default to vacation template for demo
-    else if (doc.category === '품의서') activeTemplate.value = 'expense';
-    else if (doc.category === '보고서') activeTemplate.value = 'report';
+    docInfo.content = doc.content || '';
+    docInfo.startDate = doc.startDate || '';
+    docInfo.endDate = doc.endDate || '';
+    docInfo.startTime = doc.startTime || '09:00';
+    docInfo.endTime = doc.endTime || '18:00';
+    docInfo.workDate = doc.workDate || doc.date || currentDate;
+    docInfo.tripType = doc.tripType || '외근';
+    docInfo.destination = doc.destination || '';
+    docInfo.leaveType = doc.leaveType || '육아휴직';
+    docInfo.rtwDate = doc.rtwDate || doc.date || currentDate;
 
     if (doc.approvalLine) {
       // Re-map approval line (original line minus current status)
-      approvalLine.value = doc.approvalLine.map(a => ({
-        id: Math.random().toString(36).substr(2, 9),
+      approvalLine.value = doc.approvalLine
+      .filter((a) => a.status !== '기안')
+      .map(a => ({
+        ...(mockUsers.find((u) => u.name === a.name && u.position === a.position) || {}),
+        id: mockUsers.find((u) => u.name === a.name && u.position === a.position)?.id || '',
         name: a.name,
         position: a.position,
-        department: '소속팀' // Mock
+        department: mockUsers.find((u) => u.name === a.name && u.position === a.position)?.department || '소속팀'
       }));
     }
-    
+
     if (doc.referrers) {
       referrers.value = doc.referrers.map(r => ({
         id: Math.random().toString(36).substr(2, 9),
         name: r.split(' ')[0],
         position: r.split(' ')[1] || '',
+        department: ''
+      }));
+    }
+
+    if (doc.receivers) {
+      receivers.value = doc.receivers.map((r) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        name: String(r).split(' ')[0],
+        position: String(r).split(' ')[1] || '',
         department: ''
       }));
     }
@@ -115,8 +179,9 @@ const handleClickOutside = (event) => {
 // Initialize with test data
 onMounted(() => {
     const fromId = route.query.from;
+    const source = route.query.source || 'box';
     if (fromId) {
-      loadFromData(fromId);
+      loadFromData(fromId, source);
     } else {
       loadTestData();
     }
@@ -143,10 +208,34 @@ const closeModal = () => {
   isModalOpen.value = false;
 };
 
+const getUserIdentityKey = (user) => {
+  if (!user) return '';
+  return String(user.employeeNo || user.empNo || user.id || `${user.name || ''}-${user.position || ''}`).trim();
+};
+
+const getDuplicateUsers = (sourceUsers, targetUsers) => {
+  const sourceKeySet = new Set((sourceUsers || []).map(getUserIdentityKey).filter(Boolean));
+  return (targetUsers || []).filter((user) => sourceKeySet.has(getUserIdentityKey(user)));
+};
+
 const handleModalConfirm = (selectedUsers) => {
   if (modalMode.value === 'approval') {
     approvalLine.value = selectedUsers;
+  } else if (modalMode.value === 'receiver') {
+    const duplicates = getDuplicateUsers(referrers.value, selectedUsers);
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map((user) => `${user.name}${user.position ? ` ${user.position}` : ''}`).join(', ');
+      alert(`수신자와 참조자는 중복될 수 없습니다.\n중복 인원: ${duplicateNames}`);
+      return;
+    }
+    receivers.value = selectedUsers;
   } else {
+    const duplicates = getDuplicateUsers(receivers.value, selectedUsers);
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map((user) => `${user.name}${user.position ? ` ${user.position}` : ''}`).join(', ');
+      alert(`수신자와 참조자는 중복될 수 없습니다.\n중복 인원: ${duplicateNames}`);
+      return;
+    }
     referrers.value = selectedUsers;
   }
 };
@@ -166,8 +255,58 @@ const submitApproval = () => {
 
 const finalizeSubmission = () => {
   alert(`[${currentTemplateName.value}] 기안이 상신되었습니다.\n결재 현황 페이지로 이동합니다.`);
-  router.push('/approval');
+  router.push('/approval/status');
 };
+
+const confirmMessage = computed(() => {
+  return '선택하신 결재선 정보로 기안서를 상신하시겠습니까?';
+});
+
+const reasonLabel = computed(() => {
+  if (['vacation', 'flexible', 'businessTrip', 'overtime', 'leave', 'reinstatement'].includes(activeTemplate.value)) {
+    return '사유';
+  }
+  return '내용';
+});
+
+const openDatePicker = (event) => {
+  const input = event?.target;
+  if (!input) return;
+  if (typeof input.showPicker === 'function') {
+    input.showPicker();
+    return;
+  }
+  input.focus();
+};
+
+watch(
+  () => [activeTemplate.value, docInfo.vacationType, docInfo.startDate],
+  ([template, vacationType, startDate]) => {
+    if (template === 'vacation' && vacationType === '반차') {
+      docInfo.endDate = startDate || '';
+    }
+  }
+);
+
+const vacationDurationLabel = computed(() => {
+  if (!docInfo.startDate || !docInfo.endDate) return '';
+
+  if (activeTemplate.value === 'vacation' && docInfo.vacationType === '반차') {
+    if (!docInfo.startTime || !docInfo.endTime) return '';
+    const [sh, sm] = docInfo.startTime.split(':').map(Number);
+    const [eh, em] = docInfo.endTime.split(':').map(Number);
+    const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
+    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) return `총 ${hours}시간 ${minutes}분`;
+    if (hours > 0) return `총 ${hours}시간`;
+    return `총 ${minutes}분`;
+  }
+
+  return `총 ${calculateDays.value}일`;
+});
 
 </script>
 
@@ -235,7 +374,12 @@ const finalizeSubmission = () => {
           </table>
 
           <!-- Approval Line -->
-          <div class="approval-line-container">
+          <div class="approval-line-panel">
+            <div class="approval-line-header">
+              <button type="button" class="btn-xs" @click="openModal('approval')">결재선 수정</button>
+            </div>
+
+            <div class="approval-line-container">
             <!-- Drafter (Fixed) -->
             <div class="approval-box">
               <div class="box-header">기안</div>
@@ -268,16 +412,24 @@ const finalizeSubmission = () => {
               </div>
               <div class="box-date"></div> <!-- Empty for pending approvers -->
             </div>
-
-            <!-- Add Button -->
-            <div class="approval-box add-box" @click="openModal('approval')">
-              <div class="box-header">결재선</div>
-              <div class="box-content add-btn">
-                <span>+</span>
-              </div>
             </div>
           </div>
         </div>
+
+        <!-- Receivers Section -->
+         <div class="referrer-section" v-if="receivers.length > 0">
+            <span class="section-label">수신:</span>
+            <div class="referrer-list">
+                <span v-for="receiver in receivers" :key="receiver.id" class="referrer-tag">
+                    {{ receiver.name }} ({{ receiver.position }})
+                </span>
+            </div>
+             <button class="btn-xs" @click="openModal('receiver')">수정</button>
+         </div>
+         <div class="referrer-section" v-else>
+            <span class="section-label">수신:</span>
+            <button class="btn-xs" @click="openModal('receiver')"> + 수신자 추가</button>
+         </div>
 
         <!-- Referrers Section -->
          <div class="referrer-section" v-if="referrers.length > 0">
@@ -308,21 +460,25 @@ const finalizeSubmission = () => {
                 />
               </td>
             </tr>
-            <tr v-if="['vacation', 'leave', 'reinstatement'].includes(activeTemplate)">
+            <tr v-if="activeTemplate === 'vacation'">
               <td class="label">기간</td>
               <td class="date-range">
-                <div class="datetime-input">
-                  <input type="date" v-model="docInfo.startDate" class="input-date" />
-                  <input type="time" v-model="docInfo.startTime" class="input-time" />
+                <div class="vacation-period">
+                  <div class="date-row">
+                    <input type="date" v-model="docInfo.startDate" class="input-date period-input" @mousedown.prevent="openDatePicker" />
+                    <template v-if="docInfo.vacationType !== '반차'">
+                      <span class="date-separator">~</span>
+                      <input type="date" v-model="docInfo.endDate" class="input-date period-input" @mousedown.prevent="openDatePicker" />
+                      <span v-if="vacationDurationLabel" class="hint inline-duration">({{ vacationDurationLabel }})</span>
+                    </template>
+                    <template v-else>
+                      <input type="time" v-model="docInfo.startTime" class="input-time period-input half-time" @mousedown.prevent="openDatePicker" />
+                      <span class="date-separator">~</span>
+                      <input type="time" v-model="docInfo.endTime" class="input-time period-input half-time" @mousedown.prevent="openDatePicker" />
+                      <span v-if="vacationDurationLabel" class="hint inline-duration half-duration">({{ vacationDurationLabel }})</span>
+                    </template>
+                  </div>
                 </div>
-                <span v-if="activeTemplate !== 'reinstatement'">~</span>
-                <div class="datetime-input" v-if="activeTemplate !== 'reinstatement'">
-                  <input type="date" v-model="docInfo.endDate" class="input-date" />
-                  <input type="time" v-model="docInfo.endTime" class="input-time" />
-                </div>
-                <span class="hint" v-if="docInfo.startDate && docInfo.endDate && activeTemplate !== 'reinstatement'">
-                  (총 {{ calculateDays }}일)
-                </span>
               </td>
             </tr>
             <tr v-if="activeTemplate === 'vacation'">
@@ -335,9 +491,99 @@ const finalizeSubmission = () => {
                    </label>
                  </div>
                </td>
+             </tr>
+
+            <tr v-if="activeTemplate === 'overtime'">
+              <td class="label">근무일자</td>
+              <td>
+                <input type="date" v-model="docInfo.workDate" class="input-date" @mousedown.prevent="openDatePicker" />
+              </td>
             </tr>
+            <tr v-if="activeTemplate === 'overtime'">
+              <td class="label">연장 시간</td>
+              <td class="date-range">
+                <input type="time" v-model="docInfo.startTime" class="input-time" @mousedown.prevent="openDatePicker" />
+                <span>~</span>
+                <input type="time" v-model="docInfo.endTime" class="input-time" @mousedown.prevent="openDatePicker" />
+              </td>
+            </tr>
+
+            <tr v-if="activeTemplate === 'flexible'">
+              <td class="label">시작일시</td>
+              <td class="date-range">
+                <input type="date" v-model="docInfo.startDate" class="input-date" @mousedown.prevent="openDatePicker" />
+                <input type="time" v-model="docInfo.startTime" class="input-time" @mousedown.prevent="openDatePicker" />
+              </td>
+            </tr>
+            <tr v-if="activeTemplate === 'flexible'">
+              <td class="label">종료일시</td>
+              <td class="date-range">
+                <input type="date" v-model="docInfo.endDate" class="input-date" @mousedown.prevent="openDatePicker" />
+                <input type="time" v-model="docInfo.endTime" class="input-time" @mousedown.prevent="openDatePicker" />
+              </td>
+            </tr>
+
+            <tr v-if="activeTemplate === 'businessTrip'">
+              <td class="label">외근/출장 유형</td>
+              <td>
+                <div class="radio-group">
+                  <label v-for="type in tripTypes" :key="type">
+                    <input type="radio" v-model="docInfo.tripType" :value="type" />
+                    {{ type }}
+                  </label>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="activeTemplate === 'businessTrip'">
+              <td class="label">목적지</td>
+              <td>
+                <input type="text" v-model="docInfo.destination" placeholder="목적지를 입력하세요" class="input-full" />
+              </td>
+            </tr>
+            <tr v-if="activeTemplate === 'businessTrip'">
+              <td class="label">시작 일시</td>
+              <td class="date-range">
+                <input type="date" v-model="docInfo.startDate" class="input-date" @mousedown.prevent="openDatePicker" />
+                <input type="time" v-model="docInfo.startTime" class="input-time" @mousedown.prevent="openDatePicker" />
+              </td>
+            </tr>
+            <tr v-if="activeTemplate === 'businessTrip'">
+              <td class="label">종료 일시</td>
+              <td class="date-range">
+                <input type="date" v-model="docInfo.endDate" class="input-date" @mousedown.prevent="openDatePicker" />
+                <input type="time" v-model="docInfo.endTime" class="input-time" @mousedown.prevent="openDatePicker" />
+              </td>
+            </tr>
+
+            <tr v-if="activeTemplate === 'leave'">
+              <td class="label">휴직 기간</td>
+              <td class="date-range">
+                <input type="date" v-model="docInfo.startDate" class="input-date" @mousedown.prevent="openDatePicker" />
+                <span>~</span>
+                <input type="date" v-model="docInfo.endDate" class="input-date" @mousedown.prevent="openDatePicker" />
+              </td>
+            </tr>
+            <tr v-if="activeTemplate === 'leave'">
+              <td class="label">휴직 종류</td>
+              <td>
+                <div class="radio-group">
+                  <label v-for="type in leaveTypes" :key="type">
+                    <input type="radio" v-model="docInfo.leaveType" :value="type" />
+                    {{ type }}
+                  </label>
+                </div>
+              </td>
+            </tr>
+
+            <tr v-if="activeTemplate === 'reinstatement'">
+              <td class="label">복직일</td>
+              <td>
+                <input type="date" v-model="docInfo.rtwDate" class="input-date" @mousedown.prevent="openDatePicker" />
+              </td>
+            </tr>
+
              <tr>
-              <td class="label">내용</td>
+              <td class="label">{{ reasonLabel }}</td>
               <td class="content-cell">
                 <textarea 
                   v-model="docInfo.content" 
@@ -362,7 +608,7 @@ const finalizeSubmission = () => {
     <OrgChartModal 
       :is-open="isModalOpen"
       :mode="modalMode"
-      :initial-selection="modalMode === 'approval' ? approvalLine : referrers"
+      :initial-selection="modalMode === 'approval' ? approvalLine : (modalMode === 'receiver' ? receivers : referrers)"
       @close="closeModal"
       @confirm="handleModalConfirm"
     />
@@ -371,7 +617,7 @@ const finalizeSubmission = () => {
     <ConfirmModal
       :is-open="isConfirmModalOpen"
       title="상신 확인"
-      message="선택하신 결재선으로 기안서를 상신하시겠습니까?"
+      :message="confirmMessage"
       confirm-text="상신"
       @close="isConfirmModalOpen = false"
       @confirm="finalizeSubmission"
@@ -558,6 +804,7 @@ const finalizeSubmission = () => {
 .info-section {
   display: flex;
   justify-content: space-between;
+  align-items: stretch;
   margin-bottom: 40px;
   gap: 20px;
 }
@@ -565,6 +812,7 @@ const finalizeSubmission = () => {
 .info-table {
   border-collapse: collapse;
   width: 320px;
+  height: 100%;
   font-size: 0.85rem;
 }
 
@@ -585,6 +833,26 @@ const finalizeSubmission = () => {
 }
 
 /* Approval Line Boxes */
+.approval-line-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.approval-line-header {
+  position: absolute;
+  top: -34px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+}
+
+
 .approval-line-container {
   display: flex;
   gap: 4px;
@@ -595,6 +863,16 @@ const finalizeSubmission = () => {
   display: flex;
   flex-direction: column;
   width: 90px;
+}
+
+.placeholder-box .box-content {
+  background: #fafcff;
+}
+
+.empty-box-text {
+  font-size: 0.74rem;
+  color: #8aa7c4;
+  text-align: center;
 }
 
 .box-header {
@@ -719,20 +997,6 @@ const finalizeSubmission = () => {
   padding: 2px 0;
 }
 
-.add-box {
-  cursor: pointer;
-}
-.add-box .box-content:hover {
-  background: #f9f9f9;
-}
-.add-btn {
-  font-size: 1.5rem;
-  color: #ccc;
-}
-.add-box:hover .add-btn {
-  color: #0066cc;
-}
-
 /* Referrer Section */
 .referrer-section {
     margin-bottom: 20px;
@@ -791,10 +1055,51 @@ const finalizeSubmission = () => {
 }
 
 .date-range {
+  /* Intentionally no layout display here; keep this as a plain table cell. */
+}
+
+.time-divider {
+  color: #868e96;
+  font-weight: 600;
+}
+
+.vacation-period {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-row,
+.time-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  width: auto;
+}
+
+.duration-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.period-input {
+  border: none !important;
+  border-left: 0 !important;
+  background: transparent;
+  box-shadow: none !important;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.vacation-period .period-input.input-time {
+  border: none !important;
+  border-left: 0 !important;
+  box-shadow: none !important;
+}
+
+.date-separator {
+  margin: 0 2px;
+  color: #666;
 }
 
 .datetime-input {
@@ -820,6 +1125,10 @@ const finalizeSubmission = () => {
   outline: none;
   color: #333;
   background: transparent;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  caret-color: transparent;
 }
 
 .input-date {
@@ -831,11 +1140,44 @@ const finalizeSubmission = () => {
   border-left: 1px solid #eee;
 }
 
+.vacation-period .input-time {
+  border-left: 0 !important;
+}
+
+.date-range > .input-date,
+.date-range > .input-time,
+.date-range > span {
+  vertical-align: middle;
+}
+
+.date-range > .input-date,
+.date-range > .input-time {
+  margin-right: 6px;
+}
+
+.date-range > span {
+  margin: 0 6px 0 2px;
+  color: #666;
+}
+
 .hint {
   font-size: 0.85rem;
   color: #0066cc;
   font-weight: 500;
   margin-left: 5px;
+}
+
+.inline-duration {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.half-duration {
+  margin-left: 8px;
+}
+
+.half-time {
+  width: 130px;
 }
 
 .radio-group {
@@ -899,4 +1241,87 @@ const finalizeSubmission = () => {
   background: #eee;
 }
 
+@media (max-width: 1200px) {
+  .content-area {
+    padding: 20px;
+  }
+
+  .paper {
+    width: 100%;
+    min-height: auto;
+    padding: 36px 28px;
+  }
+
+  .info-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .info-table {
+    width: 100%;
+  }
+
+  .approval-line-container {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    height: auto;
+    padding: 10px 14px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .toolbar-left, .toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .content-area {
+    padding: 12px;
+  }
+
+  .paper {
+    padding: 20px 14px;
+  }
+
+  .date-row {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .toolbar-left {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .template-btn {
+    font-size: 0.82rem;
+    padding: 6px 8px;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+
+  .referrer-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .content-cell {
+    height: 280px;
+  }
+}
+
 </style>
+
+
+
+

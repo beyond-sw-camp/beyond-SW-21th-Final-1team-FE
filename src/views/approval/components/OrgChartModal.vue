@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click.self="close">
+  <BaseModal :model-value="isOpen" width="1040px" @update:modelValue="handleBaseVisibility">
     <div class="modal-content">
       <div class="modal-header">
         <h3>{{ title }}</h3>
@@ -61,8 +61,8 @@
         <div class="panel selection-panel">
           <div class="panel-header">
             <h4>
-              {{ mode === 'approval' ? '결재선' : '참조자' }}
-              <span class="count" v-if="mode === 'referrer'">({{ localSelection.length }}/10)</span>
+              {{ mode === 'approval' ? '결재선' : mode === 'receiver' ? '수신자' : '참조자' }}
+              <span class="count" v-if="mode === 'receiver' || mode === 'referrer'">({{ localSelection.length }}/10)</span>
             </h4>
             <button class="clear-all" @click="localSelection = []">전체 해제</button>
           </div>
@@ -98,13 +98,14 @@
         <button class="confirm-btn" @click="confirm">확인</button>
       </div>
     </div>
-  </div>
+  </BaseModal>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { orgChart as rawOrgChart, mockUsers } from '@/utils/approvalData';
 import TreeItem from './TreeItem.vue';
+import BaseModal from '@/components/common/BaseModal.vue';
 
 
 const props = defineProps({
@@ -142,7 +143,11 @@ watch(() => props.isOpen, (newVal) => {
   }
 });
 
-const title = computed(() => props.mode === 'approval' ? '결재선 설정' : '참조자 설정');
+const title = computed(() => {
+  if (props.mode === 'approval') return '결재선 설정';
+  if (props.mode === 'receiver') return '수신자 설정';
+  return '참조자 설정';
+});
 
 const isSelected = (userId) => localSelection.value.some(u => u.id === userId);
 
@@ -152,8 +157,8 @@ const selectUser = (user) => {
   if (index !== -1) {
     removeUser(index);
   } else {
-    if (props.mode === 'referrer' && localSelection.value.length >= 10) {
-      alert('참조자는 최대 10명까지 지정할 수 있습니다.');
+    if ((props.mode === 'receiver' || props.mode === 'referrer') && localSelection.value.length >= 10) {
+      alert(props.mode === 'receiver' ? '수신자는 최대 10명까지 지정할 수 있습니다.' : '참조자는 최대 10명까지 지정할 수 있습니다.');
       return;
     }
     localSelection.value.push(user);
@@ -188,6 +193,10 @@ const close = () => {
   emit('close');
 };
 
+const handleBaseVisibility = (nextValue) => {
+  if (!nextValue) close();
+};
+
 const confirm = () => {
   emit('confirm', localSelection.value);
   close();
@@ -196,33 +205,19 @@ const confirm = () => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
 
 .modal-content {
-  background: white;
-  width: 800px;
-  max-width: 95%;
-  height: 600px;
-  border-radius: 8px;
+  width: 100%;
+  height: calc(100vh - 180px);
+  max-height: 700px;
+  min-height: 520px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .modal-header {
   padding: 16px 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gray200);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -230,36 +225,52 @@ const confirm = () => {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--gray800);
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--gray500);
+  font-size: 1.2rem;
+  line-height: 1;
   cursor: pointer;
+}
+
+.close-btn:hover {
+  background: var(--gray100);
+  border-color: var(--gray200);
+  color: var(--gray700);
 }
 
 .modal-body {
   flex: 1;
   display: flex;
-  padding: 20px;
-  gap: 20px;
+  padding: 16px;
+  gap: 14px;
   overflow: hidden;
+  background: #fff;
 }
 
 .panel {
   flex: 1;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--gray200);
+  border-radius: 10px;
+  background: #fff;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .panel-header {
-  background: #f8f9fa;
-  padding: 12px 16px;
-  border-bottom: 1px solid #ddd;
+  background: #fafbfc;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gray200);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -270,20 +281,28 @@ const confirm = () => {
   border: none;
   background: none;
   padding: 0;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  color: var(--gray700);
 }
 
 .search-box {
   position: relative;
-  width: 200px;
+  width: 220px;
 }
 
 .search-box input {
   width: 100%;
-  padding: 6px 30px 6px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 7px 30px 7px 10px;
+  border: 1px solid var(--gray300);
+  border-radius: 8px;
   font-size: 0.85rem;
+  color: var(--gray700);
+  outline: none;
+}
+
+.search-box input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(51, 154, 240, 0.12);
 }
 
 .search-icon {
@@ -291,17 +310,17 @@ const confirm = () => {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  color: #999;
+  color: var(--gray400);
   font-size: 0.8rem;
 }
 
 .clear-all {
     background: none;
     border: none;
-    color: #0066cc;
+    color: var(--primary);
     font-size: 0.8rem;
     cursor: pointer;
-    text-decoration: underline;
+    font-weight: 600;
 }
 
 .tree-view, .selected-list {
@@ -404,12 +423,11 @@ const confirm = () => {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  border: 1px solid #eee;
+  border: 1px solid var(--gray200);
   margin-bottom: 6px;
   background: white;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: grab;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .selected-item:active {
@@ -417,7 +435,7 @@ const confirm = () => {
 }
 
 .rank-badge {
-  background: #0066cc;
+  background: var(--primary);
   color: white;
   width: 20px;
   height: 20px;
@@ -476,30 +494,33 @@ const confirm = () => {
 }
 
 .modal-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #eee;
+  padding: 14px 20px;
+  border-top: 1px solid var(--gray200);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
 }
 
 .cancel-btn {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
+  padding: 9px 16px;
+  border: 1px solid var(--gray300);
   background: white;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
+  color: var(--gray700);
+  font-weight: 600;
 }
 
 .confirm-btn {
-  padding: 8px 16px;
-  background: #0066cc;
+  padding: 9px 16px;
+  background: var(--primary);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
+  font-weight: 700;
 }
 .confirm-btn:hover {
-  background: #0052a3;
+  background: var(--secondary);
 }
 </style>

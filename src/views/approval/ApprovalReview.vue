@@ -70,8 +70,10 @@
 import { ref } from 'vue';
 import { mockReviewList } from '@/utils/approvalData';
 import ReviewModal from './components/ReviewModal.vue';
+import { getCurrentApprovalUser, isUserRelatedApprovalDocument } from './utils/approvalVisibility';
 
-const reviewList = ref([...mockReviewList]);
+const currentUser = getCurrentApprovalUser();
+const reviewList = ref(mockReviewList.filter((item) => isUserRelatedApprovalDocument(item, currentUser)));
 const isModalOpen = ref(false);
 const selectedItem = ref({});
 
@@ -95,32 +97,38 @@ const handleReviewAction = (data) => {
 
 <style scoped>
 .review-container {
-  padding: 24px;
-  background-color: #fcfcfc;
-  min-height: 100vh;
+  padding: 32px;
+  min-height: 100%;
+  background: var(--gray50);
+  border-radius: 14px;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--gray200);
+  border-radius: 14px;
+  background: #fff;
 }
 
 .page-header h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-weight: 800;
   color: #212529;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .subtitle {
   color: #868e96;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
 }
 
 .list-card {
   background: white;
-  border-radius: 12px;
-  border: 1px solid #eee;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-radius: 14px;
+  border: 1px solid var(--gray200);
+  box-shadow: none;
   overflow: hidden;
 }
 
@@ -134,13 +142,13 @@ const handleReviewAction = (data) => {
 }
 
 .review-table th {
-  padding: 14px 20px;
+  padding: 16px 20px;
   text-align: left;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #868e96;
   background: #f8f9fa;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #f1f3f5;
 }
 
 .review-table td {
@@ -158,8 +166,8 @@ const handleReviewAction = (data) => {
   background-color: #f8f9fa;
 }
 
-.w-10 { width: 60px; }
-.w-category { width: 100px; }
+.w-10 { width: 84px; min-width: 84px; white-space: nowrap; text-align: center !important; }
+.w-category { width: 190px; min-width: 190px; text-align: center !important; }
 .w-drafter { width: 180px; }
 .w-date { width: 120px; }
 .w-actions { width: 100px; }
@@ -173,16 +181,25 @@ const handleReviewAction = (data) => {
 }
 
 .status-dot.unread {
-  background: #228be6;
-  box-shadow: 0 0 0 3px rgba(34, 139, 230, 0.2);
+  background: #339af0;
+  box-shadow: 0 0 0 3px rgba(51, 154, 240, 0.18);
 }
 
 .category-tag {
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.74rem;
   padding: 4px 8px;
   background: #f1f3f5;
-  color: #495057;
-  border-radius: 4px;
+  color: #868e96;
+  border-radius: 6px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.review-table td:nth-child(2) {
+  white-space: nowrap;
+  text-align: center;
 }
 
 .title-cell {
@@ -196,7 +213,7 @@ const handleReviewAction = (data) => {
 }
 
 .read-style {
-  color: #228be6;
+  color: #339af0;
   text-decoration: underline;
   font-weight: 500;
   font-size: 1rem;
@@ -234,21 +251,20 @@ const handleReviewAction = (data) => {
 }
 
 .review-btn {
-  padding: 6px 14px;
+  padding: 7px 14px;
   border: 1px solid #dee2e6;
-  background: white;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #495057;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #339af0;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .review-btn:hover {
-  background: #f1f3f5;
-  color: #212529;
-  border-color: #adb5bd;
+  background: #f0f7ff;
+  border-color: #d0e7ff;
 }
 
 .text-center { text-align: center !important; }

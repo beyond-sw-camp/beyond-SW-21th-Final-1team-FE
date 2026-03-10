@@ -5,7 +5,11 @@
         <h1>아카이브 메인</h1>
         <p>본인 조직 경로 기준으로 접근 가능한 문서만 표시됩니다.</p>
       </div>
-      <button class="register-btn" type="button" @click="router.push('/kms/archive/manage/new')">문서 등록</button>
+      <div class="top-actions">
+        <button class="btn ghost" type="button" @click="router.push('/kms/archive/my')">내 회의록</button>
+        <button class="btn ghost" type="button" @click="router.push('/kms/archive/trash')">임시 보관함</button>
+        <button class="btn register-btn" type="button" @click="router.push('/kms/archive/manage/new')">문서 등록</button>
+      </div>
     </section>
 
     <section class="layout">
@@ -51,7 +55,7 @@
             <p>{{ filteredDocs.length }}건</p>
           </header>
 
-          <div v-if="filteredDocs.length === 0" class="empty">해당 문서를 찾을 수 없습니다</div>
+          <KmsEmptyState v-if="filteredDocs.length === 0" title="해당 문서를 찾을 수 없습니다" />
 
           <div v-else class="card-grid">
             <article v-for="doc in filteredDocs" :key="doc.id" class="doc-card">
@@ -73,6 +77,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import KmsEmptyState from '@/components/kms/KmsEmptyState.vue'
 import { AUTH_KEYS } from '@/utils/auth'
 import { archiveCategoryOptions } from '@/mocks/kms'
 import { canReadArchiveDoc, resolveCurrentUserOrgContext, useKmsArchiveStore } from '@/store/kmsArchive'
@@ -170,7 +175,9 @@ const filteredDocs = computed(() => {
 .top-bar { border: 1px solid var(--gray200); padding: 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 h1 { font-size: 1.14rem; color: var(--gray800); }
 p { margin-top: 6px; color: var(--gray500); font-size: 0.84rem; }
-.register-btn { border: 1px solid var(--primary); background: var(--primary); color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+.top-actions { display: flex; gap: 8px; }
+.btn { border: 1px solid var(--gray300); background: #fff; color: var(--gray600); border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+.register-btn { border: 1px solid var(--primary); background: var(--primary); color: #fff; }
 .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; min-height: 620px; }
 .local-sidebar { border: 1px solid var(--gray200); padding: 14px; }
 h2 { font-size: 0.86rem; color: var(--gray700); margin-bottom: 10px; }
@@ -210,10 +217,10 @@ h3 { font-size: 0.92rem; color: var(--gray800); }
 .card-foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
 .card-foot span { color: var(--gray400); font-size: 0.74rem; }
 .edit-btn { border: 1px solid var(--gray300); background: #fff; color: var(--gray600); border-radius: 8px; padding: 5px 10px; font-size: 0.74rem; font-weight: 700; }
-.empty { border: 1px dashed var(--gray300); border-radius: 10px; background: var(--gray50); color: var(--gray500); font-size: 0.84rem; text-align: center; padding: 34px 12px; }
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }
   .card-grid { grid-template-columns: 1fr; }
   .search-box { grid-template-columns: 1fr; }
+  .top-actions { width: 100%; display: grid; grid-template-columns: 1fr; }
 }
 </style>

@@ -113,29 +113,45 @@
         </div>
       </div>
 
-      <!-- 2. Employee Salary Settings (Salary Info, Accounts) -->
+      <!-- 2. Employee Salary Settings -->
       <div v-if="currentTab === 'employee'" class="section-container user-salary-layout">
-        <!-- Left: Employee List -->
+        <!-- Left: Organization Tree -->
         <div class="sidebar-list card">
-          <div class="search-box">
-             <input type="text" placeholder="사원 검색..." v-model="searchQuery" />
+          <div class="org-tree-header">
+            <h3>조직 트리</h3>
+            <button class="btn-reset" type="button" @click="resetToMyOrg">내 조직 펼치기</button>
           </div>
-          <ul class="employee-list">
-            <li 
-              v-for="emp in filteredEmployees" 
-              :key="emp.id" 
-              class="emp-item"
-              :class="{ active: selectedEmployee?.id === emp.id }"
-              @click="selectEmployee(emp)"
+          <div class="org-search-box">
+            <input type="text" placeholder="본부, 부서, 팀, 사원 이름 검색" v-model="orgSearchQuery" />
+          </div>
+
+          <div class="tree-scroll">
+            <div v-if="!filteredOrgRoot" class="empty-tree">검색 결과가 없습니다.</div>
+            <button
+              v-for="row in visibleOrgRows"
+              :key="row.key"
+              class="tree-row"
+              :class="rowClass(row)"
+              :style="{ paddingLeft: `${12 + row.depth * 20}px` }"
+              type="button"
+              @click="handleOrgRowClick(row)"
             >
-              <div class="emp-avatar">{{ emp.name[0] }}</div>
-              <div class="emp-info">
-                <div class="emp-name">{{ emp.name }}</div>
-                <div class="emp-meta">{{ emp.dept }} · {{ emp.position }}</div>
-              </div>
-              <div v-if="emp.hasRequest" class="badge-dot"></div>
-            </li>
-          </ul>
+              <template v-if="row.kind === 'node'">
+                <span class="node-accent" :style="nodeAccentStyle(row.node.type)" aria-hidden="true"></span>
+                <span class="chevron" :class="{ open: isOpen(row.node.id) }">{{ row.expandable ? '▸' : '•' }}</span>
+                <span class="folder-icon">📁</span>
+                <strong>{{ row.node.name }}</strong>
+                <span class="type-chip">{{ row.node.type }}</span>
+                <span v-if="nodeMemberCount(row.node) > 0" class="count">{{ nodeMemberCount(row.node) }}명</span>
+              </template>
+              <template v-else>
+                <span class="member-dot">•</span>
+                <span class="member-icon">👤</span>
+                <strong>{{ row.member.name }}</strong>
+                <span class="member-duty">{{ row.member.duty }}</span>
+              </template>
+            </button>
+          </div>
         </div>
 
         <!-- Right: Detail Form -->
@@ -178,44 +194,6 @@
             </div>
           </div>
 
-          <div class="divider"></div>
-
-          <div class="form-section">
-            <h4>급여 계좌 정보</h4>
-            <div class="bank-info-box" :class="{ 'pending-change': selectedEmployee.accountRequest }">
-              <div v-if="selectedEmployee.accountRequest" class="request-alert">
-                 <span class="badge-pending">변경 요청</span>
-                 <p>사용자가 계좌 변경을 요청했습니다.<br/>
-                    <strong>{{ selectedEmployee.accountRequest.bank }} {{ selectedEmployee.accountRequest.account }} ({{ selectedEmployee.accountRequest.holder }})</strong>
-                 </p>
-                 <div class="req-actions">
-                   <button class="btn-tiny primary" @click="approveAccount(true)">승인</button>
-                   <button class="btn-tiny danger" @click="approveAccount(false)">반려</button>
-                 </div>
-              </div>
-
-              <div class="form-grid three-cols">
-                <div class="form-group">
-                  <label>은행명</label>
-                  <select v-model="selectedEmployee.bankInfo.bank">
-                    <option>국민은행</option>
-                    <option>신한은행</option>
-                    <option>우리은행</option>
-                    <option>하나은행</option>
-                    <option>카카오뱅크</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>계좌번호</label>
-                  <input type="text" v-model="selectedEmployee.bankInfo.account" />
-                </div>
-                <div class="form-group">
-                  <label>예금주</label>
-                  <input type="text" v-model="selectedEmployee.bankInfo.holder" />
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
         <div class="detail-panel card empty" v-else>
            <p>왼쪽 목록에서 사원을 선택해주세요.</p>
@@ -227,7 +205,10 @@
         <div class="card full-width">
            <div class="card-header">
              <h3>퇴직금 정산 대상자</h3>
-             <button class="btn-primary">+ 퇴직자 추가 및 정산</button>
+             <div class="control-actions">
+               <button class="btn-secondary" @click="addRetiree">+ 퇴직자 추가</button>
+               <button class="btn-primary" @click="runSeveranceSettlement">정산 실행</button>
+             </div>
            </div>
            
            <table class="data-table">
@@ -253,8 +234,8 @@
                  <td>{{ retiree.years }}년</td>
                  <td class="text-right">{{ formatNumber(retiree.avgWage) }}</td>
                  <td class="text-right font-bold">{{ formatNumber(retiree.severancePay) }}</td>
-                 <td><span class="badge success">정산 완료</span></td>
-                 <td><button class="btn-text">보기</button></td>
+                 <td><span class="badge" :class="retiree.status === 'done' ? 'success' : 'pending'">{{ retiree.status === 'done' ? '정산 완료' : '정산 대기' }}</span></td>
+                 <td><button class="btn-text" @click="previewSeverance(retiree)">보기</button></td>
                </tr>
              </tbody>
            </table>
@@ -315,7 +296,14 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import {
+  createHrCurrentUserMock,
+  createHrOrgTreeMock,
+  findNodeById,
+  findPathByNodeId,
+  sortMembersByRule
+} from '@/mocks/hr/organization'
 
 const currentTab = ref('monthly')
 const targetMonth = ref('2026-02')
@@ -363,39 +351,30 @@ const sendPayStubs = () => {
 }
 
 // --- Mock Data: Employees ---
-const searchQuery = ref('')
 const employees = ref([
   { 
-    id: 1, name: '김철수', dept: '개발팀', position: '대리', 
-    salary: { annual: '42,000,000', allowances: [{ name: '식대', amount: '200,000' }] },
-    bankInfo: { bank: '국민은행', account: '123-456-7890', holder: '김철수' },
-    hasRequest: true,
-    accountRequest: { bank: '카카오뱅크', account: '3333-01-234567', holder: '김철수' }
+    id: 1, name: '김세현', dept: '모바일1팀', position: '팀장',
+    salary: { annual: '58,000,000', allowances: [{ name: '식대', amount: '200,000' }, { name: '직책수당', amount: '200,000' }] }
   },
   { 
-    id: 2, name: '이영희', dept: '인사팀', position: '사원', 
-    salary: { annual: '36,000,000', allowances: [{ name: '식대', amount: '200,000' }] },
-    bankInfo: { bank: '신한은행', account: '110-222-333333', holder: '이영희' },
-    hasRequest: false
+    id: 2, name: '박민지', dept: '모바일1팀', position: '대리',
+    salary: { annual: '44,000,000', allowances: [{ name: '식대', amount: '200,000' }] }
   },
-   { 
-    id: 3, name: '박민수', dept: '영업팀', position: '과장', 
-    salary: { annual: '54,000,000', allowances: [{ name: '식대', amount: '200,000' }, { name: '직책수당', amount: '100,000' }] },
-    bankInfo: { bank: '우리은행', account: '1002-333-444444', holder: '박민수' },
-    hasRequest: false
+  {
+    id: 3, name: '이준호', dept: '모바일1팀', position: '주임',
+    salary: { annual: '40,000,000', allowances: [{ name: '식대', amount: '200,000' }] }
+  },
+  {
+    id: 4, name: '최수빈', dept: '모바일1팀', position: '사원',
+    salary: { annual: '36,000,000', allowances: [{ name: '식대', amount: '200,000' }] }
+  },
+  {
+    id: 5, name: '김철수', dept: '인사팀', position: '대리',
+    salary: { annual: '42,000,000', allowances: [{ name: '식대', amount: '200,000' }] }
   }
 ])
 
-const filteredEmployees = computed(() => {
-  if (!searchQuery.value) return employees.value
-  return employees.value.filter(e => e.name.includes(searchQuery.value))
-})
-
 const selectedEmployee = ref(null)
-
-const selectEmployee = (emp) => {
-  selectedEmployee.value = emp
-}
 
 const addAllowance = () => {
   if (selectedEmployee.value) {
@@ -405,28 +384,218 @@ const addAllowance = () => {
 const removeAllowance = (idx) => {
   selectedEmployee.value.salary.allowances.splice(idx, 1)
 }
-const approveAccount = (isApproved) => {
-  if (!selectedEmployee.value) return
-  if (isApproved) {
-    const req = selectedEmployee.value.accountRequest
-    selectedEmployee.value.bankInfo = { bank: req.bank, account: req.account, holder: req.holder }
-    alert('계좌 변경 요청을 승인했습니다.')
-  } else {
-    const reason = prompt('반려 사유를 입력하세요')
-    if (reason) alert('반려되었습니다.')
-    else return
-  }
-  selectedEmployee.value.accountRequest = null
-  selectedEmployee.value.hasRequest = false
-}
 const saveEmployeeSalary = () => {
   alert(`${selectedEmployee.value.name}님의 급여 정보가 저장되었습니다.`)
 }
 
+// --- Org Tree (Employee Salary Settings Left Panel) ---
+const currentUser = createHrCurrentUserMock()
+const orgRoot = ref(createHrOrgTreeMock())
+const orgSearchQuery = ref('')
+const expandedNodes = ref({})
+
+const normalize = (value) => String(value || '').trim().toLowerCase()
+const isOpen = (nodeId) => Boolean(expandedNodes.value[nodeId])
+
+const matchesMember = (member, keyword) => {
+  const text = [member.name, member.email, member.position, member.job, member.duty].join(' ')
+  return normalize(text).includes(keyword)
+}
+
+const filterOrgNode = (node, keyword) => {
+  if (!node) return null
+
+  const nodeMatch = !keyword || normalize(`${node.name} ${node.type}`).includes(keyword)
+  const children = (node.children || [])
+    .map((child) => filterOrgNode(child, keyword))
+    .filter(Boolean)
+  const members = sortMembersByRule(node.members || [])
+  const filteredMembers = nodeMatch ? members : members.filter((member) => matchesMember(member, keyword))
+
+  if (!nodeMatch && children.length === 0 && filteredMembers.length === 0) return null
+  return { ...node, children, members: filteredMembers }
+}
+
+const filteredOrgRoot = computed(() => filterOrgNode(orgRoot.value, normalize(orgSearchQuery.value)))
+
+const collectAllNodeIds = (node, acc = {}) => {
+  if (!node) return acc
+  acc[node.id] = true
+  ;(node.children || []).forEach((child) => collectAllNodeIds(child, acc))
+  return acc
+}
+
+const collectMemberNames = (node, acc = new Set()) => {
+  if (!node) return acc
+  ;(node.members || []).forEach((member) => acc.add(member.name))
+  ;(node.children || []).forEach((child) => collectMemberNames(child, acc))
+  return acc
+}
+
+const nodeMemberCount = (node) => collectMemberNames(node).size
+
+const findFirstMember = (node) => {
+  if (!node) return null
+  const ownMembers = sortMembersByRule(node.members || [])
+  if (ownMembers.length > 0) return ownMembers[0]
+  for (const child of node.children || []) {
+    const found = findFirstMember(child)
+    if (found) return found
+  }
+  return null
+}
+
+const visibleOrgRows = computed(() => {
+  if (!filteredOrgRoot.value) return []
+
+  const rows = []
+  const walk = (node, depth = 0) => {
+    const hasChildren = (node.children || []).length > 0
+    const hasMembers = (node.members || []).length > 0
+
+    rows.push({
+      key: `node-${node.id}`,
+      kind: 'node',
+      node,
+      depth,
+      expandable: hasChildren || hasMembers
+    })
+
+    if (!isOpen(node.id)) return
+
+    ;(node.children || []).forEach((child) => walk(child, depth + 1))
+    sortMembersByRule(node.members || []).forEach((member) => {
+      rows.push({
+        key: `member-${node.id}-${member.employeeId}`,
+        kind: 'member',
+        member,
+        depth: depth + 1,
+        parentNodeId: node.id
+      })
+    })
+  }
+
+  walk(filteredOrgRoot.value, 0)
+  return rows
+})
+
+const annualByDuty = {
+  팀장: '58,000,000',
+  과장: '50,000,000',
+  대리: '44,000,000',
+  주임: '40,000,000',
+  사원: '36,000,000'
+}
+
+const selectEmployeeFromMember = (member) => {
+  if (!member) return
+  let employee = employees.value.find((item) => item.name === member.name)
+  if (!employee) {
+    employee = {
+      id: Date.now(),
+      name: member.name,
+      dept: member.position || '-',
+      position: member.duty || '-',
+      salary: {
+        annual: annualByDuty[member.duty] || '40,000,000',
+        allowances: [{ name: '식대', amount: '200,000' }]
+      }
+    }
+    employees.value.push(employee)
+  }
+  selectedEmployee.value = employee
+}
+
+const selectEmployeeByNode = (nodeId) => {
+  const node = findNodeById(orgRoot.value, nodeId)
+  const firstMember = findFirstMember(node)
+  selectEmployeeFromMember(firstMember)
+}
+
+const resetToMyOrg = () => {
+  const path = findPathByNodeId(orgRoot.value, currentUser.teamNodeId) || []
+  const next = {}
+  path.forEach((id) => {
+    next[id] = true
+  })
+  expandedNodes.value = next
+  selectEmployeeByNode(currentUser.teamNodeId)
+}
+
+const handleOrgRowClick = (row) => {
+  if (row.kind === 'node') {
+    if (row.expandable) expandedNodes.value[row.node.id] = !expandedNodes.value[row.node.id]
+    selectEmployeeByNode(row.node.id)
+    return
+  }
+  selectEmployeeFromMember(row.member)
+}
+
+const rowClass = (row) => {
+  if (row.kind === 'node') return {}
+  return { 'member-active': selectedEmployee.value?.name === row.member.name }
+}
+
+const nodeAccentStyle = (type) => {
+  const palette = {
+    회사: '#CBD5E1',
+    본부: '#FDE68A',
+    센터: '#BFDBFE',
+    부: '#C7D2FE',
+    팀: '#A7F3D0',
+    실: '#FBCFE8'
+  }
+  return { backgroundColor: palette[type] || '#E2E8F0' }
+}
+
+watch(
+  () => normalize(orgSearchQuery.value),
+  (keyword) => {
+    if (keyword) {
+      expandedNodes.value = collectAllNodeIds(filteredOrgRoot.value)
+      return
+    }
+    resetToMyOrg()
+  },
+  { immediate: true }
+)
+
 // --- Mock Data: Severance ---
 const retirees = ref([
-  { id: 99, name: '최퇴직', dept: '마케팅팀', joinDate: '2020-01-01', leaveDate: '2026-01-31', years: 6, avgWage: 3800000, severancePay: 22800000 }
+  { id: 99, name: '최퇴직', dept: '마케팅팀', joinDate: '2020-01-01', leaveDate: '2026-01-31', years: 6, avgWage: 3800000, severancePay: 22800000, status: 'pending' }
 ])
+
+const addRetiree = () => {
+  const mockPool = [
+    { name: '신규영', dept: '영업팀', joinDate: '2019-03-04', leaveDate: '2026-02-28', years: 7, avgWage: 4100000, severancePay: 28700000 },
+    { name: '한가람', dept: '개발팀', joinDate: '2021-06-01', leaveDate: '2026-02-28', years: 5, avgWage: 3900000, severancePay: 19500000 },
+    { name: '정아름', dept: '인사팀', joinDate: '2022-01-10', leaveDate: '2026-02-28', years: 4, avgWage: 3600000, severancePay: 14400000 }
+  ]
+  const next = mockPool[retirees.value.length % mockPool.length]
+  retirees.value.unshift({
+    id: Date.now(),
+    ...next,
+    status: 'pending'
+  })
+  alert('퇴직자를 추가했습니다.')
+}
+
+const runSeveranceSettlement = () => {
+  const pending = retirees.value.filter((retiree) => retiree.status !== 'done')
+  if (pending.length === 0) {
+    alert('정산 대기 대상이 없습니다.')
+    return
+  }
+  retirees.value = retirees.value.map((retiree) => ({
+    ...retiree,
+    status: 'done'
+  }))
+  alert(`${pending.length}명의 퇴직금 정산을 완료했습니다.`)
+}
+
+const previewSeverance = (retiree) => {
+  alert(`${retiree.name} 퇴직금 상세\n예상 퇴직금: ${formatNumber(retiree.severancePay)}원\n상태: ${retiree.status === 'done' ? '정산 완료' : '정산 대기'}`)
+}
 
 // --- Mock Data: Settings ---
 const rates = ref({
@@ -465,7 +634,8 @@ const rates = ref({
 .btn-secondary { background: var(--gray100); color: var(--gray700); border:1px solid var(--gray300); padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; }
 .btn-warning { background: #F59E0B; color: #fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; }
 .btn-outline { background: #fff; color: var(--primary); border:1px solid var(--primary); padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; }
-.btn-save { background: var(--gray800); color: #fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:500; }
+.btn-save { background: var(--primary); color: #fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:700; }
+.btn-save:hover { background: #4338ca; }
 .btn-tiny { padding: 4px 8px; border-radius: 4px; border: none; font-size: 0.8rem; cursor: pointer; color: #fff; }
 .btn-tiny.primary { background: var(--primary); }
 .btn-tiny.danger { background: #EF4444; }
@@ -493,24 +663,83 @@ const rates = ref({
 .highlight-blue { background: #EFF6FF; color: #1E40AF; }
 .highlight-red { background: #FEF2F2; color: #991B1B; }
 .highlight-primary { background: #EEF2FF; color: var(--primary); }
+.badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 10px; font-size: 0.78rem; font-weight: 700; }
+.badge.success { background: #DCFCE7; color: #166534; }
+.badge.pending { background: #FEF3C7; color: #92400E; }
+.btn-text { border: none; background: transparent; color: var(--primary); font-weight: 700; cursor: pointer; }
 .empty-state { padding: 40px; text-align: center; color: var(--gray500); }
 
 /* Employee Layout */
-.user-salary-layout { display: flex; gap: 24px; flex-direction: row; }
-.sidebar-list { flex: 0 0 280px; display: flex; flex-direction: column; max-height: 600px; overflow-y: auto; padding: 0; }
-.search-box { padding: 16px; border-bottom: 1px solid var(--gray200); position: sticky; top: 0; background: #fff; z-index: 10; }
-.search-box input { width: 100%; padding: 8px 12px; border: 1px solid var(--gray300); border-radius: 6px; }
-.employee-list { list-style: none; padding: 0; margin: 0; }
-.emp-item { padding: 16px; border-bottom: 1px solid var(--gray100); display: flex; gap: 12px; align-items: center; cursor: pointer; transition: background 0.1s; position: relative; }
-.emp-item:hover { background: var(--gray50); }
-.emp-item.active { background: #EEF2FF; border-left: 3px solid var(--primary); }
-.emp-avatar { width: 40px; height: 40px; background: #E0E7FF; color: var(--primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
-.emp-info { display: flex; flex-direction: column; gap: 2px; }
-.emp-name { font-weight: 600; color: var(--gray900); }
-.emp-meta { font-size: 0.8rem; color: var(--gray500); }
-.badge-dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; position: absolute; top: 16px; right: 16px; }
+.user-salary-layout { display: flex; gap: 18px; flex-direction: row; }
+.sidebar-list { flex: 1 1 0; display: flex; flex-direction: column; max-height: 720px; overflow: hidden; padding: 0; }
+.org-tree-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.org-tree-header h3 { font-size: 1.45rem; font-weight: 800; color: var(--gray900); }
+.btn-reset {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-reset:hover { background: #4338ca; border-color: #4338ca; }
+.org-search-box { padding: 14px 20px; border-bottom: 1px solid var(--gray200); }
+.org-search-box input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d7deea;
+  border-radius: 12px;
+  font-size: 0.95rem;
+}
+.tree-scroll { overflow-y: auto; padding: 10px 12px 18px 12px; }
+.empty-tree { padding: 24px; color: var(--gray500); text-align: center; }
+.tree-row {
+  width: 100%;
+  border: none;
+  background: #fff;
+  min-height: 44px;
+  border-radius: 10px;
+  padding-right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #1f2937;
+  cursor: pointer;
+}
+.tree-row:hover { background: #f8fafc; }
+.tree-row.member-active { background: #e8f4ff; }
+.node-accent {
+  width: 4px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-right: 2px;
+}
+.chevron { width: 16px; color: #64748b; font-size: 0.9rem; }
+.chevron.open { transform: rotate(90deg); }
+.folder-icon, .member-icon { font-size: 1rem; opacity: 0.8; }
+.type-chip {
+  margin-left: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #6b7280;
+  background: #eef2f7;
+}
+.count { margin-left: auto; color: #64748b; font-weight: 700; font-size: 0.88rem; }
+.member-dot { color: #94a3b8; width: 10px; }
+.member-duty { color: #64748b; font-size: 0.9rem; }
 
-.detail-panel { flex: 1; min-height: 500px; }
+.detail-panel { flex: 3 1 0; min-height: 500px; min-width: 0; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--gray200); }
 .form-section h4 { font-size: 1rem; color: var(--gray800); margin-bottom: 16px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
@@ -527,12 +756,6 @@ const rates = ref({
 .btn-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; }
 .btn-add-row { background: #fff; border: 1px dashed var(--gray400); padding: 8px; border-radius: 6px; width: 100%; color: var(--gray600); cursor: pointer; margin-top: 8px; }
 .btn-add-row:hover { border-color: var(--gray600); color: var(--gray800); }
-
-.bank-info-box { padding: 20px; border: 1px solid var(--gray200); border-radius: 8px; }
-.bank-info-box.pending-change { border-color: #FCA5A5; background: #FEF2F2; }
-.request-alert { margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px dashed #FECACA; }
-.badge-pending { background: #FEE2E2; color: #991B1B; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; align-self: flex-start; }
-.req-actions { display: flex; gap: 8px; margin-top: 8px; }
 
 /* Settings */
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }

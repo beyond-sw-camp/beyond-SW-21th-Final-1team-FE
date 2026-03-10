@@ -1,42 +1,82 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { mockApprovalStatusList } from '@/utils/approvalData';
+import ApprovalDetailModal from './components/ApprovalDetailModal.vue';
+import { getCurrentApprovalUser, isUserRelatedApprovalDocument } from './utils/approvalVisibility';
 
-// State
+const router = useRouter();
 const searchQuery = ref('');
 const activeTab = ref('all'); // 'all', 'drafting', 'pending', 'rejected'
+const isModalOpen = ref(false);
+const selectedItem = ref({});
+const currentUser = getCurrentApprovalUser();
+const visibleStatusDocs = computed(() => mockApprovalStatusList.filter((item) => isUserRelatedApprovalDocument(item, currentUser)));
 
-// Tabs Configuration
-const tabs = [
-  { id: 'all', label: '전체', count: mockApprovalStatusList.length },
-  { id: 'drafting', label: '기안중', count: mockApprovalStatusList.filter(i => i.status === '기안중').length },
-  { id: 'pending', label: '진행중', count: mockApprovalStatusList.filter(i => i.status === '진행중').length },
-  { id: 'rejected', label: '반려', count: mockApprovalStatusList.filter(i => i.status === '반려').length }
-];
+const isDrafting = (status) => status === '기안중';
+const isPending = (status) => status === '진행중';
+const isRejected = (status) => status === '반려';
+const isCompleted = (status) => status === '완료';
 
-// Computed
+const tabs = computed(() => [
+  { id: 'all', label: '전체', count: visibleStatusDocs.value.length },
+  { id: 'drafting', label: '기안중', count: visibleStatusDocs.value.filter(i => isDrafting(i.status)).length },
+  { id: 'pending', label: '진행중', count: visibleStatusDocs.value.filter(i => isPending(i.status)).length },
+  { id: 'rejected', label: '반려', count: visibleStatusDocs.value.filter(i => isRejected(i.status)).length }
+]);
+
 const filteredList = computed(() => {
-  return mockApprovalStatusList.filter(item => {
-    const matchesTab = activeTab.value === 'all' || 
-                      (activeTab.value === 'drafting' && item.status === '기안중') ||
-                      (activeTab.value === 'pending' && item.status === '진행중') ||
-                      (activeTab.value === 'rejected' && item.status === '반려');
-    
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         item.id.toLowerCase().includes(searchQuery.value.toLowerCase());
-    
+  return visibleStatusDocs.value.filter(item => {
+    const matchesTab = activeTab.value === 'all' ||
+      (activeTab.value === 'drafting' && isDrafting(item.status)) ||
+      (activeTab.value === 'pending' && isPending(item.status)) ||
+      (activeTab.value === 'rejected' && isRejected(item.status));
+
+    const q = searchQuery.value.toLowerCase();
+    const matchesSearch = item.title.toLowerCase().includes(q) || item.id.toLowerCase().includes(q);
+
     return matchesTab && matchesSearch;
   });
 });
 
 const getStatusClass = (status) => {
-  switch (status) {
-    case '기안중': return 'status-draft';
-    case '진행중': return 'status-pending';
-    case '반려': return 'status-rejected';
-    case '완료': return 'status-completed';
-    default: return '';
+  if (isDrafting(status)) return 'status-draft';
+  if (isPending(status)) return 'status-pending';
+  if (isRejected(status)) return 'status-rejected';
+  if (isCompleted(status)) return 'status-completed';
+  return '';
+};
+
+const openModal = (item) => {
+  selectedItem.value = {
+    ...item,
+    category: item.templateName || '-',
+    date: item.draftDate || '-',
+    content: item.content || '상세 본문 데이터가 없습니다.',
+    attachments: Array.isArray(item.attachments) ? item.attachments : [],
+    referrers: Array.isArray(item.referrers) ? item.referrers : [],
+    department: item.department || '-',
+    isDrafter: true,
+    statusClass: getStatusClass(item.status)
+  };
+  isModalOpen.value = true;
+};
+
+const closeModal = () => {
+  isModalOpen.value = false;
+};
+
+const handleModalAction = (action) => {
+  if (action.type === 'redraft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
+  } else if (action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
   }
+  isModalOpen.value = false;
+};
+
+const handleRedraft = (item) => {
+  router.push({ name: 'approval-draft', query: { from: item.id, source: 'status' } });
 };
 </script>
 
@@ -45,16 +85,16 @@ const getStatusClass = (status) => {
     <header class="page-header">
       <div class="header-content">
         <h1 class="page-title">전자 결재 현황</h1>
-        <p class="page-subtitle">본인이 기안한 문서의 실시간 결재 진행 상태를 확인합니다.</p>
+        <p class="page-subtitle">본인이 기안자/결재자로 포함된 문서의 결재 진행 상태를 확인합니다.</p>
       </div>
-      
+
       <div class="search-box">
         <div class="search-input-wrapper">
           <span class="search-icon">🔍</span>
-          <input 
-            type="text" 
-            v-model="searchQuery" 
-            placeholder="문서 번호 또는 제목으로 검색" 
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="문서 번호 또는 제목으로 검색"
             class="search-input"
           />
         </div>
@@ -62,11 +102,10 @@ const getStatusClass = (status) => {
     </header>
 
     <main class="page-content">
-      <!-- Filter Tabs -->
       <div class="tabs-row">
         <div class="tabs">
-          <button 
-            v-for="tab in tabs" 
+          <button
+            v-for="tab in tabs"
             :key="tab.id"
             class="tab-btn"
             :class="{ active: activeTab === tab.id }"
@@ -78,7 +117,6 @@ const getStatusClass = (status) => {
         </div>
       </div>
 
-      <!-- Data Table -->
       <div class="table-card">
         <table class="data-table">
           <thead>
@@ -90,10 +128,16 @@ const getStatusClass = (status) => {
               <th>결재상태</th>
               <th>현재 결재자</th>
               <th>진행률</th>
+              <th>재상신</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in filteredList" :key="item.id" class="table-row">
+            <tr
+              v-for="item in filteredList"
+              :key="item.id"
+              class="table-row clickable-row"
+              @click="openModal(item)"
+            >
               <td class="col-id">{{ item.id }}</td>
               <td class="col-tpl">{{ item.templateName }}</td>
               <td class="col-title">
@@ -114,9 +158,20 @@ const getStatusClass = (status) => {
                   <span class="progress-text">{{ item.progress }}%</span>
                 </div>
               </td>
+              <td @click.stop>
+                <button
+                  v-if="getStatusClass(item.status) === 'status-rejected'"
+                  type="button"
+                  class="redraft-btn"
+                  @click="handleRedraft(item)"
+                >
+                  재상신
+                </button>
+              </td>
             </tr>
+
             <tr v-if="filteredList.length === 0">
-              <td colspan="7" class="empty-state">
+              <td colspan="8" class="empty-state">
                 <div class="empty-content">
                   <span class="empty-icon">📂</span>
                   <p>조회된 결재 문서가 없습니다.</p>
@@ -127,82 +182,94 @@ const getStatusClass = (status) => {
         </table>
       </div>
     </main>
+
+    <ApprovalDetailModal
+      :is-open="isModalOpen"
+      :item="selectedItem"
+      @close="closeModal"
+      @action="handleModalAction"
+    />
   </div>
 </template>
 
 <style scoped>
 .status-container {
-  padding: 40px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 32px;
+  min-height: 100%;
+  background: var(--gray50);
+  border-radius: 14px;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 32px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--gray200);
+  border-radius: 14px;
+  background: #fff;
 }
 
 .page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 8px;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #212529;
+  margin-bottom: 6px;
 }
 
 .page-subtitle {
-  color: #6B7280;
-  font-size: 1.1rem;
+  color: #868e96;
+  font-size: 0.92rem;
 }
 
-/* Search Box */
 .search-input-wrapper {
   position: relative;
-  width: 320px;
+  width: 300px;
 }
 
 .search-icon {
   position: absolute;
-  left: 14px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #9CA3AF;
+  color: #adb5bd;
   font-size: 0.9rem;
 }
 
 .search-input {
   width: 100%;
-  padding: 10px 16px 10px 40px;
-  border: 1px solid #E5E7EB;
-  border-radius: 8px;
-  font-size: 0.9rem;
+  padding: 10px 14px 10px 36px;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  font-size: 0.85rem;
   transition: all 0.2s;
   outline: none;
+  background: #fff;
 }
 
 .search-input:focus {
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #339af0;
+  box-shadow: 0 0 0 3px rgba(51, 154, 240, 0.12);
 }
 
-/* Tabs */
 .tabs-row {
-  border-bottom: 1px solid #E5E7EB;
-  margin-bottom: 24px;
+  border-bottom: 1px solid var(--gray200);
+  margin-bottom: 20px;
+  padding: 0 4px;
 }
 
 .tabs {
   display: flex;
-  gap: 32px;
+  gap: 20px;
 }
 
 .tab-btn {
   padding: 12px 4px;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #6B7280;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #868e96;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -214,29 +281,28 @@ const getStatusClass = (status) => {
 }
 
 .tab-btn.active {
-  color: #3B82F6;
-  border-bottom-color: #3B82F6;
+  color: #339af0;
+  border-bottom-color: #339af0;
 }
 
 .tab-btn .count {
-  font-size: 0.8rem;
-  background: #F3F4F6;
-  padding: 2px 8px;
+  font-size: 0.75rem;
+  background: #f1f3f5;
+  padding: 2px 7px;
   border-radius: 10px;
-  color: #6B7280;
+  color: #868e96;
 }
 
 .tab-btn.active .count {
-  background: #EBF5FF;
-  color: #3B82F6;
+  background: #f0f7ff;
+  color: #339af0;
 }
 
-/* Table Card */
 .table-card {
   background: white;
-  border-radius: 12px;
-  border: 1px solid #E5E7EB;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  border: 1px solid var(--gray200);
+  box-shadow: none;
   overflow: hidden;
 }
 
@@ -246,44 +312,47 @@ const getStatusClass = (status) => {
 }
 
 .data-table th {
-  background: #F9FAFB;
-  padding: 14px 20px;
+  background: #f8f9fa;
+  padding: 13px 20px;
   text-align: left;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #4B5563;
-  border-bottom: 1px solid #E5E7EB;
+  color: #868e96;
+  border-bottom: 1px solid #f1f3f5;
 }
 
 .data-table td {
-  padding: 16px 20px;
-  font-size: 0.9rem;
-  color: #1F2937;
-  border-bottom: 1px solid #F3F4F6;
+  padding: 14px 20px;
+  font-size: 0.85rem;
+  color: #495057;
+  border-bottom: 1px solid #f8f9fa;
 }
 
 .table-row:hover {
-  background: #F9FAFB;
+  background: #f8f9fa;
 }
 
-.col-id { color: #6B7280; font-family: monospace; }
-.col-title { font-weight: 500; }
-.title-text:hover { color: #3B82F6; text-decoration: underline; cursor: pointer; }
+.clickable-row {
+  cursor: pointer;
+}
 
-/* Status Badge */
+.col-id { color: #868e96; font-family: monospace; }
+.col-title { font-weight: 500; }
+.title-text:hover { color: #339af0; text-decoration: underline; cursor: pointer; }
+
 .status-badge {
   padding: 4px 10px;
   border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid transparent;
 }
 
-.status-draft { background: #E5E7EB; color: #4B5563; }
-.status-pending { background: #FFF7ED; color: #F59E0B; }
-.status-rejected { background: #FEF2F2; color: #EF4444; }
-.status-completed { background: #ECFDF5; color: #10B981; }
+.status-draft { background: #f1f3f5; color: #495057; border-color: #e9ecef; }
+.status-pending { background: #fff4e6; color: #f08c00; border-color: #ffe8cc; }
+.status-rejected { background: #fff5f5; color: #fa5252; border-color: #ffe3e3; }
+.status-completed { background: #f2fcf5; color: #40c057; border-color: #d3f9d8; }
 
-/* Progress Bar */
 .progress-container {
   display: flex;
   align-items: center;
@@ -293,7 +362,7 @@ const getStatusClass = (status) => {
 .progress-bar-bg {
   flex: 1;
   height: 6px;
-  background: #E5E7EB;
+  background: #e9ecef;
   border-radius: 3px;
   overflow: hidden;
   min-width: 80px;
@@ -301,18 +370,32 @@ const getStatusClass = (status) => {
 
 .progress-bar-fill {
   height: 100%;
-  background: #3B82F6;
+  background: #339af0;
   transition: width 0.3s ease;
 }
 
 .progress-text {
-  font-size: 0.8rem;
-  color: #6B7280;
+  font-size: 0.75rem;
+  color: #868e96;
   width: 35px;
   text-align: right;
 }
 
-/* Empty State */
+.redraft-btn {
+  border: 1px solid #d0e7ff;
+  background: #f0f7ff;
+  color: #1971c2;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.redraft-btn:hover {
+  background: #e7f5ff;
+}
+
 .empty-state {
   padding: 80px 0;
   text-align: center;
@@ -331,8 +414,7 @@ const getStatusClass = (status) => {
 }
 
 .empty-content p {
-  color: #9CA3AF;
-  font-size: 1.1rem;
+  color: #adb5bd;
+  font-size: 0.95rem;
 }
 </style>
-

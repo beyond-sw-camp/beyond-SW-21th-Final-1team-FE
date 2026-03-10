@@ -58,13 +58,19 @@
     <div class="list-section-card">
       <div class="filter-row">
         <div class="tabs">
-          <button class="tab active">전체</button>
-          <button class="tab">휴가</button>
-          <button class="tab">근무</button>
+          <button 
+            v-for="tab in tabs" 
+            :key="tab" 
+            class="tab" 
+            :class="{ active: activeTab === tab }"
+            @click="activeTab = tab"
+          >
+            {{ tab }}
+          </button>
         </div>
         <div class="search-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="검색" />
+          <input type="text" v-model="searchQuery" placeholder="신청 내역 검색" />
         </div>
       </div>
 
@@ -81,13 +87,21 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, idx) in historyList" :key="idx">
+            <tr v-for="(item, idx) in filteredHistoryList" :key="idx">
               <td class="date">{{ item.date }}</td>
               <td><span class="type-badge" :class="getTypeColor(item.type)">{{ item.type }}</span></td>
               <td class="title">{{ item.title }}</td>
               <td class="target-date">{{ item.targetDate }}</td>
               <td class="approver">{{ item.approver }}</td>
-              <td class="text-right"><span class="status-badge" :class="getStatusColor(item.status)">{{ item.status }}</span></td>
+              <td class="text-right">
+                <span 
+                  class="status-badge" 
+                  :class="[getStatusColor(item.status), { 'clickable': item.status === '반려' }]"
+                  @click="handleStatusClick(item)"
+                >
+                  {{ item.status }}
+                </span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -100,12 +114,24 @@
         <button class="page-arrow">&gt;</button>
       </div>
     </div>
+
+    <!-- Rejection Reason Modal -->
+    <BaseModal v-model="showReasonModal" width="400px">
+      <div class="modal-content">
+        <h3 class="modal-title">반려 사유</h3>
+        <p class="modal-text">{{ rejectionReason || '사유가 없습니다.' }}</p>
+        <div class="modal-actions">
+          <button class="btn-confirm" @click="showReasonModal = false">확인</button>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
+import BaseModal from '@/components/common/BaseModal.vue'
 
 const store = useAttendanceStore()
 
@@ -125,6 +151,33 @@ const historyList = computed(() => {
     approver: item.approver || 'Steve 매니저',
     status: mapStatus(item.status)
   }))
+})
+
+const tabs = ['전체', '휴가', '근무']
+const activeTab = ref('전체')
+const searchQuery = ref('')
+
+const filteredHistoryList = computed(() => {
+  let list = historyList.value
+
+  // 1. Filter by Tab
+  if (activeTab.value === '휴가') {
+    list = list.filter(item => item.type === '휴가' || item.type.includes('휴가'))
+  } else if (activeTab.value === '근무') {
+    list = list.filter(item => item.type !== '휴가' && !item.type.includes('휴가'))
+  }
+
+  // 2. Filter by Search
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    list = list.filter(item => 
+      item.title.toLowerCase().includes(query) || 
+      (item.approver && item.approver.toLowerCase().includes(query)) ||
+      (item.type && item.type.toLowerCase().includes(query))
+    )
+  }
+  
+  return list
 })
 
 const mapStatus = (status) => {
@@ -153,6 +206,18 @@ const getStatusColor = (status) => {
   if (status === '승인') return 'green'
   if (status === '반려') return 'red'
   return 'gray'
+}
+
+const showReasonModal = ref(false)
+const rejectionReason = ref('')
+
+const handleStatusClick = (item) => {
+  console.log('Status clicked:', item.status)
+  if (item.status === '반려' || item.status.includes('반려')) {
+    // In a real app, this should come from the store item
+    rejectionReason.value = '거래처 미팅이 있습니다.'
+    showReasonModal.value = true
+  }
 }
 </script>
 
@@ -245,7 +310,7 @@ const getStatusColor = (status) => {
   background: var(--gray50); border: 1px solid var(--gray200);
   border-radius: 6px; padding: 6px 12px; width: 240px; color: var(--gray400);
 }
-.search-box input { border: none; background: transparent; width: 100%; font-size: 0.9rem; }
+.search-box input { border: none; background: transparent; width: 100%; font-size: 0.9rem; outline: none; }
 
 /* Table */
 .table-wrapper {
@@ -292,6 +357,17 @@ const getStatusColor = (status) => {
 .status-badge.orange { background: #FFFBEB; color: #D97706; border-color: #FCD34D; }
 .status-badge.green { background: #ECFDF5; color: #059669; border-color: #6EE7B7; }
 .status-badge.red { background: #FEF2F2; color: #DC2626; border-color: #FCA5A5; }
+.status-badge.clickable { cursor: pointer; text-decoration: underline; }
+
+/* Modal Styles */
+.modal-title { font-size: 1.1rem; font-weight: 700; color: var(--gray900); margin-bottom: 12px; }
+.modal-text { font-size: 0.95rem; color: var(--gray700); line-height: 1.5; margin-bottom: 24px; }
+.modal-actions { display: flex; justify-content: flex-end; }
+.btn-confirm {
+  background: var(--primary); color: #fff; border: none; padding: 8px 20px;
+  border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+}
+.btn-confirm:hover { opacity: 0.9; }
 
 
 /* Pagination */

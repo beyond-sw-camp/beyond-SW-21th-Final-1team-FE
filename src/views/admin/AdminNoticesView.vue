@@ -224,7 +224,7 @@ const submitCreate = () => {
 </script>
 
 <style scoped>
-.admin-page { max-width: 1200px; }
+.admin-page { width: 100%; max-width: none; min-width: 0; }
 .card { margin-top: 12px; background: #fff; border: 1px solid var(--gray200); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .card-head h3 { margin: 0; color: var(--gray800); }

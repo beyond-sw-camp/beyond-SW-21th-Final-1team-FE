@@ -1,8 +1,14 @@
 <template>
   <div class="manual-upload">
     <section class="card header">
-      <h1>업무 메뉴얼 업로드</h1>
-      <p>직접 작성 또는 PDF 자동작성 중 하나를 선택하세요.</p>
+      <div>
+        <p class="eyebrow">KMS MANUAL</p>
+        <h1>업무 메뉴얼 업로드</h1>
+        <p class="header-desc">기존 스타일을 유지하면서 문서 작성 경험을 강화한 편집 화면입니다.</p>
+      </div>
+      <div class="header-status">
+        <span>{{ mode === 'write' ? '직접 작성' : 'PDF 업로드' }}</span>
+      </div>
     </section>
 
     <section class="card content">
@@ -11,24 +17,33 @@
         <button :class="{ active: mode === 'pdf' }" @click="mode = 'pdf'">PDF 업로드</button>
       </div>
 
-      <div class="form">
-        <label>제목</label>
-        <input v-model="title" type="text" placeholder="제목 입력" />
+      <div class="meta-grid">
+        <div class="form-item">
+          <label>제목</label>
+          <input v-model="title" type="text" placeholder="예: Vue 프론트엔드 배포 가이드" />
+        </div>
+        <div class="form-item">
+          <label>카테고리</label>
+          <select v-model="category">
+            <option value="">선택</option>
+            <option v-for="item in kmsCategories" :key="item.key" :value="item.key">{{ item.name }}</option>
+          </select>
+        </div>
+      </div>
 
-        <label>카테고리</label>
-        <select v-model="category">
-          <option value="">선택</option>
-          <option v-for="item in kmsCategories" :key="item.key" :value="item.key">{{ item.name }}</option>
-        </select>
-
-        <template v-if="mode === 'write'">
-          <label>내용</label>
-          <textarea v-model="content" rows="8" placeholder="업무 메뉴얼 내용을 입력하세요." />
-        </template>
-        <template v-else>
-          <label>PDF</label>
-          <input type="file" accept=".pdf" />
-        </template>
+      <div v-if="mode === 'write'" class="editor-panel">
+        <div class="editor-head">
+          <div>
+            <label>본문 편집</label>
+            <p>굵게, 색상, 리스트, 코드블록 등 문서 포맷을 지원합니다.</p>
+          </div>
+          <span class="editor-stat">{{ contentTextLength }}자</span>
+        </div>
+        <KmsRichEditor v-model="content" placeholder="업무 메뉴얼 내용을 입력하세요." />
+      </div>
+      <div v-else class="form-item file-item">
+        <label>PDF</label>
+        <input type="file" accept=".pdf" />
       </div>
     </section>
 
@@ -224,10 +239,16 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import EmployeePickerModal from '@/components/org/EmployeePickerModal.vue'
+import KmsRichEditor from '@/components/kms/KmsRichEditor.vue'
 import { kmsCategories } from '@/mocks/kms'
 import { createHrOrgTreeMock, sortMembersByRule } from '@/mocks/hr/organization'
+import { AUTH_KEYS } from '@/utils/auth'
+import { useKmsManualStore } from '@/store/kmsManuals'
 
+const router = useRouter()
+const manualStore = useKmsManualStore()
 const mode = ref('write')
 const title = ref('')
 const category = ref('')
@@ -293,6 +314,7 @@ const editTeamChips = computed(() => toTeamChips(editTeams.value))
 const editUserChips = computed(() => toUserChips(editUsers.value))
 const deleteTeamChips = computed(() => toTeamChips(deleteTeams.value))
 const deleteUserChips = computed(() => toUserChips(deleteUsers.value))
+const contentTextLength = computed(() => content.value.replace(/<[^>]+>/g, '').trim().length)
 
 const openTeamPicker = (permission) => {
   pickerPermissionTarget.value = permission
@@ -347,24 +369,85 @@ watch(deleteScope, (next) => {
 })
 
 const handleUpload = () => {
-  alert('권한 설정(조직도 기반) 시안 적용 완료. 저장 API 연동 전 단계입니다.')
+  const plainTextLength = contentTextLength.value
+  if (!title.value.trim()) {
+    alert('제목을 입력해 주세요.')
+    return
+  }
+  if (!category.value) {
+    alert('카테고리를 선택해 주세요.')
+    return
+  }
+  if (mode.value === 'write' && !plainTextLength) {
+    alert('본문 내용을 입력해 주세요.')
+    return
+  }
+
+  const authorName = sessionStorage.getItem(AUTH_KEYS.userName) || '사용자'
+  const bodyValue = mode.value === 'write'
+    ? content.value
+    : '<p>PDF 업로드 기반 문서입니다. 본문 자동 생성 대기 중입니다.</p>'
+
+  const created = manualStore.createManual({
+    title: title.value.trim(),
+    category: category.value,
+    body: bodyValue,
+    author: authorName
+  })
+
+  alert('업무 메뉴얼이 등록되었습니다.')
+  router.push(`/kms/manuals/detail/${created.id}`)
 }
 </script>
 
 <style scoped>
 .manual-upload { display: flex; flex-direction: column; gap: 16px; }
-.header { padding: 18px; border: 1px solid var(--gray200); }
-h1 { font-size: 1.14rem; color: var(--gray800); }
-p { margin-top: 6px; color: var(--gray500); font-size: 0.84rem; }
+.header {
+  padding: 20px;
+  border: 1px solid var(--gray200);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.eyebrow { color: var(--primary); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.08em; }
+.header h1 { margin-top: 4px; font-size: 1.16rem; color: var(--gray800); }
+.header-desc { margin-top: 6px; color: var(--gray500); font-size: 0.82rem; }
+.header-status span {
+  display: inline-flex;
+  background: #e6fffb;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
 .content { border: 1px solid var(--gray200); padding: 18px; }
 .mode-switch { display: inline-flex; border: 1px solid var(--gray200); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
-.mode-switch button { border: none; background: #fff; padding: 8px 12px; font-size: 0.82rem; color: var(--gray600); }
+.mode-switch button { border: none; background: #fff; padding: 8px 14px; font-size: 0.82rem; color: var(--gray600); font-weight: 600; }
 .mode-switch button.active { background: var(--primary); color: #fff; }
-.form { display: grid; gap: 8px; }
-label { font-size: 0.8rem; color: var(--gray500); }
-input, textarea, select { border: 1px solid var(--gray300); border-radius: 10px; padding: 10px 12px; font-size: 0.86rem; }
+.meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-item { display: grid; gap: 6px; }
+.form-item label { font-size: 0.8rem; color: var(--gray500); }
+.form-item input,
+.form-item select { border: 1px solid var(--gray300); border-radius: 10px; padding: 10px 12px; font-size: 0.86rem; background: #fff; }
+.editor-panel { margin-top: 12px; display: grid; gap: 8px; }
+.editor-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-end; }
+.editor-head label { font-size: 0.8rem; color: var(--gray500); }
+.editor-head p { margin-top: 3px; font-size: 0.77rem; color: var(--gray400); }
+.editor-stat {
+  border: 1px solid var(--gray200);
+  border-radius: 999px;
+  color: var(--gray600);
+  background: var(--gray50);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.file-item { margin-top: 8px; }
 .permissions { border: 1px solid var(--gray200); padding: 18px; }
-h2 { font-size: 0.95rem; color: var(--gray800); }
+.permissions h2 { font-size: 0.95rem; color: var(--gray800); }
 .help { margin-top: 6px; color: var(--gray500); font-size: 0.82rem; }
 .permission-card { margin-top: 12px; border: 1px solid #dbe7ef; border-radius: 14px; background: linear-gradient(180deg, #ffffff 0%, #f8fcff 100%); padding: 14px; }
 .permission-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
@@ -374,6 +457,7 @@ h2 { font-size: 0.95rem; color: var(--gray800); }
 .permission-body { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .picker-col { display: flex; flex-direction: column; gap: 6px; }
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.label-row label { font-size: 0.8rem; color: var(--gray500); }
 .inline-actions { display: flex; gap: 6px; }
 .pick-btn {
   border: 1px solid #bfdbfe;
@@ -426,6 +510,8 @@ h2 { font-size: 0.95rem; color: var(--gray800); }
 .permissions-footer { margin-top: 16px; display: flex; justify-content: flex-end; }
 .save-btn { background: var(--primary); color: #fff; border-radius: 10px; padding: 10px 18px; font-weight: 700; }
 @media (max-width: 900px) {
+  .header { flex-direction: column; }
+  .meta-grid { grid-template-columns: 1fr; }
   .permission-head { flex-direction: column; align-items: flex-start; }
   .permission-body { grid-template-columns: 1fr; }
   .permissions-footer { justify-content: stretch; }

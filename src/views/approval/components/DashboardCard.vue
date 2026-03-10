@@ -1,5 +1,5 @@
 <template>
-  <div class="card">
+  <div class="card" :class="`card--${variant}`">
     <div class="card-header">
       <h3 class="card-title">{{ title }}</h3>
       <button class="more-btn" @click="goToList">
@@ -55,7 +55,11 @@ const props = defineProps({
   items: Array,
   countLabel: String,
   linkType: String,
-  isTemp: Boolean
+  isTemp: Boolean,
+  variant: {
+    type: String,
+    default: 'default'
+  }
 });
 
 const emit = defineEmits(['click-item']);
@@ -70,38 +74,39 @@ const goToList = () => {
 .card {
   background: white;
   border-radius: 20px;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f3f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
 .card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.08);
 }
 
 .card-header {
-  padding: 24px;
+  padding: 18px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f3f5;
 }
 
 .card-title {
   font-size: 1.1rem;
   font-weight: 800;
-  color: #1e293b;
+  color: #212529;
 }
 
 .more-btn {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #6366f1;
-  background: #f5f3ff;
+  color: #339af0;
+  background: #f0f7ff;
   border: none;
   padding: 6px 12px;
   border-radius: 8px;
@@ -113,14 +118,13 @@ const goToList = () => {
 }
 
 .more-btn:hover {
-  background: #ede9fe;
+  background: #e7f5ff;
   gap: 8px;
 }
 
 .card-body {
   flex: 1;
-  padding: 8px 0;
-  min-height: 300px;
+  padding: 4px 0;
 }
 
 .mini-list {
@@ -129,13 +133,13 @@ const goToList = () => {
 }
 
 .mini-item {
-  padding: 14px 24px;
+  padding: 11px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
   transition: background 0.2s;
-  border-bottom: 1px solid #f8fafc;
+  border-bottom: 1px solid #f8f9fa;
 }
 
 .mini-item:last-child {
@@ -143,7 +147,7 @@ const goToList = () => {
 }
 
 .mini-item:hover {
-  background: #f8fafc;
+  background: #f8f9fa;
 }
 
 .item-main {
@@ -162,18 +166,18 @@ const goToList = () => {
 
 .unread-style {
   font-weight: 800;
-  color: #0f172a;
+  color: #212529;
 }
 
 .read-style {
-  color: #3b82f6;
+  color: #339af0;
   text-decoration: underline;
   font-weight: 500;
 }
 
 .item-meta {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: #adb5bd;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -186,10 +190,10 @@ const goToList = () => {
   border-radius: 6px;
 }
 
-.status-완료 { background: #ecfdf5; color: #059669; }
-.status-진행중 { background: #eff6ff; color: #2563eb; }
-.status-반려 { background: #fef2f2; color: #dc2626; }
-.status-보류 { background: #fffbeb; color: #d97706; }
+.status-완료 { background: #f2fcf5; color: #40c057; border: 1px solid #d3f9d8; }
+.status-진행중 { background: #f0f7ff; color: #339af0; border: 1px solid #d0e7ff; }
+.status-반려 { background: #fff5f5; color: #fa5252; border: 1px solid #ffe3e3; }
+.status-보류 { background: #fff9db; color: #f08c00; border: 1px solid #ffec99; }
 
 .temp-actions {
   display: flex;
@@ -203,26 +207,45 @@ const goToList = () => {
 }
 
 .empty-list {
-  height: 300px;
+  height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: #adb5bd;
   font-size: 0.9rem;
 }
 
 .card-footer {
-  padding: 16px 24px;
-  background: #f8fafc;
-  border-top: 1px solid #f1f5f9;
+  padding: 12px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #f1f3f5;
+}
+
+.card--reference {
+  border-color: #dbeafe;
+  box-shadow: 0 2px 10px rgba(59, 130, 246, 0.08);
+}
+
+.card--reference .card-header {
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border-bottom-color: #e2ecff;
+}
+
+.card--reference .card-title {
+  color: #1d4ed8;
+}
+
+.card--reference .card-footer {
+  background: #f8fbff;
+  border-top-color: #e2ecff;
 }
 
 .total-count {
   font-size: 0.8rem;
-  color: #64748b;
+  color: #868e96;
 }
 
 .total-count strong {
-  color: #0f172a;
+  color: #212529;
 }
 </style>

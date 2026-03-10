@@ -14,20 +14,47 @@
       <div class="profile-name">{{ name }} {{ position }}</div>
       <div class="profile-team">{{ team }}</div>
       <div class="profile-btns">
-        <button class="btn-checkin" @click="$emit('checkin')">출근</button>
-        <button class="btn-checkout" @click="$emit('checkout')">퇴근</button>
+        <div class="btn-group">
+          <button class="btn-checkin" @click="handleCheckIn">출근</button>
+          <div v-if="checkInTime" class="time-display">{{ checkInTime }}</div>
+        </div>
+        <div class="btn-group">
+          <button class="btn-checkout" @click="handleCheckOut">퇴근</button>
+          <div v-if="checkOutTime" class="time-display">{{ checkOutTime }}</div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
+import { useAttendanceStore } from '@/store/attendance'
+import { storeToRefs } from 'pinia'
+
 defineProps({
-  name: { type: String, default: 'Steve' },
-  position: { type: String, default: '매니저' },
-  team: { type: String, default: '전략 기획팀' },
+  name: { type: String, default: '김봉식' },
+  position: { type: String, default: '과장' },
+  team: { type: String, default: '모바일 1팀' },
 })
-defineEmits(['checkin', 'checkout'])
+const emit = defineEmits(['checkin', 'checkout'])
+
+const store = useAttendanceStore()
+const { checkInTime, checkOutTime } = storeToRefs(store)
+
+const handleCheckIn = () => {
+  const now = new Date()
+  const h = String(now.getHours()).padStart(2, '0')
+  const m = String(now.getMinutes()).padStart(2, '0')
+  store.setCheckInTime(`${h}:${m}`)
+}
+
+const handleCheckOut = () => {
+  const now = new Date()
+  const h = String(now.getHours()).padStart(2, '0')
+  const m = String(now.getMinutes()).padStart(2, '0')
+  store.setCheckOutTime(`${h}:${m}`)
+}
 </script>
 
 <style scoped>
@@ -47,12 +74,14 @@ defineEmits(['checkin', 'checkout'])
 .profile-name{font-size:1.05rem;font-weight:700;color:var(--gray800);margin-top:10px}
 .profile-team{font-size:0.8rem;color:var(--gray500);margin-bottom:16px}
 .profile-btns{display:flex;gap:6px}
+.btn-group { flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: center; }
 .btn-checkin,.btn-checkout{
-  flex:1;padding:9px;border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;
+  width: 100%; padding:9px;border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;
   transition:all var(--transition);
 }
-.btn-checkin{background:var(--primary);color:#fff}
+.btn-checkin{background:var(--primary);color:#fff;border:none}
 .btn-checkin:hover{background:var(--primary-dark)}
 .btn-checkout{background:var(--gray100);color:var(--gray600);border:1px solid var(--gray200)}
 .btn-checkout:hover{background:var(--gray200)}
+.time-display { font-size: 0.85rem; color: var(--primary); font-weight: 600; margin-top: 2px; }
 </style>

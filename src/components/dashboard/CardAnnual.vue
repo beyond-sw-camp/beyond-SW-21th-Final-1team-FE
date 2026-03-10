@@ -7,7 +7,7 @@
           <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
         <h3>연차 현황</h3>
-        <button class="more-btn">더보기</button>
+        <button class="more-btn" @click="$router.push('/attendance/vacation')">더보기</button>
       </div>
       <div v-for="(row, i) in rows" :key="row.label" class="annual-row" :class="{ first: i === 0 }">
         <span class="annual-label">{{ row.label }}</span>

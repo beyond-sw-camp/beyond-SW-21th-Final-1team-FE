@@ -77,7 +77,7 @@ if (sessionLastLogin) {
 </script>
 
 <style scoped>
-.mypage{max-width:1200px}
+.mypage{width:100%;max-width:none;min-width:0}
 .breadcrumb{font-size:.78rem;color:var(--gray400);margin-bottom:4px}
 
 /* 프로필 헤더 */

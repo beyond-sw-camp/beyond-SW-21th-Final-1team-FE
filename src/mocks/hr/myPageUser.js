@@ -1,10 +1,10 @@
 export const hrMyPageUserMock = {
   profileImage: '',
-  name: '김세현',
+  name: '김봉식',
   team: '모바일1팀',
   jobTitle: '백엔드 개발자',
   position: '팀장',
-  email: 'sehyun.kim@rhight.co.kr',
+  email: 'bong@rhight.co.kr',
   phone: '010-1234-5678',
   extension: '1042',
   workLocation: '서울 강남',
@@ -24,14 +24,65 @@ export const hrMyPageUserMock = {
   workRegion: '서울 강남',
   hireType: '경력',
   careers: [
-    { company: 'RHight', role: '백엔드 개발자 · 모바일1팀', period: '2024.02 ~ 재직중', duration: '2년 0개월' },
-    { company: '네이버', role: '서버 개발자 · 플랫폼개발팀', period: '2021.03 ~ 2024.01', duration: '2년 11개월' },
-    { company: '카카오', role: '백엔드 개발자 · 서비스개발팀', period: '2019.07 ~ 2021.02', duration: '1년 8개월' }
+    {
+      company: 'RHight',
+      role: '백엔드 개발자 · 모바일1팀',
+      period: '2024.02 ~ 재직중',
+      duration: '2년 0개월',
+      fileName: 'RHight_재직증빙.pdf',
+      fileType: 'application/pdf',
+      fileUrl: 'data:text/plain;charset=utf-8,RHight%20%EA%B2%BD%EB%A0%A5%20%EC%A6%9D%EB%B9%99%20%EB%8D%94%EB%AF%B8%20%ED%8C%8C%EC%9D%BC'
+    },
+    {
+      company: '네이버',
+      role: '서버 개발자 · 플랫폼개발팀',
+      period: '2021.03 ~ 2024.01',
+      duration: '2년 11개월',
+      fileName: 'Naver_경력증빙.pdf',
+      fileType: 'application/pdf',
+      fileUrl: 'data:text/plain;charset=utf-8,Naver%20%EA%B2%BD%EB%A0%A5%20%EC%A6%9D%EB%B9%99%20%EB%8D%94%EB%AF%B8%20%ED%8C%8C%EC%9D%BC'
+    },
+    {
+      company: '카카오',
+      role: '백엔드 개발자 · 서비스개발팀',
+      period: '2019.07 ~ 2021.02',
+      duration: '1년 8개월',
+      fileName: 'Kakao_경력증빙.pdf',
+      fileType: 'application/pdf',
+      fileUrl: 'data:text/plain;charset=utf-8,Kakao%20%EA%B2%BD%EB%A0%A5%20%EC%A6%9D%EB%B9%99%20%EB%8D%94%EB%AF%B8%20%ED%8C%8C%EC%9D%BC'
+    }
   ],
   skills: [
-    { type: '자격증', name: '정보처리기사', issuer: '한국산업인력공단', date: '2023.06', status: '유효' },
-    { type: '어학', name: 'TOEIC 920', issuer: 'ETS', date: '2024.01', status: '유효' },
-    { type: '자격증', name: 'SQLD', issuer: '한국데이터산업진흥원', date: '2023.09', status: '유효' }
+    {
+      type: '자격증',
+      name: '정보처리기사',
+      issuer: '한국산업인력공단',
+      date: '2023.06',
+      status: '유효',
+      fileName: '정보처리기사_증빙.pdf',
+      fileType: 'application/pdf',
+      fileUrl: 'data:text/plain;charset=utf-8,%EC%A0%95%EB%B3%B4%EC%B2%98%EB%A6%AC%EA%B8%B0%EC%82%AC%20%EC%A6%9D%EB%B9%99%20%EB%8D%94%EB%AF%B8%20%ED%8C%8C%EC%9D%BC'
+    },
+    {
+      type: '어학',
+      name: 'TOEIC 920',
+      issuer: 'ETS',
+      date: '2024.01',
+      status: '유효',
+      fileName: 'TOEIC_920_증빙.pdf',
+      fileType: 'application/pdf',
+      fileUrl: 'data:text/plain;charset=utf-8,TOEIC%20920%20%EC%A6%9D%EB%B9%99%20%EB%8D%94%EB%AF%B8%20%ED%8C%8C%EC%9D%BC'
+    },
+    {
+      type: '자격증',
+      name: 'SQLD',
+      issuer: '한국데이터산업진흥원',
+      date: '2023.09',
+      status: '유효',
+      fileName: 'SQLD_증빙.pdf',
+      fileType: 'application/pdf',
+      fileUrl: 'data:text/plain;charset=utf-8,SQLD%20%EC%A6%9D%EB%B9%99%20%EB%8D%94%EB%AF%B8%20%ED%8C%8C%EC%9D%BC'
+    }
   ]
 }
 

@@ -50,9 +50,9 @@
             </button>
           </div>
           <div class="right-actions">
-            <select class="filter-select">
-              <option>전체 상태</option>
-              <option>승인 대기</option>
+            <select class="filter-select" v-model="selectedFilter">
+              <option value="all">전체 상태</option>
+              <option value="pending">승인 대기</option>
             </select>
           </div>
         </div>
@@ -91,12 +91,16 @@
                 <span class="type-badge">{{ item.type }}</span>
               </td>
               <td>
-                <span class="status-badge" :class="item.status">
+                <span 
+                  class="status-badge" 
+                  :class="[item.status, { 'clickable': item.status === 'rejected' }]"
+                  @click="item.status === 'rejected' && handleViewDetail(item)"
+                >
                   {{ getStatusLabel(item.status) }}
                 </span>
               </td>
               <td>
-                <button class="btn-detail">보기</button>
+                <button class="btn-detail" @click="handleViewDetail(item)">보기</button>
               </td>
             </tr>
           </tbody>
@@ -179,22 +183,97 @@
               <div class="core-legend">
                  <span class="core-box"></span> 코어타임 (14:00 - 16:00)
               </div>
-           </div>
+            </div>
         </div>
       </div>
     </div>
+
+    <!-- Detail Modal -->
+    <BaseModal v-model="showDetailModal" width="600px" v-if="selectedPlan">
+      <div class="modal-header">
+        <h3 class="modal-title">유연근무 신청 상세</h3>
+        <span class="status-badge" :class="selectedPlan.status">{{ getStatusLabel(selectedPlan.status) }}</span>
+      </div>
+      
+      <div class="detail-grid">
+        <div class="detail-item">
+          <label>신청자</label>
+          <div class="val">{{ selectedPlan.name }} {{ selectedPlan.position }}</div>
+        </div>
+        <div class="detail-item">
+          <label>부서</label>
+          <div class="val">{{ selectedPlan.dept }}</div>
+        </div>
+        <div class="detail-item full">
+          <label>신청 기간</label>
+          <div class="val">{{ selectedPlan.period }}</div>
+        </div>
+        <div class="detail-item full">
+          <label>근무 유형</label>
+          <div class="val highlight">{{ selectedPlan.type }}</div>
+        </div>
+        <div class="detail-item full">
+           <label>신청 사유</label>
+           <div class="val box">{{ selectedPlan.reason || '육아로 인한 시차출퇴근 신청합니다.' }}</div>
+        </div>
+        <div class="detail-item full" v-if="selectedPlan.status === 'rejected'">
+           <label style="color: var(--red);">반려 사유</label>
+           <div class="val box reject-box">{{ selectedPlan.rejectionReason || '인력 부족으로 인한 반려' }}</div>
+        </div>
+      </div>
+
+      <!-- Simple visual representation of schedule pattern -->
+      <div class="schedule-pattern-preview">
+        <h4>근무 패턴 예시 (09:00 - 18:00)</h4>
+        <div class="pattern-bar">
+           <div class="p-segment work" style="width: 100%">기본 근무</div>
+        </div>
+      </div>
+
+      <div class="modal-actions" v-if="selectedPlan.status === 'pending'">
+        <button class="btn-reject" @click="handleModalReject">반려</button>
+        <button class="btn-approve" @click="handleModalApprove">승인</button>
+      </div>
+      <div class="modal-actions" v-else>
+         <button class="btn-close" @click="showDetailModal = false">닫기</button>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
+import BaseModal from '@/components/common/BaseModal.vue'
 
 const store = useAttendanceStore()
 const currentTab = ref('list')
 const selectedIds = ref([])
 const hasStaffShortage = ref(true)
 const selectedDayIndex = ref(0) // 0: Mon, 1: Tue ...
+const selectedFilter = ref('all') // 'all' or 'pending'
+
+// Detail Modal State
+const showDetailModal = ref(false)
+const selectedPlan = ref(null)
+
+const handleViewDetail = (item) => {
+  selectedPlan.value = item
+  showDetailModal.value = true
+}
+
+const handleModalApprove = () => {
+  if (!confirm('승인하시겠습니까?')) return
+  store.updateFlexibleStatus(selectedPlan.value.id, 'approved')
+  showDetailModal.value = false
+}
+
+const handleModalReject = () => {
+  const reason = prompt('반려 사유를 입력하세요')
+  if (!reason) return
+  store.updateFlexibleStatus(selectedPlan.value.id, 'rejected', reason)
+  showDetailModal.value = false
+}
 
 // Days for Tabs
 const days = [
@@ -211,7 +290,15 @@ const hours = Array.from({length: 13}, (_, i) => i + 8) // 8, 9, ... 20
 // Use store data for plans
 const planList = computed(() => store.flexibleWorkPlans)
 const sortedPlanList = computed(() => {
-  return [...planList.value].sort((a, b) => {
+  let list = [...planList.value]
+
+  // Filtering
+  if (selectedFilter.value === 'pending') {
+    list = list.filter(item => item.status === 'pending')
+  }
+
+  // Sorting (Pending first)
+  return list.sort((a, b) => {
     if (a.status === 'pending' && b.status !== 'pending') return -1
     return 0
   })
@@ -409,6 +496,7 @@ const getBarStyle = (day) => {
 .status-badge.approved::before { background: #10B981; }
 .status-badge.rejected { background: #FEF2F2; color: #B91C1C; border: 1px solid #FEE2E2; }
 .status-badge.rejected::before { background: #EF4444; }
+.status-badge.clickable { cursor: pointer; text-decoration: underline; }
 
 .btn-detail { 
   border: 1px solid var(--gray300); background: #fff; padding: 6px 12px; border-radius: 6px; 
@@ -510,4 +598,28 @@ const getBarStyle = (day) => {
 .core-legend { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--gray600); margin-left: auto; }
 .core-box { width: 24px; height: 24px; background: rgba(255, 200, 0, 0.1); border: 1px dashed rgba(245, 158, 11, 0.5); border-radius: 4px; }
 
+
+/* Modal Styles */
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--gray100); }
+.modal-title { font-size: 1.25rem; font-weight: 700; color: var(--gray900); }
+
+.detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px;
+}
+.detail-item { display: flex; flex-direction: column; gap: 8px; }
+.detail-item.full { grid-column: span 2; }
+.detail-item label { font-size: 0.85rem; color: var(--gray500); font-weight: 600; }
+.detail-item .val { font-size: 1rem; color: var(--gray900); font-weight: 500; }
+.detail-item .val.highlight { color: var(--primary); font-weight: 700; }
+.detail-item .val.box { background: var(--gray50); padding: 12px; border-radius: 8px; border: 1px solid var(--gray200); font-size: 0.95rem; line-height: 1.5; }
+.detail-item .val.reject-box { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+
+.schedule-pattern-preview { background: var(--gray50); padding: 16px; border-radius: 8px; margin-bottom: 32px; }
+.schedule-pattern-preview h4 { font-size: 0.9rem; color: var(--gray600); margin-bottom: 12px; }
+.pattern-bar { height: 40px; background: #e5e7eb; border-radius: 20px; overflow: hidden; display: flex; }
+.p-segment.work { background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; }
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px; border-top: 1px solid var(--gray100); }
+.btn-close { padding: 10px 24px; border: 1px solid var(--gray300); background: #fff; border-radius: 6px; font-weight: 600; cursor: pointer; color: var(--gray700); }
+.btn-close:hover { background: var(--gray50); }
 </style>

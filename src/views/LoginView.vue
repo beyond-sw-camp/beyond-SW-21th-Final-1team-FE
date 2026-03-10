@@ -75,19 +75,28 @@
             type="password"
             v-model="resetPasswordForm.newPassword"
             placeholder="새 비밀번호를 입력하세요"
+            @input="validateResetPassword"
           />
+          <div v-if="resetPasswordForm.newPassword" class="pw-rules">
+            <div v-for="rule in resetPwRules" :key="rule.label" class="pw-rule" :class="{ pass: rule.pass }">
+              <svg v-if="rule.pass" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+              {{ rule.label }}
+            </div>
+          </div>
         </div>
         <div class="field-group">
           <input
             type="password"
             v-model="resetPasswordForm.confirmPassword"
             placeholder="새 비밀번호를 다시 입력하세요"
+            @input="validateResetPassword"
           />
         </div>
       </div>
       <p v-if="resetPasswordError" class="reset-error">{{ resetPasswordError }}</p>
       <div class="force-actions">
-        <button class="login-btn" type="button" @click="submitResetPassword">비밀번호 변경 후 로그인</button>
+        <button class="login-btn" type="button" :disabled="!canSubmitResetPassword" @click="submitResetPassword">비밀번호 변경 후 로그인</button>
       </div>
     </BaseModal>
   </div>
@@ -95,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { changeInitialPassword, initializePassword, login } from '@/api/auth'
 import logo from '@/assets/logo-rhight.png'
@@ -125,6 +134,9 @@ const completeLogin = (sessionPayload) => {
 
 const clearLoginError = () => {
   loginError.value = ''
+}
+const validateResetPassword = () => {
+  resetPasswordError.value = ''
 }
 
 const formatLoginTimestamp = () => {
@@ -199,12 +211,12 @@ const submitResetPassword = async () => {
     resetPasswordError.value = '새 비밀번호를 모두 입력해주세요.'
     return
   }
-  if (newPassword !== confirmPassword) {
-    resetPasswordError.value = '새 비밀번호가 일치하지 않습니다.'
+  if (!allResetPwRulesPass.value) {
+    resetPasswordError.value = '비밀번호 정책을 모두 충족해주세요.'
     return
   }
-  if (newPassword.length < 8) {
-    resetPasswordError.value = '새 비밀번호는 8자 이상이어야 합니다.'
+  if (newPassword !== confirmPassword) {
+    resetPasswordError.value = '새 비밀번호가 일치하지 않습니다.'
     return
   }
 
@@ -242,7 +254,7 @@ const submitResetPassword = async () => {
 
 .login-form-wrap {
   width: 100%;
-  max-width: 320px;
+  max-width: none;
 }
 
 .login-logo {
@@ -370,6 +382,22 @@ const submitResetPassword = async () => {
 }
 .force-actions {
   margin-top: 14px;
+}
+.pw-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+}
+.pw-rule {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .72rem;
+  color: #94A3B8;
+}
+.pw-rule.pass {
+  color: #16A34A;
 }
 
 .login-footer {

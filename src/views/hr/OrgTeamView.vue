@@ -6,16 +6,16 @@
       <div class="title-wrap">
         <h1>내 조직 조회</h1>
       </div>
-      <div class="head-actions">
-        <button class="btn-head btn-head-muted" type="button">근태</button>
-        <button class="btn-head btn-head-muted" type="button">목표</button>
+      <div v-if="canViewMemberDetail" class="head-actions">
+        <button class="btn-head btn-head-muted" type="button" @click="goToTeamAttendance">근태</button>
+        <button class="btn-head btn-head-muted" type="button" @click="goToPerformanceInquiry">목표</button>
       </div>
     </section>
 
     <section class="info-bar">
       <strong>{{ currentUser.teamName }}</strong>
       <span>팀원 {{ sortedTeamMembers.length }}명</span>
-      <span v-if="canViewMemberDetail" class="permission-text">팀원 상세 조회 권한 있음</span>
+      <span v-if="canViewMemberDetail" class="permission-text"></span>
     </section>
 
     <section class="member-grid">
@@ -50,9 +50,7 @@
         <div class="detail-head">
           <div>
             <h2>{{ selectedMember.name }} 인사 정보</h2>
-            <p>팀장 권한 상세 조회</p>
           </div>
-          <span class="view-badge">팀장 뷰</span>
         </div>
 
         <div class="detail-sections">
@@ -81,6 +79,9 @@
               <div v-for="(skill, idx) in selectedMember.skills" :key="`${selectedMember.employeeId}-${idx}`" class="skill-item">
                 <strong>{{ skill.name }}</strong>
                 <span>{{ skill.type }} · {{ skill.issuer }} · {{ skill.date }}</span>
+                <div class="item-actions">
+                  <button type="button" class="link-btn" @click="openSkillEvidence(skill)">증빙 조회</button>
+                </div>
               </div>
             </div>
             <p v-else class="empty-text">등록된 역량 정보가 없습니다.</p>
@@ -97,6 +98,9 @@
                 <strong>{{ career.company }}</strong>
                 <span>{{ career.role }}</span>
                 <span class="font-num">{{ career.period }}</span>
+                <div class="item-actions">
+                  <button type="button" class="link-btn" @click="openCareerEvidence(career)">증빙 조회</button>
+                </div>
               </div>
             </div>
             <p v-else class="empty-text">등록된 경력사항이 없습니다.</p>
@@ -137,6 +141,8 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/common/BaseModal.vue'
+import { AUTH_KEYS } from '@/utils/auth'
+import { usePerformanceStore } from '@/store/performance'
 import {
   createHrCurrentUserMock,
   createHrTeamMembersMock,
@@ -145,6 +151,7 @@ import {
 import { createHrEventsMock } from '@/mocks/hr/hrEvents'
 
 const router = useRouter()
+const performanceStore = usePerformanceStore()
 
 const currentUser = ref(createHrCurrentUserMock())
 const teamMembers = ref(createHrTeamMembersMock())
@@ -153,7 +160,7 @@ const hrEvents = ref(createHrEventsMock())
 const showDetailModal = ref(false)
 const selectedMember = ref(null)
 
-const canViewMemberDetail = computed(() => currentUser.value.role === 'TEAM_LEADER')
+const canViewMemberDetail = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) === 'admin1234')
 const sortedTeamMembers = computed(() => sortMembersByRule(teamMembers.value))
 const selectedMemberHistories = computed(() => {
   if (!selectedMember.value?.employeeId) return []
@@ -172,6 +179,15 @@ const openMemberDetail = (member) => {
   showDetailModal.value = true
 }
 
+const goToTeamAttendance = () => {
+  router.push('/attendance/team')
+}
+
+const goToPerformanceInquiry = () => {
+  performanceStore.setPage('inquiry')
+  router.push('/performance')
+}
+
 const statusClass = (status) => {
   if (status === '정상') return 'ok'
   if (status === '재택') return 'remote'
@@ -183,10 +199,33 @@ const historyStatusText = (status) => {
   if (status === 'REJECTED') return '반려'
   return '진행중'
 }
+
+const openDataUrl = (url) => {
+  if (!url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+const buildSkillEvidenceFallback = (skill) => {
+  const text = `${skill?.name || '역량'} 증빙 더미 파일`
+  return `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`
+}
+
+const buildCareerEvidenceFallback = (career) => {
+  const text = `${career?.company || '경력'} 증빙 더미 파일`
+  return `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`
+}
+
+const openSkillEvidence = (skill) => {
+  openDataUrl(skill?.fileUrl || buildSkillEvidenceFallback(skill))
+}
+
+const openCareerEvidence = (career) => {
+  openDataUrl(career?.fileUrl || buildCareerEvidenceFallback(career))
+}
 </script>
 
 <style scoped>
-.org-page { max-width: 1200px; }
+.org-page { width: 100%; max-width: none; min-width: 0; }
 
 .breadcrumb { font-size: .78rem; color: var(--gray400); margin-bottom: 4px; }
 
@@ -496,6 +535,24 @@ const historyStatusText = (status) => {
 .career-item span {
   color: var(--gray500);
   font-size: .8rem;
+}
+
+.item-actions {
+  margin-top: 4px;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
 }
 
 .history-list {

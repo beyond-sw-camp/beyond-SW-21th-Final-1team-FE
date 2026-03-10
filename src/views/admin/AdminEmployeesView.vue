@@ -8,7 +8,7 @@
         <div class="form-grid">
           <label>
             이름
-            <input v-model.trim="form.name" type="text" placeholder="예: 김세현" />
+            <input v-model.trim="form.name" type="text" placeholder="예: 김봉식" />
           </label>
           <label>
             이메일
@@ -300,7 +300,7 @@ const createAccount = () => {
 </script>
 
 <style scoped>
-.admin-page { max-width: 1200px; }
+.admin-page { width: 100%; max-width: none; min-width: 0; }
 .layout { margin-top: 12px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; }
 .card { background: #fff; border: 1px solid var(--gray200); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
 .card h3 { margin: 0 0 12px; color: var(--gray800); }

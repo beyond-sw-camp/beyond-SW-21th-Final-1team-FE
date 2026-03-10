@@ -1,63 +1,56 @@
 <template>
   <div class="paper">
-    <!-- Document Header -->
     <div class="doc-header">
       <h1>{{ formalTitle }}</h1>
     </div>
 
-    <!-- Info Section (Drafter & Approval Line) -->
     <div class="info-section">
-      <!-- Drafter Info -->
       <table class="info-table drafter-table">
         <tbody>
           <tr>
             <td class="label">기안자</td>
-            <td>{{ item.drafter }}</td>
+            <td>{{ item.drafter || '-' }}</td>
           </tr>
           <tr>
             <td class="label">소속</td>
-            <td>{{ item.department }}</td>
+            <td>{{ item.department || '-' }}</td>
           </tr>
           <tr>
             <td class="label">기안일</td>
-            <td>{{ item.date?.split(' ')[0] }}</td>
+            <td>{{ (item.date || item.draftDate || '').split(' ')[0] || '-' }}</td>
           </tr>
           <tr>
             <td class="label">문서번호</td>
-            <td class="text-gray">{{ item.id }}</td>
+            <td class="text-gray">{{ item.id || '-' }}</td>
           </tr>
         </tbody>
       </table>
 
-      <!-- Approval Line -->
       <div class="approval-line-container">
-        <div 
-          v-for="(step, index) in item.approvalLine" 
-          :key="index" 
+        <div
+          v-for="(step, index) in normalizedApprovalLine"
+          :key="index"
           class="approval-box"
         >
           <div class="box-header">{{ index === 0 ? '기안' : `결재자 ${index}` }}</div>
           <div class="box-content">
             <div class="signature">
-              <!-- Stamp for completed steps -->
-              <div v-if="step.status === '승인' || step.status === '기안'" class="real-stamp">
-                <div class="stamp-inner" :class="{ 'vertical': step.name.length === 3, 'grid-2x2': step.name.length === 4 }">
-                  <span class="char" v-for="(c, idx) in step.name" :key="idx">{{ c }}</span>
+              <div v-if="step.status === '승인' || step.status === '기안' || step.status === '확인'" class="real-stamp">
+                <div class="stamp-inner" :class="{ 'vertical': (step.name || '').length === 3, 'grid-2x2': (step.name || '').length === 4 }">
+                  <span class="char" v-for="(c, idx) in (step.name || '')" :key="idx">{{ c }}</span>
                 </div>
               </div>
-              <!-- Text for all steps -->
               <div class="signature-text">
                 <span class="name">{{ step.name }}</span>
                 <span class="position">{{ step.position }}</span>
               </div>
             </div>
           </div>
-          <div class="box-date">{{ step.date !== '-' ? formatShortDate(step.date) : '' }}</div>
+          <div class="box-date">{{ shouldShowApprovalDate(step) ? formatShortDate(step.date) : '' }}</div>
         </div>
       </div>
     </div>
 
-    <!-- Referrer Section -->
     <div v-if="item.referrers && item.referrers.length > 0" class="referrer-section">
       <span class="section-label">참조:</span>
       <div class="referrer-list">
@@ -67,16 +60,15 @@
       </div>
     </div>
 
-    <!-- Document Body Form -->
     <table class="form-table">
       <tbody>
         <tr>
           <td class="label">제목</td>
-          <td class="value-cell">{{ item.title }}</td>
+          <td class="value-cell">{{ item.title || '-' }}</td>
         </tr>
         <tr>
           <td class="label">카테고리</td>
-          <td class="value-cell">{{ item.category }}</td>
+          <td class="value-cell">{{ item.category || item.templateName || '-' }}</td>
         </tr>
         <tr v-if="item.startDate || item.endDate">
           <td class="label">기간</td>
@@ -87,23 +79,29 @@
         <tr>
           <td class="label">내용</td>
           <td class="content-cell">
-            <div class="content-text">{{ item.content }}</div>
+            <div class="content-text">{{ item.content || '상세 본문 데이터가 없습니다.' }}</div>
           </td>
         </tr>
       </tbody>
     </table>
 
-    <!-- Attachments -->
     <div v-if="item.attachments && item.attachments.length > 0" class="attachments-area">
       <span class="label">첨부파일</span>
       <div class="file-list">
-        <span v-for="file in item.attachments" :key="file" class="file-tag">📄 {{ file }}</span>
+        <button
+          v-for="file in item.attachments"
+          :key="file"
+          type="button"
+          class="file-tag"
+          @click="downloadAttachment(file)"
+        >
+          📄 {{ typeof file === 'string' ? file : (file?.name || '첨부파일') }}
+        </button>
       </div>
     </div>
 
-    <!-- Rejected Reason (if any) -->
-    <div v-if="item.status === '반려' && item.rejectReason" class="reject-display">
-      <div class="reject-title">❌ 반려 사유</div>
+    <div v-if="isRejectedStatus && item.rejectReason" class="reject-display">
+      <div class="reject-title">반려 사유</div>
       <div class="reject-text">{{ item.rejectReason }}</div>
     </div>
   </div>
@@ -119,24 +117,91 @@ const props = defineProps({
   }
 });
 
+const isRejectedStatus = computed(() => {
+  return props.item.status === '반려';
+});
+
 const formalTitle = computed(() => {
-  const category = props.item.category || '기안서';
+  const category = props.item.category || props.item.templateName || '기안서';
   let title = category;
-  if (category === '휴가신청서') title = '휴 가 신 청 서';
-  else if (category === '기안서') title = '기 안 서';
-  else if (category === '품의서') title = '품 의 서';
-  else if (category === '보고서') title = '보 고 서';
-  
+  if (category === '휴가 신청서') title = '연가 신청서';
+  else if (category === '유연근무 신청서') title = '유연근무 신청서';
+  else if (category === '외근/출장 신청서') title = '외근/출장 신청서';
+  else if (category === '연장근무 신청서') title = '연장근무 신청서';
+  else if (category === '휴직신청서') title = '휴직신청서';
+  else if (category === '복직신청서') title = '복직신청서';
+  else if (category === '기안서') title = '기안서';
+  else if (category === '품의서') title = '품의서';
+  else if (category === '보고서') title = '보고서';
+
   return title.split('').join('  ');
 });
 
+const normalizedApprovalLine = computed(() => {
+  const baseLine = Array.isArray(props.item.approvalLine) ? [...props.item.approvalLine] : [];
+  const firstStep = baseLine[0];
+  const drafterName = props.item.drafter || '';
+  const drafterDate = (props.item.date || props.item.draftDate || '').split(' ')[0] || '';
+
+  if (!drafterName) return baseLine;
+
+  if (!firstStep || firstStep.status !== '기안') {
+    return [
+      { name: drafterName, position: props.item.position || '기안자', status: '기안', date: drafterDate },
+      ...baseLine
+    ];
+  }
+
+  return baseLine;
+});
+
+const shouldShowApprovalDate = (step) => {
+  if (!step?.date || step.date === '-') return false;
+  return ['기안', '승인', '확인', '전결'].includes(step.status);
+};
+
 const formatShortDate = (dateStr) => {
   if (!dateStr) return '';
-  const parts = dateStr.split('-');
+  const dateOnly = String(dateStr).split(' ')[0].split('T')[0];
+  const parts = dateOnly.split('-');
   if (parts.length === 3) {
     return `${parts[1]}. ${parts[2]}.`;
   }
-  return dateStr;
+  return dateOnly;
+};
+
+const triggerDownload = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || 'attachment';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const downloadAttachment = async (file) => {
+  const fileName = typeof file === 'string' ? file : (file?.name || 'attachment.txt');
+  const rawUrl = typeof file === 'object' ? (file?.url || file?.path || '') : '';
+  const encodedName = encodeURIComponent(fileName);
+  const candidates = [rawUrl, `/attachments/${encodedName}`, `/files/${encodedName}`].filter(Boolean);
+
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      triggerDownload(blob, fileName);
+      return;
+    } catch (error) {
+      // Fallback to mock download below.
+    }
+  }
+
+  const fallbackText = `첨부파일: ${fileName}\n실서버 연동 전 목데이터 다운로드입니다.`;
+  const blob = new Blob([fallbackText], { type: 'text/plain;charset=utf-8' });
+  triggerDownload(blob, fileName.endsWith('.txt') ? fileName : `${fileName}.txt`);
 };
 </script>
 
@@ -144,19 +209,18 @@ const formatShortDate = (dateStr) => {
 .paper {
   width: 100%;
   background: white;
-  padding: 40px;
+  padding: 24px;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
-/* Document Header */
 .doc-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 
 .doc-header h1 {
   font-family: serif;
-  font-size: 2rem;
+  font-size: 1.7rem;
   font-weight: 700;
   color: #111;
   text-decoration: underline;
@@ -166,12 +230,11 @@ const formatShortDate = (dateStr) => {
   margin: 0;
 }
 
-/* Info Section (Drafter & Approval Line) */
 .info-section {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 30px;
-  gap: 20px;
+  margin-bottom: 14px;
+  gap: 12px;
 }
 
 .info-table {
@@ -182,7 +245,7 @@ const formatShortDate = (dateStr) => {
 
 .info-table td {
   border: 1px solid #ccc;
-  padding: 8px;
+  padding: 6px;
   text-align: center;
 }
 
@@ -196,7 +259,6 @@ const formatShortDate = (dateStr) => {
   color: #666;
 }
 
-/* Approval Line Boxes */
 .approval-line-container {
   display: flex;
   gap: 4px;
@@ -220,7 +282,7 @@ const formatShortDate = (dateStr) => {
 
 .box-content {
   flex: 1;
-  min-height: 70px;
+  min-height: 62px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -233,7 +295,7 @@ const formatShortDate = (dateStr) => {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 70px;
+  height: 62px;
 }
 
 .signature-text {
@@ -256,7 +318,6 @@ const formatShortDate = (dateStr) => {
   color: #666;
 }
 
-/* Stamp Style */
 .real-stamp {
   position: absolute;
   top: 50%;
@@ -310,39 +371,38 @@ const formatShortDate = (dateStr) => {
   padding: 1px 0;
 }
 
-/* Referrer Section */
 .referrer-section {
-    margin-bottom: 20px;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: #f8f9fa;
-    border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
 }
+
 .section-label { font-weight: 600; color: #555; }
 .referrer-list { display: flex; gap: 6px; flex-wrap: wrap; }
 .referrer-tag {
-    background: white;
-    border: 1px solid #e1e4e8;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    color: #444;
+  background: white;
+  border: 1px solid #e1e4e8;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  color: #444;
 }
 
-/* Form Table */
 .form-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   font-size: 0.9rem;
 }
 
 .form-table td {
   border: 1px solid #ccc;
-  padding: 10px 15px;
+  padding: 8px 12px;
 }
 
 .form-table .label {
@@ -357,7 +417,7 @@ const formatShortDate = (dateStr) => {
 }
 
 .content-cell {
-  height: 300px;
+  height: 180px;
   vertical-align: top;
 }
 
@@ -367,11 +427,10 @@ const formatShortDate = (dateStr) => {
   color: #333;
 }
 
-/* Attachments */
 .attachments-area {
   border: 1px solid #ccc;
   background: #f9f9f9;
-  padding: 10px 15px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -394,9 +453,17 @@ const formatShortDate = (dateStr) => {
   border: 1px solid #ddd;
   padding: 2px 8px;
   border-radius: 4px;
+  cursor: pointer;
+  color: #334155;
+  font-size: 0.82rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-/* Reject Section */
+.file-tag:hover {
+  background: #eef6ff;
+  border-color: #cdddf6;
+}
+
 .reject-display {
   margin-top: 20px;
   padding: 15px;

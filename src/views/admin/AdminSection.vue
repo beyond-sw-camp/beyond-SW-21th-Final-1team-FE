@@ -23,7 +23,7 @@ const description = computed(() => String(route.meta.description || '관리자 �
 </script>
 
 <style scoped>
-.admin-page { max-width: 1200px; }
+.admin-page { width: 100%; max-width: none; min-width: 0; }
 
 .admin-head {
   margin-top: 12px;

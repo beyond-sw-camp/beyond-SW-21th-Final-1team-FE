@@ -4,7 +4,7 @@
       <div class="modal-header">
         <div class="header-main">
           <div class="header-tags">
-            <span class="category-chip">{{ item.category }}</span>
+            <span v-if="item.category" class="category-chip">{{ item.category }}</span>
             <span class="status-badge" :class="statusClass">{{ item.status }}</span>
           </div>
           <h3 class="modal-title">{{ item.title }}</h3>
@@ -26,10 +26,9 @@
           <template v-if="isDrafter">
             <button v-if="item.status === '진행중'" class="btn btn-danger-ghost" @click="handleAction('cancel')">기안 취소</button>
             <button v-if="item.status === '반려'" class="btn btn-primary" @click="handleAction('redraft')">재상신 하기</button>
-            <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>
             <button v-if="item.status === '임시저장'" class="btn btn-primary" @click="handleAction('draft')">상신</button>
+            <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>
           </template>
-          <!-- If logic to check if user is approver exists, show Review button -->
           <button v-if="canReview" class="btn btn-indigo" @click="handleAction('review')">결재 검토</button>
         </div>
         <button class="btn btn-secondary" @click="close">닫기</button>
@@ -41,6 +40,7 @@
 <script setup>
 import { computed } from 'vue';
 import ApprovalDocumentPaper from './ApprovalDocumentPaper.vue';
+import { mockUsers } from '@/utils/approvalData';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -52,14 +52,15 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'action']);
 
-// For demo, assume current user matches drafter if 'isDrafter' flag is true or by name
+const currentUser = mockUsers.find((user) => user.id === 'u1') || { name: '' };
+
 const isDrafter = computed(() => {
-  // Mock logic: assume '최지훈' is current user for demo
-  return props.item.drafter === '최지훈' || props.item.status === '임시저장';
+  if (typeof props.item.isDrafter === 'boolean') return props.item.isDrafter;
+  return props.item.drafter === currentUser.name || props.item.status === '임시저장';
 });
 
 const canReview = computed(() => {
-  // Mock logic: if status is '진행중' and not drafter, assume reviewer
+  if (typeof props.item.canReview === 'boolean') return props.item.canReview;
   return props.item.status === '진행중' && !isDrafter.value;
 });
 
@@ -96,8 +97,8 @@ const handleAction = (type) => {
 
 .modal-content {
   background: white;
-  width: 800px; max-width: 95%;
-  max-height: 90vh;
+  width: 860px; max-width: 95%;
+  max-height: calc(100vh - 24px);
   border-radius: 24px;
   display: flex; flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -144,8 +145,32 @@ const handleAction = (type) => {
 .icon-btn:hover { background: #f1f5f9; color: #0f172a; transform: rotate(90deg); }
 
 .modal-body {
-  padding: 32px 40px;
-  overflow-y: auto; flex: 1;
+  padding: 24px 28px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  border-top: 1px solid #e5e7eb;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #f8fafc;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .info-grid {
@@ -243,4 +268,18 @@ const handleAction = (type) => {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+@media (max-height: 900px) {
+  .modal-header {
+    padding: 24px 28px 16px;
+  }
+
+  .modal-footer {
+    padding: 16px 28px;
+  }
+
+  .btn {
+    padding: 10px 18px;
+  }
+}
 </style>

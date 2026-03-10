@@ -31,15 +31,7 @@
     <div v-if="currentTab === 'daily'" class="tab-content">
       <div class="filter-card">
         <div class="filter-row">
-          <div class="filter-group">
-            <label>부서</label>
-            <select class="form-select">
-              <option>전체</option>
-              <option>개발팀</option>
-              <option>디자인팀</option>
-              <option>마케팅팀</option>
-            </select>
-          </div>
+
           <div class="filter-group">
             <label>날짜</label>
             <input type="date" v-model="filterDate" class="form-input" />

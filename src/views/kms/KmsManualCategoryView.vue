@@ -31,10 +31,12 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { kmsCategories, manuals, sortByDateDesc } from '@/mocks/kms'
+import { kmsCategories, sortByDateDesc } from '@/mocks/kms'
+import { useKmsManualStore } from '@/store/kmsManuals'
 
 const route = useRoute()
 const router = useRouter()
+const manualStore = useKmsManualStore()
 
 const categoryName = computed(() => {
   const category = kmsCategories.find((item) => item.key === route.params.categoryKey)
@@ -42,7 +44,7 @@ const categoryName = computed(() => {
 })
 
 const rows = computed(() =>
-  sortByDateDesc(manuals.filter((item) => item.category === route.params.categoryKey))
+  sortByDateDesc(manualStore.activeManuals.filter((item) => item.category === route.params.categoryKey))
 )
 </script>
 

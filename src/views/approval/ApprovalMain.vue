@@ -1,5 +1,6 @@
 <template>
   <div class="dashboard-container">
+
     <!-- Top Summary Cards -->
     <div class="stats-grid">
       <!-- 결재 대기 -->
@@ -10,7 +11,7 @@
           <div class="stat-value">3<span class="unit">건</span></div>
         </div>
         <div class="card-footer red-text">
-          <span class="icon">⚠️</span> 처리 필요
+          <span class="status-marker danger"></span> 처리 필요
         </div>
       </div>
 
@@ -22,7 +23,7 @@
           <div class="stat-value">8<span class="unit">건</span></div>
         </div>
         <div class="card-footer blue-text">
-          <span class="icon">🕒</span> 진행 중
+          <span class="status-marker progress"></span> 진행 중
         </div>
       </div>
 
@@ -34,7 +35,7 @@
           <div class="stat-value">152<span class="unit">건</span></div>
         </div>
         <div class="card-footer green-text">
-          <span class="icon">✅</span> 이번 달
+          <span class="status-marker complete"></span> 이번 달
         </div>
       </div>
 
@@ -134,36 +135,100 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
 
 <style scoped>
 .dashboard-container {
-  padding: 32px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  background-color: #fcfcfd;
+  gap: 20px;
   height: 100%;
   overflow-y: auto;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+}
+
+.dashboard-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  background-color: #fcfcfd;
+  border: 1px solid var(--gray200);
+  border-radius: 20px;
+}
+
+.dashboard-hero h1 {
+  margin: 6px 0 0;
+  font-size: 1.45rem;
+  color: var(--gray800);
+}
+
+.dashboard-hero-eyebrow {
+  margin: 0;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.dashboard-hero-desc {
+  margin: 8px 0 0;
+  color: var(--gray500);
+  font-size: 0.9rem;
+}
+
+.dashboard-hero-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.hero-btn {
+  border: 1px solid var(--gray300);
+  background: #fff;
+  color: var(--gray700);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hero-btn:hover {
+  border-color: var(--gray400);
+}
+
+.hero-btn-primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.hero-btn-primary:hover {
+  border-color: var(--secondary);
+  background: var(--secondary);
 }
 
 /* Grid Layouts */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  gap: 16px;
 }
 
 .main-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  gap: 16px;
   flex: 1;
+}
+
+.main-grid.single-section {
+  grid-template-columns: 1fr;
 }
 
 /* Stat Cards */
 .stat-card {
   background: white;
-  padding: 24px;
+  padding: 20px;
   border-radius: 20px;
   border: 1px solid #f1f3f5;
+
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -234,6 +299,17 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
   z-index: 1;
 }
 
+.status-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.status-marker.danger { background: #fa5252; }
+.status-marker.progress { background: #339af0; }
+.status-marker.complete { background: #40c057; }
+
 .red-text { color: #fa5252; }
 .blue-text { color: #339af0; }
 .green-text { color: #40c057; }
@@ -247,7 +323,7 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   color: white;
   height: 128px;
   cursor: pointer;
@@ -288,8 +364,9 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
 }
 
 .section-header {
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid #f8f9fa;
+  background-color: #fcfcfd;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -341,7 +418,7 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
 }
 
 .dashboard-table th {
-  padding: 12px 24px;
+  padding: 12px 20px;
   background: #f8f9fa;
   color: #868e96;
   font-weight: 500;
@@ -349,7 +426,7 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
 }
 
 .dashboard-table td {
-  padding: 14px 24px;
+  padding: 12px 20px;
   border-bottom: 1px solid #f8f9fa;
   color: #495057;
   cursor: pointer;
@@ -453,6 +530,7 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
 
 /* Responsiveness */
 @media (max-width: 1024px) {
+  .dashboard-hero { flex-direction: column; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .main-grid { grid-template-columns: 1fr; }
 }
@@ -461,4 +539,3 @@ import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
   .stats-grid { grid-template-columns: 1fr; }
 }
 </style>
-

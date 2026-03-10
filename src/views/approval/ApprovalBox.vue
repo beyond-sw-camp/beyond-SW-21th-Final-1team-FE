@@ -15,12 +15,12 @@
         @click-item="openDetail"
       />
       
-      <!-- In Progress -->
+      <!-- Received -->
       <DashboardCard 
-        title="처리중인 문서함" 
-        :items="inProgressItems" 
+        title="수신 문서함" 
+        :items="receivedItems" 
         count-label="건"
-        link-type="ing"
+        link-type="received"
         @click-item="openDetail"
       />
 
@@ -51,6 +51,15 @@
         @click-item="openDetail"
         is-temp
       />
+
+      <DashboardCard
+        title="참조 문서함"
+        :items="referenceItems"
+        count-label="건"
+        link-type="reference"
+        variant="reference"
+        @click-item="openDetail"
+      />
     </div>
 
     <ApprovalDetailModal 
@@ -68,15 +77,51 @@ import { useRouter } from 'vue-router';
 import { mockApprovalBox } from '@/utils/approvalData';
 import DashboardCard from './components/DashboardCard.vue';
 import ApprovalDetailModal from './components/ApprovalDetailModal.vue';
+import {
+  getCurrentApprovalUser,
+  isUserRelatedApprovalDocument,
+  matchesCurrentApprovalUser,
+  isCurrentUserDrafterDocument
+} from './utils/approvalVisibility';
 
 const router = useRouter();
 const allDocuments = ref([...mockApprovalBox]);
+const currentUser = getCurrentApprovalUser();
 
-const totalItems = computed(() => allDocuments.value.slice(0, 10));
-const inProgressItems = computed(() => allDocuments.value.filter(d => d.status === '진행중').slice(0, 10));
-const issueItems = computed(() => allDocuments.value.filter(d => d.status === '반려' || d.status === '보류').slice(0, 10));
-const completedItems = computed(() => allDocuments.value.filter(d => d.status === '완료').slice(0, 10));
-const tempItems = computed(() => allDocuments.value.filter(d => d.status === '임시저장').slice(0, 10));
+const visibleDocuments = computed(() => allDocuments.value.filter((doc) => isUserRelatedApprovalDocument(doc, currentUser)));
+const drafterDocuments = computed(() => allDocuments.value.filter((doc) => isCurrentUserDrafterDocument(doc, currentUser)));
+const totalItems = computed(() => visibleDocuments.value.slice(0, 10));
+const issueItems = computed(() => visibleDocuments.value.filter(d => d.status === '반려' || d.status === '보류').slice(0, 10));
+const completedItems = computed(() => visibleDocuments.value.filter(d => d.status === '완료').slice(0, 10));
+const tempItems = computed(() => drafterDocuments.value.filter(d => d.status === '임시저장').slice(0, 10));
+
+const isReferenceDocumentForCurrentUser = (doc) => {
+  if (doc?.status !== '완료') return false;
+  if (!Array.isArray(doc?.referrers) || doc.referrers.length === 0) return false;
+  return doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser));
+};
+
+const isReceivedDocumentForCurrentUser = (doc) => {
+  if (isCurrentUserDrafterDocument(doc, currentUser)) return false;
+  if (matchesCurrentApprovalUser(doc?.currentApprover, currentUser)) return true;
+
+  if (Array.isArray(doc?.approvalLine) && doc.approvalLine.some((line) => {
+    if (!line) return false;
+    return matchesCurrentApprovalUser(`${line.name || ''} ${line.position || ''}`, currentUser)
+      || matchesCurrentApprovalUser(line.name, currentUser);
+  })) {
+    return true;
+  }
+
+  if (Array.isArray(doc?.referrers) && doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser))) {
+    return true;
+  }
+
+  return false;
+};
+
+const referenceItems = computed(() => visibleDocuments.value.filter(isReferenceDocumentForCurrentUser).slice(0, 10));
+const receivedItems = computed(() => visibleDocuments.value.filter(isReceivedDocumentForCurrentUser).slice(0, 10));
 
 const isDetailOpen = ref(false);
 const selectedItem = ref({});
@@ -96,7 +141,9 @@ const handleModalAction = (action) => {
   console.log('Action performed:', action);
   if (action.type === 'redraft') {
     // Navigate to draft with pre-filled state
-    router.push({ name: 'approval-draft', query: { from: action.id } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
+  } else if (action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
   } else if (action.type === 'delete' || action.type === 'cancel') {
     // Remove from mock list locally
     allDocuments.value = allDocuments.value.filter(d => d.id !== action.id);
@@ -109,31 +156,43 @@ const handleModalAction = (action) => {
 
 <style scoped>
 .box-container {
-  padding: 32px;
-  background-color: #f8fafc;
-  min-height: 100vh;
+  padding: 24px;
+  min-height: auto;
+  background: var(--gray50);
+  border-radius: 14px;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
 .page-header {
-  margin-bottom: 32px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--gray200);
+  border-radius: 14px;
+  background: #fff;
 }
 
 .page-header h2 {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   font-weight: 800;
-  color: #0f172a;
-  margin-bottom: 8px;
+  color: #212529;
+  margin-bottom: 6px;
 }
 
 .subtitle {
-  color: #64748b;
-  font-size: 1rem;
+  color: #868e96;
+  font-size: 0.92rem;
 }
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 1400px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1024px) {

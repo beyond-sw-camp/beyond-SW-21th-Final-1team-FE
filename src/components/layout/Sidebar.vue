@@ -1,13 +1,22 @@
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ 'mode-hr-admin': isAdminMode || isHrMode }">
     <template v-if="isAdminMode">
       <div class="sidebar-header">
         <span>관리자</span>
       </div>
 
+      <div
+        class="sidebar-item"
+        :class="{ active: currentPath === adminDashboardMenu.route }"
+        @click="handleNavigate(adminDashboardMenu.route)"
+      >
+        <component :is="adminDashboardMenu.icon" />
+        {{ adminDashboardMenu.label }}
+      </div>
+
       <div class="menu-section">
         <div
-            v-for="item in adminMenus"
+            v-for="item in adminOtherMenus"
             :key="item.label"
             class="sidebar-item"
             :class="{ active: currentPath === item.route, disabled: !item.route }"
@@ -48,13 +57,23 @@
         <span v-if="['manager', 'admin'].includes(userRank)" class="sidebar-role-badge sidebar-role-badge--manager">관리자</span>
       </div>
 
+      <div
+          class="sidebar-item"
+          :class="{ 'active': currentPath.includes(attendanceDashboardMenu.route) }"
+          @click="handleNavigate(attendanceDashboardMenu.route)"
+      >
+        <component :is="attendanceDashboardMenu.icon" />
+        {{ attendanceDashboardMenu.label }}
+      </div>
+      <div class="divider"></div>
+
       <template v-if="isAttendanceManager">
         <div class="sidebar-section-label">내 근태 관리</div>
         <div
             v-for="item in myAttendanceMenus"
             :key="item.label"
             class="sidebar-item"
-            :class="{ 'active': currentPath.includes(item.route) || (item.route === '/attendance' && currentPath === '/attendance') }"
+            :class="[{ 'active': currentPath.includes(item.route) }, item.className]"
             @click="handleNavigate(item.route)"
         >
           <component :is="item.icon" />
@@ -82,7 +101,7 @@
               v-for="item in myAttendanceMenus"
               :key="item.label"
               class="sidebar-item"
-              :class="{ 'active': currentPath.includes(item.route) || (item.route === '/attendance' && currentPath === '/attendance') }"
+              :class="[{ 'active': currentPath.includes(item.route) }, item.className]"
               @click="handleNavigate(item.route)"
           >
             <component :is="item.icon" />
@@ -118,38 +137,38 @@
         <span>전자결재</span>
       </div>
 
-      <div class="menu-section">
-        <div v-for="menu in approvalMenus" :key="menu.label" class="menu-group">
-          <div class="sidebar-item menu-head" @click="toggleMenu(menu.label)">
-            <div class="menu-label-wrap">
-              <component :is="menu.icon" />
-              <span>{{ menu.label }}</span>
-            </div>
-            <svg
-                class="chevron"
-                :class="{ 'rotate': isOpen(menu.label) }"
-                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            >
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </div>
-
-          <div v-show="isOpen(menu.label)" class="sub-menu">
-            <div
-                v-for="sub in menu.children"
-                :key="sub.label"
-                class="sidebar-item sub-item"
-                @click="handleNavigate(sub.route)"
-                :class="{ active: currentPath === sub.route }"
-            >
-              <span class="dot"></span>
-              {{ sub.label }}
-            </div>
-          </div>
-        </div>
+      <div
+        class="sidebar-item"
+        :class="{ 'sidebar-item--active': isMenuActive(approvalDashboardMenu) }"
+        @click="handleNavigate(approvalDashboardMenu.route)"
+      >
+        <component :is="approvalDashboardMenu.icon" />
+        {{ approvalDashboardMenu.label }}
       </div>
 
-      <div class="divider"></div>
+      <div class="sidebar-divider"></div>
+
+      <template v-for="item in approvalMenus" :key="item.label">
+        <div
+          v-if="!item.isSub"
+          class="sidebar-item"
+          :class="{ 'sidebar-item--active': isMenuActive(item) }"
+          @click="handleNavigate(item.route)"
+        >
+          <component :is="item.icon" />
+          {{ item.label }}
+        </div>
+
+        <div
+          v-else
+          class="sidebar-item sub-item"
+          :class="{ 'sidebar-item--active': isMenuActive(item) }"
+          @click="handleNavigate(item.route)"
+        >
+          <span class="dot"></span>
+          {{ item.label }}
+        </div>
+      </template>
     </template>
 
     <template v-else-if="isPerformance">
@@ -210,6 +229,19 @@
       </div>
 
       <div class="sidebar-divider"></div>
+      <div class="sidebar-section-label">공통</div>
+      <div
+        v-for="item in kmsCommonMenus"
+        :key="item.label"
+        class="sidebar-item"
+        :class="{ 'sidebar-item--active': isMenuActive(item) }"
+        @click="handleNavigate(item.route)"
+      >
+        <component :is="item.icon" />
+        {{ item.label }}
+      </div>
+
+      <div class="sidebar-divider"></div>
       <div class="sidebar-section-label">업무 메뉴얼</div>
       <div
         v-for="item in kmsManualMenus"
@@ -239,7 +271,7 @@
     <template v-else>
       <div class="sidebar-header">
         <span>바로가기</span>
-        <span class="sidebar-add" title="바로가기 추가">
+        <span class="sidebar-add" title="바로가기 추가" @click="openShortcutModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
           </svg>
@@ -255,14 +287,38 @@
         {{ item.label }}
       </div>
     </template>
+
+    <BaseModal v-model="showShortcutModal" width="520px">
+      <h3 class="shortcut-modal-title">바로가기 설정</h3>
+      <p class="shortcut-modal-desc">접근 가능한 메뉴만 선택할 수 있습니다.</p>
+      <div class="shortcut-option-list">
+        <label
+          v-for="item in shortcutOptionsByUser"
+          :key="item.key"
+          class="shortcut-option-item"
+        >
+          <input v-model="draftShortcutKeys" type="checkbox" :value="item.key" />
+          <span>{{ item.label }}</span>
+        </label>
+      </div>
+      <div class="shortcut-modal-actions">
+        <button class="shortcut-btn shortcut-btn--ghost" type="button" @click="showShortcutModal = false">
+          취소
+        </button>
+        <button class="shortcut-btn shortcut-btn--primary" type="button" @click="saveShortcutSelection">
+          저장
+        </button>
+      </div>
+    </BaseModal>
   </aside>
 </template>
 
 <script setup>
-import { h, ref, computed, watch } from 'vue'
+import { h, computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePerformanceStore } from '@/store/performance'
 import { AUTH_KEYS } from '@/utils/auth'
+import BaseModal from '@/components/common/BaseModal.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -363,9 +419,28 @@ const ListIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill
   h('line', { x1:'3', y1:'12', x2:'3.01', y2:'12' }),
   h('line', { x1:'3', y1:'18', x2:'3.01', y2:'18' })
 ])
+const CommuteIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
+  h('line', { x1:'8', y1:'6', x2:'21', y2:'6' }),
+  h('line', { x1:'8', y1:'12', x2:'21', y2:'12' }),
+  h('line', { x1:'8', y1:'18', x2:'21', y2:'18' }),
+  h('line', { x1:'3', y1:'6', x2:'3.01', y2:'6' }),
+  h('line', { x1:'3', y1:'12', x2:'3.01', y2:'12' }),
+  h('line', { x1:'3', y1:'18', x2:'3.01', y2:'18' })
+])
 const CheckIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
   h('polyline', { points:'9 11 12 14 22 4' }),
   h('path', { d:'M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11' }),
+])
+const SunIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
+  h('circle', { cx:'12', cy:'12', r:'5' }),
+  h('line', { x1:'12', y1:'1', x2:'12', y2:'3' }),
+  h('line', { x1:'12', y1:'21', x2:'12', y2:'23' }),
+  h('line', { x1:'4.22', y1:'4.22', x2:'5.64', y2:'5.64' }),
+  h('line', { x1:'18.36', y1:'18.36', x2:'19.78', y2:'19.78' }),
+  h('line', { x1:'1', y1:'12', x2:'3', y2:'12' }),
+  h('line', { x1:'21', y1:'12', x2:'23', y2:'12' }),
+  h('line', { x1:'4.22', y1:'19.78', x2:'5.64', y2:'18.36' }),
+  h('line', { x1:'18.36', y1:'5.64', x2:'19.78', y2:'4.22' })
 ])
 const FileTextIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
   h('path', { d:'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z' }),
@@ -413,14 +488,17 @@ const SlidersIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', f
 ])
 
 const adminMenus = [
+  { label: '인사 정보 조회', icon: DashboardIcon, route: '/admin/main' },
   { label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees' },
-  { label: '인사변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change' },
+  { label: '인사 정보 변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change' },
+  { label: 'KMS 권한 변경 이력', icon: ClockIcon, route: '/admin/kms-permissions-history' },
   { label: '근태 관리', icon: ClockIcon, route: '/admin/attendance' },
   { label: '정책 관리', icon: ShieldIcon, route: '/admin/policies' },
   { label: '공지사항 관리', icon: BellIcon, route: '/admin/notices' },
-  { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary' },
-  { label: '전자결재 정책선 관리', icon: SlidersIcon, route: '' }
+  { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary' }
 ]
+const adminDashboardMenu = adminMenus[0]
+const adminOtherMenus = adminMenus.slice(1)
 const myPerformanceMenuItems = [
   { id: 'dashboard', name: '대시보드', icon: DashboardIcon },
   { id: 'registration', name: '성과 등록', icon: PlusIcon },
@@ -467,10 +545,95 @@ watch([isPerformance, isPerformanceManager, performanceMenuIds, () => route.para
 }, { immediate: true })
 
 // --- 메인 모드 데이터 ---
-const shortcuts = [
-  { label: '마이페이지', icon: StarIcon, route: '/hr/my' },
-  { label: '휴가 신청', icon: FileIcon, route: '/hr/leave' },
+const SHORTCUT_STORAGE_PREFIX = 'sidebarShortcuts:'
+const showShortcutModal = ref(false)
+const selectedShortcutKeys = ref([])
+const draftShortcutKeys = ref([])
+
+const baseShortcutOptions = [
+  { key: 'hr-my', label: '마이페이지', icon: StarIcon, route: '/hr/my' },
+  { key: 'hr-org', label: '내 조직 조회', icon: UsersIcon, route: '/hr/org' },
+  { key: 'hr-orgchart', label: '조직도', icon: TreeIcon, route: '/hr/orgchart' },
+  { key: 'attendance-my', label: '나의 근태', icon: ClockIcon, route: '/attendance/my' },
+  { key: 'attendance-record', label: '출퇴근 기록', icon: ListIcon, route: '/attendance/record' },
+  { key: 'attendance-history', label: '신청 내역 조회', icon: CheckIcon, route: '/attendance/history' },
+  { key: 'attendance-schedule', label: '근무 일정', icon: CalendarIcon, route: '/attendance/schedule' },
+  { key: 'salary-my', label: '급여 조회', icon: CreditCardIcon, route: '/salary/my' },
+  { key: 'approval-dashboard', label: '전자결재 대시보드', icon: DashboardIcon, route: '/approval' },
+  { key: 'approval-draft', label: '전자결재 기안', icon: PlusIcon, route: '/approval/draft' },
+  { key: 'approval-status', label: '전자결재 현황', icon: SearchIcon, route: '/approval/status' },
+  { key: 'approval-box', label: '전자결재 문서함', icon: FolderIcon, route: '/approval/box/all' },
 ]
+
+const adminOnlyShortcutOptions = [
+  { key: 'admin-main', label: '인사 정보 조회(관리자)', icon: DashboardIcon, route: '/admin/main' },
+  { key: 'admin-employees', label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees' },
+  { key: 'admin-hr-change', label: '인사변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change' },
+  { key: 'admin-attendance', label: '근태 관리(관리자)', icon: ClockIcon, route: '/admin/attendance' },
+  { key: 'admin-policies', label: '정책 관리', icon: ShieldIcon, route: '/admin/policies' },
+  { key: 'admin-notices', label: '공지사항 관리', icon: BellIcon, route: '/admin/notices' },
+  { key: 'admin-salary', label: '급여 관리(관리자)', icon: CreditCardIcon, route: '/admin/salary' },
+]
+
+const shortcutOptionsByUser = computed(() => (
+  currentUserId.value === 'admin1234'
+    ? [...baseShortcutOptions, ...adminOnlyShortcutOptions]
+    : baseShortcutOptions
+))
+
+const defaultShortcutKeysByUser = computed(() => (
+  currentUserId.value === 'admin1234'
+    ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
+    : ['hr-my', 'hr-org', 'attendance-my']
+))
+
+const shortcuts = computed(() => {
+  const selectedKeySet = new Set(selectedShortcutKeys.value)
+  return shortcutOptionsByUser.value.filter((item) => selectedKeySet.has(item.key))
+})
+
+const getShortcutStorageKey = (userId) => `${SHORTCUT_STORAGE_PREFIX}${userId || 'guest'}`
+
+function loadShortcutKeys(userId) {
+  const optionKeys = new Set(shortcutOptionsByUser.value.map((item) => item.key))
+  const fallback = defaultShortcutKeysByUser.value.filter((key) => optionKeys.has(key))
+  const raw = localStorage.getItem(getShortcutStorageKey(userId))
+  if (!raw) {
+    selectedShortcutKeys.value = fallback
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+    const validated = Array.isArray(parsed)
+      ? parsed.filter((key) => optionKeys.has(key))
+      : fallback
+    selectedShortcutKeys.value = validated.length ? validated : fallback
+  } catch (error) {
+    selectedShortcutKeys.value = fallback
+  }
+}
+
+const saveShortcutKeys = (userId, keys) => {
+  localStorage.setItem(getShortcutStorageKey(userId), JSON.stringify(keys))
+}
+
+const openShortcutModal = () => {
+  draftShortcutKeys.value = [...selectedShortcutKeys.value]
+  showShortcutModal.value = true
+}
+
+const saveShortcutSelection = () => {
+  const optionKeys = new Set(shortcutOptionsByUser.value.map((item) => item.key))
+  const validated = draftShortcutKeys.value.filter((key) => optionKeys.has(key))
+  selectedShortcutKeys.value = validated.length ? validated : [...defaultShortcutKeysByUser.value]
+  saveShortcutKeys(currentUserId.value, selectedShortcutKeys.value)
+  showShortcutModal.value = false
+}
+
+watch(currentUserId, (userId) => {
+  loadShortcutKeys(userId)
+}, { immediate: true })
 
 // --- 인사 모드 데이터 ---
 const hrMenus = [
@@ -486,16 +649,18 @@ const userRank = computed(() => {
 })
 
 // --- 근태 모드 데이터 ---
+const attendanceDashboardMenu = { label: '근태 대쉬보드', icon: DashboardIcon, route: '/attendance/my' }
+
 const myAttendanceMenus = [
-  { label: '나의 근태', icon: ClockIcon, route: '/attendance/my' },
-  { label: '출퇴근 기록', icon: ListIcon, route: '/attendance/record' },
+  { label: '출퇴근 기록', icon: CommuteIcon, route: '/attendance/record', className: 'sidebar-item--tight' },
   { label: '신청 내역 조회', icon: CheckIcon, route: '/attendance/history' },
   { label: '근무 일정', icon: CalendarIcon, route: '/attendance/schedule' },
+  { label: '연차/휴가 현황', icon: SunIcon, route: '/attendance/vacation' },
 ]
 
 const teamAttendanceMenus = [
-  { label: '팀 근태 관리', icon: UsersIcon, route: '/attendance/team' },
-  { label: '근태 관리', icon: UsersIcon, route: '/attendance/manage' },
+  { label: '팀 일일 근태 현황', icon: UsersIcon, route: '/attendance/team' },
+  { label: '팀 근태 관리', icon: UsersIcon, route: '/attendance/manage' },
   { label: '유연근무관리', icon: SlidersIcon, route: '/attendance/flexible' },
 ]
 
@@ -509,32 +674,38 @@ const salaryMenus = [
 ]
 
 const approvalMenus = computed(() => {
-  const children = [
-    { label: '전자 결재 기안', route: '/approval/draft' },
-    { label: '전자 결재 현황', route: '/approval/status' },
-    { label: '전자 결재 문서함', route: '/approval/box' },
+  const topMenus = [
+    { label: '전자 결재 기안', icon: PlusIcon, route: '/approval/draft' },
+    { label: '전자 결재 현황', icon: SearchIcon, route: '/approval/status' },
+    { label: '전자 결재 검토', icon: CheckIcon, route: '/approval/review' }
   ]
 
-  if (['manager', 'admin'].includes(userRank.value)) {
-    children.push({ label: '전자 결재 검토', route: '/approval/review' })
-  }
-
-  return [
-    {
-      label: '전자결재 메뉴', // 메뉴 그룹명
-      icon: ApprovalIcon,
-      children: children
-    }
+  const boxMenu = { label: '전자 결재 문서함', icon: FolderIcon, route: '/approval/box' }
+  const boxSubMenus = [
+    { label: '전체 문서함', route: '/approval/box/all', routePrefix: '/approval/box/all', isSub: true },
+    { label: '수신 문서함', route: '/approval/box/received', routePrefix: '/approval/box/received', isSub: true },
+    { label: '보류/반려 문서함', route: '/approval/box/issue', routePrefix: '/approval/box/issue', isSub: true },
+    { label: '완료 문서함', route: '/approval/box/completed', routePrefix: '/approval/box/completed', isSub: true },
+    { label: '임시 보관함', route: '/approval/box/temp', routePrefix: '/approval/box/temp', isSub: true },
+    { label: '참조 문서함', route: '/approval/box/reference', routePrefix: '/approval/box/reference', isSub: true },
   ]
+
+  return [...topMenus, boxMenu, ...boxSubMenus]
 })
+const approvalDashboardMenu = { label: '전자결재 대시보드', icon: DashboardIcon, route: '/approval' }
+const kmsCommonMenus = [
+  { label: '통합 검색', icon: SearchIcon, route: '/kms/search' },
+]
 
 const kmsManualMenus = [
   {
     label: '메뉴얼 대시보드',
     icon: FileTextIcon,
     route: '/kms/manuals',
-    routePrefixes: ['/kms/manuals/category', '/kms/manuals/detail', '/kms/manuals/edit']
+    routePrefixes: ['/kms/manuals/category', '/kms/manuals/detail', '/kms/manuals/edit', '/kms/manuals/history']
   },
+  { label: '내 메뉴얼', icon: UserIcon, route: '/kms/manuals/my' },
+  { label: '임시 보관함', icon: FolderIcon, route: '/kms/manuals/trash' },
   { label: '메뉴얼 업로드', icon: PlusIcon, route: '/kms/manuals/upload' },
 ]
 
@@ -544,21 +715,14 @@ const kmsArchiveMenus = [
     icon: FolderIcon,
     route: '/kms/archive',
     routePrefix: '/kms/archive',
-    excludePrefixes: ['/kms/archive/manage']
+    excludePrefixes: ['/kms/archive/manage', '/kms/archive/my', '/kms/archive/trash', '/kms/archive/history']
   },
+  { label: '내 회의록', icon: UserIcon, route: '/kms/archive/my' },
+  { label: '아카이브 임시 보관함', icon: FolderIcon, route: '/kms/archive/trash' },
   { label: '아카이브 문서 등록', icon: PlusIcon, route: '/kms/archive/manage/new', routePrefix: '/kms/archive/manage' },
 ]
 
 const kmsDashboardMenu = { label: 'KMS 대시보드', icon: DashboardIcon, route: '/kms' }
-
-// 메뉴 토글 상태 관리
-const openMenus = ref({ '전자결재 메뉴': true })
-
-const toggleMenu = (label) => {
-  openMenus.value[label] = !openMenus.value[label]
-}
-
-const isOpen = (label) => !!openMenus.value[label]
 
 const isMenuActive = (item) => {
   if (currentPath.value === item.route) return true
@@ -602,6 +766,17 @@ const handleNavigate = (route) => {
 .sidebar-item:hover{background:var(--gray200);color:var(--gray700)}
 .sidebar-item svg{opacity:0.5;flex-shrink:0}
 .sidebar-item.active { background: var(--gray200); color: var(--primary); font-weight: 600; }
+
+/* 인사/관리자 사이드바만 KMS 톤으로: 기본 active 하늘색 + hover 시 회색 */
+.sidebar.mode-hr-admin .sidebar-item.active {
+  background: var(--accent);
+  color: var(--primary);
+}
+.sidebar.mode-hr-admin .sidebar-item.active svg { opacity: 1; }
+.sidebar.mode-hr-admin .sidebar-item.active:hover {
+  background: var(--gray200);
+  color: var(--gray700);
+}
 .sidebar-item.disabled {
   opacity: .55;
   cursor: default;
@@ -710,5 +885,81 @@ const handleNavigate = (route) => {
 }
 .sidebar-item--toggle:hover {
   color: var(--primary);
+}
+
+/* Approval sub-menu indent tuning */
+.sub-item {
+  margin-left: 16px;
+  width: calc(100% - 16px);
+  padding-left: 28px;
+  border-radius: 8px;
+}
+
+.sub-item .dot {
+  left: 12px;
+}
+
+.sub-item.sidebar-item--active .dot {
+  background-color: var(--primary);
+}
+
+.shortcut-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gray700);
+}
+
+.shortcut-modal-desc {
+  margin: 8px 0 16px;
+  font-size: 0.85rem;
+  color: var(--gray500);
+}
+
+.shortcut-option-list {
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--gray200);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.shortcut-option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  font-size: 0.9rem;
+  color: var(--gray600);
+}
+
+.shortcut-option-item input {
+  accent-color: var(--primary);
+}
+
+.shortcut-modal-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.shortcut-btn {
+  height: 36px;
+  min-width: 64px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--gray200);
+  background: #fff;
+  color: var(--gray600);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shortcut-btn--primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
 }
 </style>

@@ -4,7 +4,7 @@
     <div class="record-header-card">
       <div class="header-top">
         <h2 class="page-title">이번 달 근태 현황</h2>
-        <span class="date-info">2026년 2월 기준</span>
+        <span class="date-info">{{ headerMonthLabel }} 기준</span>
       </div>
       
       <div class="stats-row">
@@ -14,7 +14,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </div>
           <div class="stat-text">
-            <span class="num">12</span>
+            <span class="num">{{ monthlyStats.normalCount }}</span>
             <span class="label">정상 출근</span>
           </div>
         </div>
@@ -24,7 +24,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </div>
           <div class="stat-text">
-            <span class="num">1</span>
+            <span class="num">{{ monthlyStats.lateCount }}</span>
             <span class="label">지각/조퇴</span>
           </div>
         </div>
@@ -34,7 +34,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </div>
           <div class="stat-text">
-            <span class="num">2</span>
+            <span class="num">{{ monthlyStats.remoteCount }}</span>
             <span class="label">재택/외근</span>
           </div>
         </div>
@@ -44,7 +44,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
           </div>
           <div class="stat-text">
-            <span class="num">0.5</span>
+            <span class="num">{{ monthlyStats.leaveDays }}</span>
             <span class="label">휴가 사용</span>
           </div>
         </div>
@@ -64,9 +64,9 @@
       </div>
       <div class="action-right">
         <div class="month-selector">
-          <button class="btn-icon">&lt;</button>
-          <span class="current-month">2026.02</span>
-          <button class="btn-icon">&gt;</button>
+          <button class="btn-icon" @click="goPrevMonth" aria-label="이전 달">&lt;</button>
+          <span class="current-month">{{ selectorMonthLabel }}</span>
+          <button class="btn-icon" @click="goNextMonth" aria-label="다음 달">&gt;</button>
         </div>
         <button class="btn-download">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -79,14 +79,19 @@
     <div class="list-section-card">
       <div class="filter-row">
         <div class="tabs">
-          <div class="tab active">전체</div>
-          <div class="tab">정상</div>
-          <div class="tab">지각/조퇴</div>
-          <div class="tab">휴가</div>
+          <button
+            v-for="tab in tabs"
+            :key="tab.value"
+            class="tab"
+            :class="{ active: activeTab === tab.value }"
+            @click="activeTab = tab.value"
+          >
+            {{ tab.label }}
+          </button>
         </div>
         <div class="search-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="검색" />
+          <input v-model="searchQuery" type="text" placeholder="검색" />
         </div>
       </div>
 
@@ -104,7 +109,7 @@
           </thead>
           <tbody>
             <!-- Mock Data Rows -->
-            <tr v-for="(row, idx) in records" :key="idx">
+            <tr v-for="(row, idx) in paginatedRecords" :key="idx">
               <td>{{ row.date }} <span class="weekday">({{ row.day }})</span></td>
               <td>{{ row.inTime }}</td>
               <td>{{ row.outTime }}</td>
@@ -118,29 +123,185 @@
 
       <!-- Pagination -->
       <div class="pagination">
-        <button class="page-arrow" disabled>&lt;</button>
-        <button class="page-num active">1</button>
-        <button class="page-num">2</button>
-        <button class="page-num">3</button>
-        <button class="page-arrow">&gt;</button>
+        <button class="page-arrow" :disabled="currentPage === 1" @click="goPrevPage">&lt;</button>
+        <button
+          v-for="page in pageNumbers"
+          :key="page"
+          class="page-num"
+          :class="{ active: currentPage === page }"
+          :disabled="page > totalPages"
+          @click="setPage(page)"
+        >
+          {{ page }}
+        </button>
+        <button class="page-arrow" :disabled="currentPage === totalPages" @click="goNextPage">&gt;</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
-const records = ref([
-  { date: '2026.02.13', day: '금', inTime: '08:55', outTime: '18:10', status: '정상', statusClass: 'normal', memo: '-', total: '8h 15m' },
-  { date: '2026.02.12', day: '목', inTime: '09:02', outTime: '19:30', status: '지각', statusClass: 'late', memo: '지하철 지연으로 인한 지각', total: '9h 28m' },
-  { date: '2026.02.11', day: '수', inTime: '08:50', outTime: '18:05', status: '정상', statusClass: 'normal', memo: '-', total: '8h 15m' },
-  { date: '2026.02.10', day: '화', inTime: '08:45', outTime: '18:00', status: '정상', statusClass: 'normal', memo: '-', total: '8h 15m' },
-  { date: '2026.02.09', day: '월', inTime: '08:58', outTime: '18:12', status: '정상', statusClass: 'normal', memo: '-', total: '8h 14m' },
-  { date: '2026.02.06', day: '금', inTime: '08:50', outTime: '18:00', status: '정상', statusClass: 'normal', memo: '-', total: '8h 10m' },
-  { date: '2026.02.05', day: '목', inTime: '08:52', outTime: '18:05', status: '정상', statusClass: 'normal', memo: '-', total: '8h 13m' },
-  { date: '2026.02.04', day: '수', inTime: '09:00', outTime: '18:00', status: '정상', statusClass: 'normal', memo: '-', total: '8h 00m' },
-])
+const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+
+const tabs = [
+  { value: 'all', label: '전체' },
+  { value: 'normal', label: '정상' },
+  { value: 'late', label: '지각/조퇴' },
+  { value: 'leave', label: '휴가' }
+]
+
+const statusMap = {
+  normal: { status: '정상', statusClass: 'normal', inTime: '08:55', outTime: '18:10', memo: '-', total: '8h 15m', leaveDays: 0 },
+  late: { status: '지각/조퇴', statusClass: 'late', inTime: '09:10', outTime: '18:20', memo: '대중교통 지연', total: '8h 10m', leaveDays: 0 },
+  remote: { status: '재택/외근', statusClass: 'remote', inTime: '09:00', outTime: '18:00', memo: '재택근무', total: '8h 00m', leaveDays: 0 },
+  leave: { status: '휴가', statusClass: 'leave', inTime: '-', outTime: '-', memo: '연차 사용', total: '-', leaveDays: 1 }
+}
+
+const monthPatterns = [
+  ['normal', 'late', 'normal', 'normal', 'remote', 'normal', 'leave', 'normal'],
+  ['normal', 'normal', 'late', 'remote', 'normal', 'leave', 'normal', 'normal'],
+  ['late', 'normal', 'normal', 'normal', 'leave', 'normal', 'remote', 'normal'],
+  ['normal', 'leave', 'normal', 'late', 'normal', 'remote', 'normal', 'normal']
+]
+
+const selectedMonth = ref({ year: 2026, month: 2 })
+const activeTab = ref('all')
+const searchQuery = ref('')
+const currentPage = ref(1)
+
+const monthOffset = computed(() => (selectedMonth.value.year - 2026) * 12 + (selectedMonth.value.month - 2))
+
+const selectorMonthLabel = computed(() => {
+  const month = String(selectedMonth.value.month).padStart(2, '0')
+  return `${selectedMonth.value.year}.${month}`
+})
+
+const headerMonthLabel = computed(() => `${selectedMonth.value.year}년 ${selectedMonth.value.month}월`)
+
+const monthlyRecords = computed(() => {
+  const { year, month } = selectedMonth.value
+  const pattern = monthPatterns[Math.abs(monthOffset.value) % monthPatterns.length]
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const today = new Date()
+  const startOfSelectedMonth = new Date(year, month - 1, 1)
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
+  const currentYear = today.getFullYear()
+  const currentMonth = today.getMonth() + 1
+
+  if (startOfSelectedMonth > endOfToday) return []
+
+  const maxDay = year === currentYear && month === currentMonth ? today.getDate() : daysInMonth
+
+  return Array.from({ length: maxDay }, (_, idx) => maxDay - idx)
+    .map((day) => {
+      const dateObj = new Date(year, month - 1, day)
+      const y = dateObj.getFullYear()
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0')
+      const d = String(dateObj.getDate()).padStart(2, '0')
+      const dayType = pattern[(day - 1) % pattern.length]
+      const statusInfo = statusMap[dayType]
+
+      return {
+        ...statusInfo,
+        type: dayType,
+        date: `${y}.${m}.${d}`,
+        day: dayNames[dateObj.getDay()],
+        dateObj
+      }
+    })
+    .filter((record) => ![0, 6].includes(record.dateObj.getDay()))
+    .filter((record) => record.dateObj <= endOfToday)
+    .map(({ dateObj, ...record }) => record)
+})
+
+const monthlyStats = computed(() => {
+  const normalCount = monthlyRecords.value.filter((record) => record.type === 'normal').length
+  const lateCount = monthlyRecords.value.filter((record) => record.type === 'late').length
+  const remoteCount = monthlyRecords.value.filter((record) => record.type === 'remote').length
+  const leaveTotal = monthlyRecords.value.reduce((sum, record) => sum + (record.leaveDays || 0), 0)
+
+  return {
+    normalCount,
+    lateCount,
+    remoteCount,
+    leaveDays: Number.isInteger(leaveTotal) ? String(leaveTotal) : leaveTotal.toFixed(1)
+  }
+})
+
+const displayedRecords = computed(() => {
+  if (activeTab.value === 'all') return monthlyRecords.value
+  return monthlyRecords.value.filter((record) => record.type === activeTab.value)
+})
+
+const filteredRecords = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase()
+  if (!keyword) return displayedRecords.value
+
+  return displayedRecords.value.filter((record) => {
+    const searchTargets = [
+      record.date,
+      record.day,
+      record.inTime,
+      record.outTime,
+      record.status,
+      record.memo,
+      record.total
+    ]
+    return searchTargets.some((target) => String(target).toLowerCase().includes(keyword))
+  })
+})
+
+const pageSize = computed(() => (activeTab.value === 'all' ? 10 : 3))
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRecords.value.length / pageSize.value)))
+
+const pageNumbers = computed(() => Array.from({ length: totalPages.value }, (_, idx) => idx + 1))
+
+const paginatedRecords = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredRecords.value.slice(start, start + pageSize.value)
+})
+
+watch([activeTab, searchQuery, monthOffset], () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, (nextTotal) => {
+  if (currentPage.value > nextTotal) currentPage.value = nextTotal
+})
+
+const setPage = (page) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+}
+
+const goPrevPage = () => {
+  if (currentPage.value > 1) currentPage.value -= 1
+}
+
+const goNextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value += 1
+}
+
+const goPrevMonth = () => {
+  if (selectedMonth.value.month === 1) {
+    selectedMonth.value.year -= 1
+    selectedMonth.value.month = 12
+    return
+  }
+  selectedMonth.value.month -= 1
+}
+
+const goNextMonth = () => {
+  if (selectedMonth.value.month === 12) {
+    selectedMonth.value.year += 1
+    selectedMonth.value.month = 1
+    return
+  }
+  selectedMonth.value.month += 1
+}
 </script>
 
 <style scoped>
@@ -299,6 +460,7 @@ const records = ref([
 .tab {
   padding: 6px 16px;
   border-radius: 20px;
+  border: none;
   font-size: 0.9rem; font-weight: 600;
   color: var(--gray500); background: var(--gray100);
   cursor: pointer; transition: all 0.2s;
@@ -347,6 +509,8 @@ const records = ref([
 }
 .status-tag.normal { background: #E3F2FD; color: #1E88E5; }
 .status-tag.late { background: #FFF3E0; color: #FB8C00; }
+.status-tag.remote { background: #F3E8FF; color: #7E22CE; }
+.status-tag.leave { background: #FEE2E2; color: #DC2626; }
 .memo {
   color: var(--gray500); font-size: 0.85rem;
 }

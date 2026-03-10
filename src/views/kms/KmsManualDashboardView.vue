@@ -51,19 +51,22 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { kmsCategories, manuals } from '@/mocks/kms'
+import { kmsCategories } from '@/mocks/kms'
+import { useKmsManualStore } from '@/store/kmsManuals'
 
 const router = useRouter()
+const manualStore = useKmsManualStore()
 const keyword = ref('')
 const restrictedCategoryKeys = ['finance', 'security']
 
 const filteredManuals = computed(() => {
   const q = keyword.value.trim().toLowerCase()
-  if (!q) return manuals
-  return manuals.filter((item) => item.title.toLowerCase().includes(q) || item.summary.toLowerCase().includes(q))
+  const rows = manualStore.activeManuals
+  if (!q) return rows
+  return rows.filter((item) => item.title.toLowerCase().includes(q) || item.summary.toLowerCase().includes(q))
 })
 
-const countByCategory = (key) => manuals.filter((item) => item.category === key).length
+const countByCategory = (key) => manualStore.activeManuals.filter((item) => item.category === key).length
 
 const goCategory = (category) => {
   if (restrictedCategoryKeys.includes(category.key)) {

@@ -31,20 +31,14 @@
       <!-- Filters -->
       <div class="filter-card">
         <div class="filter-row">
-          <div class="filter-group">
-            <label>부서</label>
-            <select v-model="filters.dept" class="select-input">
-              <option value="">전체 부서</option>
-              <option value="dev">개발팀</option>
-              <option value="hr">인사팀</option>
-              <option value="sales">영업팀</option>
-            </select>
-          </div>
+
           <div class="filter-group">
             <label>기간</label>
-            <input type="date" v-model="filters.startDate" class="date-input" />
-            <span class="tilde">~</span>
-            <input type="date" v-model="filters.endDate" class="date-input" />
+            <div class="date-range-row">
+              <input type="date" v-model="filters.startDate" class="date-input" />
+              <span class="tilde">~</span>
+              <input type="date" v-model="filters.endDate" class="date-input" />
+            </div>
           </div>
           <div class="filter-group">
             <label>근태 상태</label>
@@ -98,7 +92,7 @@
                     </div>
                   </div>
                 </td>
-                <td>{{ item.deptName }}</td>
+                <td>개발팀</td>
                 <td>{{ item.date }}</td>
                 <td>{{ item.checkIn || '-' }}</td>
                 <td>{{ item.checkOut || '-' }}</td>
@@ -285,6 +279,12 @@ const filters = ref({
   status: ''
 })
 
+const appliedFilters = ref({
+  startDate: '',
+  endDate: '',
+  status: ''
+})
+
 const showModal = ref(false)
 const selectedItem = ref(null)
 const editForm = ref({
@@ -303,11 +303,13 @@ const rejectReason = ref('')
 // --- Computed (Daily) ---
 const filteredList = computed(() => {
   return store.dailyAttendance.filter(item => {
-    if (filters.value.dept && item.deptName !== filters.value.dept && !item.deptName.includes(filters.value.dept)) {
-      const deptMap = { 'dev': '개발팀', 'hr': '인사팀', 'sales': '영업팀' }
-      if (deptMap[filters.value.dept] !== item.deptName) return false
-    }
-    if (filters.value.status && item.status !== filters.value.status) return false
+    // Status Filter
+    if (appliedFilters.value.status && item.status !== appliedFilters.value.status) return false
+    
+    // Date Range Filter
+    if (appliedFilters.value.startDate && item.date < appliedFilters.value.startDate) return false
+    if (appliedFilters.value.endDate && item.date > appliedFilters.value.endDate) return false
+    
     return true
   })
 })
@@ -344,7 +346,8 @@ const isAllLeaveSelected = computed(() => {
 
 // --- Methods (Daily) ---
 const fetchData = () => {
-  console.log('Fetching data with filters:', filters.value)
+  appliedFilters.value = { ...filters.value }
+  console.log('Fetching data with filters:', appliedFilters.value)
 }
 
 const openEditModal = (item) => {
@@ -472,6 +475,12 @@ const submitReject = () => {
 .filter-group label {
   font-size: 0.85rem; font-weight: 700; color: var(--gray700);
   text-transform: uppercase; letter-spacing: 0.03em;
+}
+.date-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 .select-input, .date-input {
   padding: 10px 14px;

@@ -106,203 +106,686 @@ export const mockReferrers = [
     mockUsers.find(u => u.id === 'u6')   // 정수진 이사
 ];
 
+// 기본 Mock 검토자
+export const mockReviewers = [
+    mockUsers.find(u => u.id === 'u1'),  // 홍길동 사원
+    mockUsers.find(u => u.id === 'u15'), // 최유진 과장
+    mockUsers.find(u => u.id === 'u4')   // 박민수 차장
+];
+
 export const templates = [
     { id: 'vacation', name: '휴가 신청서', type: 'HR' },
     { id: 'flexible', name: '유연근무 신청서', type: 'HR' },
+    { id: 'businessTrip', name: '외근/출장 신청서', type: 'HR' },
+    { id: 'overtime', name: '연장근무 신청서', type: 'HR' },
     { id: 'leave', name: '휴직신청서', type: 'HR' },
-    { id: 'reinstatement', name: '복직신청서', type: 'HR' },
+    { id: 'reinstatement', name: '복직신청서', type: 'HR' }
 ];
 
 export const mockApprovalStatusList = [
     {
-        id: 'DOC-2024-001',
-        title: '2024년 정기 휴가 신청',
-        templateName: '휴가 신청서',
-        drafter: '홍길동',
-        draftDate: '2024-02-10',
-        status: '진행중',
-        currentApprover: '최지훈 부장',
-        progress: 66,
-        approvalLine: [
-            { name: '김철수', position: '대리', status: '승인', date: '2024-02-10' },
-            { name: '최지훈', position: '부장', status: '대기', date: '' },
-            { name: '강동원', position: '대표이사', status: '대기', date: '' }
-        ]
-    },
-    {
-        id: 'DOC-2024-002',
-        title: '신규 프로젝트 협업툴 도입 품의',
-        templateName: '기안서',
-        drafter: '홍길동',
-        draftDate: '2024-02-11',
-        status: '반려',
-        currentApprover: '정수진 이사',
-        progress: 33,
-        approvalLine: [
-            { name: '김철수', position: '대리', status: '승인', date: '2024-02-11' },
-            { name: '정수진', position: '이사', status: '반려', date: '2024-02-12' }
-        ]
-    },
-    {
-        id: 'DOC-2024-003',
-        title: '3월 유연근무제 신청',
+        id: 'DOC-2026-001',
+        title: '3월 1주차 재택 유연근무 신청',
         templateName: '유연근무 신청서',
         drafter: '홍길동',
-        draftDate: '2024-02-12',
-        status: '기안중',
+        draftDate: '2026-02-24',
+        status: '진행중',
+        currentApprover: '최유진 과장',
+        progress: 50,
+        content: '집중 개발 주간 운영을 위해 3월 1주차 재택 유연근무를 신청합니다.',
+        attachments: ['weekly_focus_plan.pdf'],
+        reviewers: ['박민수 차장'],
+        referrers: ['김철수 대리'],
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-24' },
+            { name: '최유진', position: '과장', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'DOC-2026-002',
+        title: '부산 고객사 방문 출장 신청',
+        templateName: '외근/출장 신청서',
+        drafter: '홍길동',
+        draftDate: '2026-02-22',
+        status: '진행중',
+        currentApprover: '박민수 차장',
+        progress: 33,
+        content: '부산 고객사 현장 미팅을 위한 1박 2일 출장 승인 요청입니다.',
+        attachments: ['busan_meeting_agenda.pdf'],
+        reviewers: ['최유진 과장', '홍길동 사원'],
+        referrers: ['정수진 이사'],
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-22' },
+            { name: '박민수', position: '차장', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'DOC-2026-003',
+        title: 'QA 배포 지원 연장근무 신청',
+        templateName: '연장근무 신청서',
+        drafter: '윤도현',
+        draftDate: '2026-02-21',
+        status: '진행중',
+        currentApprover: '홍길동 사원',
+        progress: 66,
+        content: '배포 안정성 점검을 위한 연장근무 승인 요청입니다.',
+        attachments: ['qa_release_checklist.pdf'],
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        referrers: ['박민수 차장'],
+        approvalLine: [
+            { name: '윤도현', position: '대리', status: '기안', date: '2026-02-21' },
+            { name: '최유진', position: '과장', status: '승인', date: '2026-02-21' },
+            { name: '민윤기', position: '과장', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'DOC-2026-004',
+        title: '3월 연차 사용 계획',
+        templateName: '휴가 신청서',
+        drafter: '홍길동',
+        draftDate: '2026-02-20',
+        status: '반려',
+        currentApprover: '최유진 과장',
+        progress: 33,
+        content: '3월 셋째 주 연차 사용 계획 승인 요청입니다.',
+        attachments: [],
+        reviewers: ['홍길동 사원'],
+        referrers: ['박민수 차장'],
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-20' },
+            { name: '최유진', position: '과장', status: '반려', date: '2026-02-20' }
+        ]
+    },
+    {
+        id: 'DOC-2026-005',
+        title: '복직 후 근무전환 신청',
+        templateName: '복직신청서',
+        drafter: '홍길동',
+        draftDate: '2026-02-18',
+        status: '완료',
         currentApprover: '-',
-        progress: 0,
-        approvalLine: []
+        progress: 100,
+        content: '복직 이후 1개월간 유연근무 병행 적용을 신청합니다.',
+        attachments: ['return_plan_v2.pdf'],
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        referrers: ['홍길동 사원', '정수진 이사'],
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-18' },
+            { name: '최유진', position: '과장', status: '승인', date: '2026-02-18' },
+            { name: '정수진', position: '이사', status: '전결', date: '2026-02-19' }
+        ]
     }
 ];
 
 export const mockPendingApprovals = [
-    { id: 1, title: '2024년 정기 휴가 신청', templateName: '휴가', drafter: '김팀원', draftDate: '02-10', isNew: true },
-    { id: 2, title: '신규 프로젝트 협업툴 도입 품의', templateName: '기안', drafter: '이대리', draftDate: '02-11', isNew: false },
-    { id: 3, title: '운영 서버 스토리지 증설 요청', templateName: '품의', drafter: '박과장', draftDate: '02-12', isNew: false },
+    { id: 1, title: 'QA 배포 지원 연장근무 신청', templateName: '연장근무', drafter: '윤도현', draftDate: '02-21', isNew: true, currentStep: 2, currentApprover: '홍길동 사원' },
+    { id: 2, title: '월말 점검 외근 신청', templateName: '외근/출장', drafter: '박민수', draftDate: '02-22', isNew: true, currentStep: 2, currentApprover: '홍길동 사원' },
+    { id: 3, title: '개발2팀 유연근무 검토 요청', templateName: '유연근무', drafter: '민윤기', draftDate: '02-22', isNew: false, currentStep: 1, currentApprover: '홍길동 사원' },
+    { id: 4, title: '3월 첫째 주 외근 신청', templateName: '외근/출장', drafter: '이영희', draftDate: '02-23', isNew: false, currentStep: 2, currentApprover: '홍길동 사원' },
+    { id: 5, title: '긴급 서버대응 연장근무 신청', templateName: '연장근무', drafter: '김철수', draftDate: '02-24', isNew: false, currentStep: 1, currentApprover: '홍길동 사원' }
+];
+
+export const mockMainApprovalDocuments = [
+    { id: 'MAIN-001', docId: 'ING-2026-003', type: 'pending', title: 'QA 배포 지원 연장근무 신청', who: '윤도현', date: '2026-02-22' },
+    { id: 'MAIN-002', docId: 'ING-2026-005', type: 'pending', title: '월말 점검 외근 신청', who: '박민수', date: '2026-02-20' },
+    { id: 'MAIN-003', docId: 'ING-2026-004', type: 'pending', title: '개발2팀 유연근무 검토 요청', who: '민윤기', date: '2026-02-21' },
+    { id: 'MAIN-004', docId: 'ISS-2026-002', type: 'pending', title: '긴급 서버대응 연장근무 신청', who: '김철수', date: '2026-02-18' },
+    { id: 'MAIN-005', docId: 'ISS-2026-004', type: 'pending', title: '복직 후 근무전환 신청', who: '홍길동', date: '2026-02-16' },
+    { id: 'MAIN-006', docId: 'ING-2026-001', type: 'progress', title: '3월 1주차 재택 유연근무 신청', who: '홍길동', date: '2026-02-24' },
+    { id: 'MAIN-007', docId: 'ING-2026-002', type: 'progress', title: '부산 고객사 방문 출장 신청', who: '홍길동', date: '2026-02-23' },
+    { id: 'MAIN-008', docId: 'CMP-2026-001', type: 'progress', title: '상반기 교육 참석 출장 신청', who: '박민수', date: '2026-02-14' },
+    { id: 'MAIN-009', docId: 'CMP-2026-002', type: 'progress', title: '복직 후 근무전환 신청', who: '홍길동', date: '2026-02-13' },
+    { id: 'MAIN-010', docId: 'CMP-2026-005', type: 'progress', title: '3월 연차 사용 계획', who: '이영희', date: '2026-02-10' }
 ];
 
 export const mockMyDrafts = [
-    { id: 1, title: '4월 마케팅 예산 승인 요청', currentApprover: '박본부장', status: '진행', approverInitial: '박' },
-    { id: 2, title: '비품(노트북) 구매 요청의 건', currentApprover: '이지아 과장', status: '진행', approverInitial: '이' },
-    { id: 3, title: '상반기 워크샵 장소 선정 보고', currentApprover: '정수진 이사', status: '완료', approverInitial: '정' },
-    { id: 4, title: '팀 빌딩 비용 정산', currentApprover: '-', status: '기안', approverInitial: '-' },
+    { id: 1, title: '3월 1주차 재택 유연근무 신청', currentApprover: '최유진 과장', status: '진행', approverInitial: '최' },
+    { id: 2, title: '부산 고객사 방문 출장 신청', currentApprover: '박민수 차장', status: '진행', approverInitial: '박' },
+    { id: 3, title: '복직 후 근무전환 신청', currentApprover: '-', status: '완료', approverInitial: '-' },
+    { id: 4, title: '3월 연차 사용 계획', currentApprover: '-', status: '반려', approverInitial: '-' },
+    { id: 5, title: '상반기 직무교육 참석 신청', currentApprover: '-', status: '기안', approverInitial: '-' }
 ];
 
 export const mockReviewList = [
     {
-        id: '2024-REG-001',
-        title: '2024년 1분기 영업 실적 분석 및 전략 보고',
-        drafter: '최지훈',
-        position: '부장',
-        department: '영업1팀',
-        date: '2024-02-10',
+        id: 'REV-2026-001',
+        title: 'QA 배포 지원 연장근무 신청',
+        drafter: '윤도현',
+        position: '대리',
+        department: '개발2팀',
+        date: '2026-02-24',
         status: '진행중',
-        content: '2024년 1분기 영업 실적을 분석하고 향후 전략을 보고합니다.',
+        content: '배포 전 점검 강화를 위해 연장근무 승인을 요청합니다.',
         isRead: false,
-        category: '보고서',
-        attachments: ['performance_2024_q1.pdf'],
-        canFinalize: true,
-        step: 2
+        category: '연장근무 신청서',
+        attachments: ['qa_release_checklist.pdf'],
+        reviewers: ['홍길동 사원'],
+        canFinalize: false,
+        step: 2,
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '윤도현', position: '대리', status: '기안', date: '2026-02-24' },
+            { name: '최유진', position: '과장', status: '승인', date: '2026-02-24' },
+            { name: '민윤기', position: '과장', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
     },
     {
-        id: '2024-EXP-015',
-        title: '신규 서버 인프라 구축 비용 정산',
+        id: 'REV-2026-002',
+        title: '월말 점검 외근 신청',
         drafter: '박민수',
         position: '차장',
         department: '개발1팀',
-        date: '2024-02-12',
+        date: '2026-02-23',
         status: '진행중',
-        content: '클라우드 마이그레이션에 따른 신규 서버 구축 비용 정산 요청입니다.',
-        isRead: true,
-        category: '품의서',
-        attachments: ['invoice_cloud.png', 'cost_benefit_analysis.xlsx'],
+        content: '협력사 시스템 점검을 위한 외근 승인 요청입니다.',
+        isRead: false,
+        category: '외근/출장 신청서',
+        attachments: ['onsite_checklist.pdf'],
+        reviewers: ['홍길동 사원', '최유진 과장'],
         canFinalize: false,
-        step: 3
+        step: 1,
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '박민수', position: '차장', status: '기안', date: '2026-02-23' },
+            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
     },
     {
-        id: '2024-HR-048',
-        title: '하반기 공채 채용 홍보 예산 기안',
+        id: 'REV-2026-003',
+        title: '개발2팀 유연근무 검토 요청',
+        drafter: '민윤기',
+        position: '과장',
+        department: '개발2팀',
+        date: '2026-02-22',
+        status: '진행중',
+        content: '개발2팀 집중 작업 주간 유연근무 신청 검토 요청입니다.',
+        isRead: true,
+        category: '유연근무 신청서',
+        attachments: [],
+        reviewers: ['홍길동 사원'],
+        canFinalize: false,
+        step: 1,
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '민윤기', position: '과장', status: '기안', date: '2026-02-22' },
+            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'REV-2026-004',
+        title: '3월 첫째 주 외근 신청',
+        drafter: '이영희',
+        position: '과장',
+        department: '개발1팀',
+        date: '2026-02-21',
+        status: '진행중',
+        content: '협력사 기술 미팅 참석을 위한 외근 신청입니다.',
+        isRead: true,
+        category: '외근/출장 신청서',
+        attachments: [],
+        reviewers: ['홍길동 사원', '박민수 차장'],
+        canFinalize: false,
+        step: 2,
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '이영희', position: '과장', status: '기안', date: '2026-02-21' },
+            { name: '박민수', position: '차장', status: '승인', date: '2026-02-21' },
+            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'REV-2026-005',
+        title: '긴급 서버대응 연장근무 신청',
         drafter: '김철수',
         position: '대리',
         department: '인사팀',
-        date: '2024-02-13',
+        date: '2026-02-20',
         status: '진행중',
-        content: '우수 인재 확보를 위한 하반기 공채 채용 홍보 예산 집행 요청입니다.',
+        content: '야간 긴급 대응을 위한 연장근무 신청 승인 요청입니다.',
         isRead: false,
-        category: '기안서',
-        attachments: [],
-        canFinalize: true,
-        step: 1
+        category: '연장근무 신청서',
+        attachments: ['incident_summary.pdf'],
+        reviewers: ['홍길동 사원'],
+        canFinalize: false,
+        step: 1,
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '김철수', position: '대리', status: '기안', date: '2026-02-20' },
+            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '최유진', position: '과장', status: '대기', date: '' }
+        ]
     }
 ];
 
 export const mockApprovalBox = [
+    // 진행중 5건
     {
-        id: '2024-REG-101',
-        title: '연간 마케팅 제안서 검토 요청',
+        id: 'ING-2026-001',
+        title: '3월 1주차 재택 유연근무 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-24 09:10',
+        status: '진행중',
+        category: '유연근무 신청서',
+        isRead: false,
+        content: '집중 개발 주간 운영을 위해 재택 유연근무를 신청합니다.',
+        attachments: ['weekly_focus_plan.pdf'],
+        reviewers: ['박민수 차장'],
+        referrers: ['김철수 대리'],
+        currentApprover: '최유진 과장',
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-24' },
+            { name: '최유진', position: '과장', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'ING-2026-002',
+        title: '부산 고객사 방문 출장 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-23 10:20',
+        status: '진행중',
+        category: '외근/출장 신청서',
+        isRead: false,
+        content: '고객사 분기 리뷰 미팅 참석을 위한 출장 승인 요청입니다.',
+        attachments: ['busan_meeting_agenda.pdf'],
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        referrers: ['정수진 이사'],
+        currentApprover: '박민수 차장',
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-23' },
+            { name: '박민수', position: '차장', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'ING-2026-003',
+        title: 'QA 배포 지원 연장근무 신청',
+        drafter: '윤도현',
+        position: '대리',
+        department: '개발2팀',
+        date: '2026-02-22 18:00',
+        status: '진행중',
+        category: '연장근무 신청서',
+        isRead: true,
+        content: '배포 안정성 점검을 위한 QA 연장근무 승인 요청입니다.',
+        attachments: ['qa_release_checklist.pdf'],
+        reviewers: ['홍길동 사원'],
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '윤도현', position: '대리', status: '기안', date: '2026-02-22' },
+            { name: '최유진', position: '과장', status: '승인', date: '2026-02-22' },
+            { name: '민윤기', position: '과장', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'ING-2026-004',
+        title: '개발2팀 유연근무 검토 요청',
+        drafter: '민윤기',
+        position: '과장',
+        department: '개발2팀',
+        date: '2026-02-21 11:15',
+        status: '진행중',
+        category: '유연근무 신청서',
+        isRead: false,
+        content: '개발2팀 집중 작업 주간 유연근무 신청 건입니다.',
+        attachments: [],
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '민윤기', position: '과장', status: '기안', date: '2026-02-21' },
+            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+    {
+        id: 'ING-2026-005',
+        title: '월말 점검 외근 신청',
+        drafter: '박민수',
+        position: '차장',
+        department: '개발1팀',
+        date: '2026-02-20 17:40',
+        status: '진행중',
+        category: '외근/출장 신청서',
+        isRead: true,
+        content: '협력사 시스템 월말 점검을 위한 외근 신청입니다.',
+        attachments: ['onsite_checklist.pdf'],
+        reviewers: ['홍길동 사원'],
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '박민수', position: '차장', status: '기안', date: '2026-02-20' },
+            { name: '홍길동', position: '사원', status: '대기', date: '' },
+            { name: '정수진', position: '이사', status: '대기', date: '' }
+        ]
+    },
+
+    // 보류/반려 5건
+    {
+        id: 'ISS-2026-001',
+        title: '3월 연차 사용 계획',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-19 09:15',
+        status: '반려',
+        category: '휴가 신청서',
+        isRead: true,
+        content: '3월 셋째 주 연차 사용 계획 승인 요청 건입니다.',
+        attachments: [],
+        reviewers: ['홍길동 사원'],
+        rejectReason: '해당 주간 인력 운영 계획과 충돌합니다.',
+        currentApprover: '최유진 과장',
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-19' },
+            { name: '최유진', position: '과장', status: '반려', date: '2026-02-19' }
+        ]
+    },
+    {
+        id: 'ISS-2026-002',
+        title: '긴급 서버대응 연장근무 신청',
+        drafter: '김철수',
+        position: '대리',
+        department: '인사팀',
+        date: '2026-02-18 15:00',
+        status: '보류',
+        category: '연장근무 신청서',
+        isRead: false,
+        content: '긴급 서버대응을 위한 야간 연장근무 신청입니다.',
+        attachments: ['incident_summary.pdf'],
+        reviewers: ['홍길동 사원'],
+        currentApprover: '홍길동 사원',
+        approvalLine: [
+            { name: '김철수', position: '대리', status: '기안', date: '2026-02-18' },
+            { name: '홍길동', position: '사원', status: '보류', date: '2026-02-18' }
+        ]
+    },
+    {
+        id: 'ISS-2026-003',
+        title: '영업1팀 유연근무 신청',
         drafter: '최지훈',
         position: '부장',
-        department: '마케팅팀',
-        date: '2024-02-01 10:00',
-        status: '완료',
-        category: '보고서',
-        isRead: true,
-        content: '2024년 연간 마케팅 핵심 전략 및 예산안 보고서입니다.',
-        attachments: ['marketing_strategy_2024.pdf'],
-        approvalLine: [
-            { name: '최지훈', position: '부장', status: '기안', date: '2024-02-01' },
-            { name: '이팀장', position: '팀장', status: '승인', date: '2024-02-01' },
-            { name: '박본부장', position: '본부장', status: '승인', date: '2024-02-02' }
-        ],
-        referrers: ['김철수 (대리)', '이영희 (사원)'],
-        comments: [
-            { name: '박본부장', text: '좋은 마케팅 계획입니다. 실행에 차질 없도록 하세요.', date: '2024-02-02' }
-        ]
-    },
-    {
-        id: '2024-EXP-202',
-        title: '신규 법인카드 발급 신청',
-        drafter: '김나영',
-        position: '사원',
-        department: '경영지원팀',
-        date: '2024-02-05 14:30',
-        status: '진행중',
-        category: '품의서',
-        isRead: false,
-        content: '영업팀 신규 입사자 법인카드 발급을 요청합니다.',
-        attachments: [],
-        approvalLine: [
-            { name: '김나영', position: '사원', status: '기안', date: '2024-02-05' },
-            { name: '백팀장', position: '팀장', status: '대기', date: '-' }
-        ]
-    },
-    {
-        id: '2024-HR-303',
-        title: '3월 연차 휴가 사용 계획',
-        drafter: '정수진',
-        position: '이사',
-        department: 'IT디자인실',
-        date: '2024-02-08 09:15',
+        department: '영업1팀',
+        date: '2026-02-17 20:10',
         status: '반려',
-        category: '기안서',
+        category: '유연근무 신청서',
         isRead: true,
-        content: '3월 중순 개인 사정으로 인한 연차 휴가 사용 계획입니다.',
+        content: '영업1팀 유연근무 운영 신청 건입니다.',
         attachments: [],
-        rejectReason: '해당 주간에 전사 워크샵이 예정되어 있습니다. 일정 조정 바랍니다.',
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        rejectReason: '보완 자료 제출 후 재상신 필요',
+        currentApprover: '정수진 이사',
         approvalLine: [
-            { name: '정수진', position: '이사', status: '기안', date: '2024-02-08' },
-            { name: '김상무', position: '상무', status: '반려', date: '2024-02-08' }
+            { name: '최지훈', position: '부장', status: '기안', date: '2026-02-17' },
+            { name: '홍길동', position: '사원', status: '승인', date: '2026-02-17' },
+            { name: '정수진', position: '이사', status: '반려', date: '2026-02-17' }
         ]
     },
     {
-        id: 'TEMP-001',
-        title: '(임시) 전사 보안 교육 실시의 건',
-        drafter: '박기안',
-        position: '대리',
-        department: '정보보안팀',
-        date: '2024-02-12 11:00',
-        status: '임시저장',
-        category: '기안서',
-        isRead: true,
-        content: '전 임직원 대상 상반기 정보보안 교육 실시를 위한 기안입니다.',
-        attachments: ['sec_training_plan.docx']
+        id: 'ISS-2026-004',
+        title: '복직 후 근무전환 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-16 08:40',
+        status: '보류',
+        category: '복직신청서',
+        isRead: false,
+        content: '복직 후 유연근무 병행 전환 신청 건입니다.',
+        attachments: ['return_plan_v1.pdf'],
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        currentApprover: '최유진 과장',
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-16' },
+            { name: '최유진', position: '과장', status: '보류', date: '2026-02-16' }
+        ]
     },
     {
-        id: '2024-PUR-404',
-        title: '모니터링 서버 노후 장비 교체 품의',
-        drafter: '이대리',
+        id: 'ISS-2026-005',
+        title: '개발1팀 외근 신청',
+        drafter: '이영희',
+        position: '과장',
+        department: '개발1팀',
+        date: '2026-02-15 14:10',
+        status: '반려',
+        category: '외근/출장 신청서',
+        isRead: true,
+        content: '협력사 기술 협의 외근 신청입니다.',
+        attachments: [],
+        reviewers: ['홍길동 사원'],
+        rejectReason: '외근 사유서 상세 보완 필요',
+        currentApprover: '박민수 차장',
+        approvalLine: [
+            { name: '이영희', position: '과장', status: '기안', date: '2026-02-15' },
+            { name: '홍길동', position: '사원', status: '승인', date: '2026-02-15' },
+            { name: '박민수', position: '차장', status: '반려', date: '2026-02-15' }
+        ]
+    },
+
+    // 완료 5건
+    {
+        id: 'CMP-2026-001',
+        title: '3월 초 연장근무 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-14 19:00',
+        status: '완료',
+        category: '연장근무 신청서',
+        isRead: true,
+        content: '3월 초 시스템 점검 대응 연장근무 신청 건입니다.',
+        attachments: ['maintenance_plan.pdf'],
+        reviewers: ['홍길동 사원'],
+        referrers: ['홍길동 사원', '최유진 과장'],
+        currentApprover: '-',
+        approvalLine: [
+            { name: '홍길동', position: '사원', status: '기안', date: '2026-02-14' },
+            { name: '최유진', position: '과장', status: '승인', date: '2026-02-14' },
+            { name: '정수진', position: '이사', status: '전결', date: '2026-02-15' }
+        ]
+    },
+    {
+        id: 'CMP-2026-002',
+        title: '1분기 고객사 방문 출장 신청',
+        drafter: '최지훈',
+        position: '부장',
+        department: '영업1팀',
+        date: '2026-02-13 10:30',
+        status: '완료',
+        category: '외근/출장 신청서',
+        isRead: true,
+        content: '1분기 핵심 고객사 방문 출장 신청 건입니다.',
+        attachments: ['customer_visit_plan.pdf'],
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        referrers: ['홍길동 사원', '정수진 이사'],
+        currentApprover: '-',
+        approvalLine: [
+            { name: '최지훈', position: '부장', status: '기안', date: '2026-02-13' },
+            { name: '홍길동', position: '사원', status: '승인', date: '2026-02-13' },
+            { name: '손흥민', position: '본부장', status: '승인', date: '2026-02-13' },
+            { name: '강동원', position: '대표이사', status: '전결', date: '2026-02-14' }
+        ]
+    },
+    {
+        id: 'CMP-2026-003',
+        title: '2월 연차 사용 신청',
+        drafter: '이영희',
+        position: '과장',
+        department: '개발1팀',
+        date: '2026-02-12 09:05',
+        status: '완료',
+        category: '휴가 신청서',
+        isRead: true,
+        content: '2월 마지막 주 연차 사용 신청입니다.',
+        attachments: [],
+        reviewers: ['홍길동 사원'],
+        referrers: ['최유진 과장'],
+        currentApprover: '-',
+        approvalLine: [
+            { name: '이영희', position: '과장', status: '기안', date: '2026-02-12' },
+            { name: '홍길동', position: '사원', status: '승인', date: '2026-02-12' },
+            { name: '정수진', position: '이사', status: '승인', date: '2026-02-13' }
+        ]
+    },
+    {
+        id: 'CMP-2026-004',
+        title: '복직 신청서',
+        drafter: '김제니',
         position: '대리',
-        department: '인프라팀',
-        date: '2024-02-10 16:45',
-        status: '보류',
-        category: '품의서',
-        isRead: false,
-        content: '인프라 모니터링 서버의 내구연한 만료에 따른 장비 교체 요청입니다.',
-        attachments: ['server_spec_compare.xlsx']
+        department: '영업2팀',
+        date: '2026-02-11 13:20',
+        status: '완료',
+        category: '복직신청서',
+        isRead: true,
+        content: '복직 신청 승인 완료 건입니다.',
+        attachments: ['return_certificate.pdf'],
+        reviewers: ['홍길동 사원', '최유진 과장'],
+        referrers: ['박민수 차장'],
+        currentApprover: '-',
+        approvalLine: [
+            { name: '김제니', position: '대리', status: '기안', date: '2026-02-11' },
+            { name: '홍길동', position: '사원', status: '승인', date: '2026-02-11' },
+            { name: '강석진', position: '차장', status: '승인', date: '2026-02-11' },
+            { name: '손흥민', position: '본부장', status: '전결', date: '2026-02-12' }
+        ]
+    },
+    {
+        id: 'CMP-2026-005',
+        title: '2월 2주차 유연근무 신청',
+        drafter: '민윤기',
+        position: '과장',
+        department: '개발2팀',
+        date: '2026-02-10 09:45',
+        status: '완료',
+        category: '유연근무 신청서',
+        isRead: true,
+        content: '2월 2주차 유연근무 승인 완료 건입니다.',
+        attachments: [],
+        reviewers: ['홍길동 사원'],
+        referrers: ['김철수 대리'],
+        currentApprover: '-',
+        approvalLine: [
+            { name: '민윤기', position: '과장', status: '기안', date: '2026-02-10' },
+            { name: '홍길동', position: '사원', status: '승인', date: '2026-02-10' },
+            { name: '정수진', position: '이사', status: '승인', date: '2026-02-10' }
+        ]
+    },
+
+    // 임시저장 5건 (기안자 본인)
+    {
+        id: 'TEMP-2026-001',
+        title: '(임시) 3월 2주차 유연근무 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-25 11:00',
+        status: '임시저장',
+        category: '유연근무 신청서',
+        isRead: true,
+        content: '집중 업무를 위한 주 2회 재택 유연근무 임시 저장 건입니다.',
+        reviewers: [],
+        attachments: ['flex_draft_week2.docx']
+    },
+    {
+        id: 'TEMP-2026-002',
+        title: '(임시) 대구 지사 출장 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-25 10:10',
+        status: '임시저장',
+        category: '외근/출장 신청서',
+        isRead: true,
+        content: '대구 지사 방문 출장 신청 임시 저장 건입니다.',
+        reviewers: ['최유진 과장'],
+        attachments: []
+    },
+    {
+        id: 'TEMP-2026-003',
+        title: '(임시) 분기마감 연장근무 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-25 09:30',
+        status: '임시저장',
+        category: '연장근무 신청서',
+        isRead: true,
+        content: '분기마감 대응 연장근무 신청 임시 저장 건입니다.',
+        reviewers: [],
+        attachments: ['overtime_draft.xlsx']
+    },
+    {
+        id: 'TEMP-2026-004',
+        title: '(임시) 4월 연차 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-24 18:20',
+        status: '임시저장',
+        category: '휴가 신청서',
+        isRead: true,
+        content: '4월 중 연차 사용 계획 임시 저장 건입니다.',
+        reviewers: ['최유진 과장'],
+        attachments: []
+    },
+    {
+        id: 'TEMP-2026-005',
+        title: '(임시) 복직 후 유연근무 병행 신청',
+        drafter: '홍길동',
+        position: '사원',
+        department: '인사팀',
+        date: '2026-02-24 15:40',
+        status: '임시저장',
+        category: '복직신청서',
+        isRead: true,
+        content: '복직 이후 근무형태 전환 신청 임시 저장 건입니다.',
+        reviewers: ['최유진 과장'],
+        attachments: ['returning_plan.docx']
     }
 ];
 
+const mapStatusToCategory = (templateName) => {
+    if (templateName?.includes('휴가')) return '휴가 신청서';
+    if (templateName?.includes('유연근무')) return '유연근무 신청서';
+    if (templateName?.includes('외근') || templateName?.includes('출장')) return '외근/출장 신청서';
+    if (templateName?.includes('연장근무')) return '연장근무 신청서';
+    if (templateName?.includes('복직')) return '복직신청서';
+    if (templateName?.includes('휴직')) return '휴직신청서';
+    if (templateName?.includes('품의')) return '품의서';
+    if (templateName?.includes('보고')) return '보고서';
+    return templateName || '기안서';
+};
 
+export const findApprovalDocument = (id, source = 'box') => {
+    if (!id) return null;
 
+    if (source === 'status') {
+        const statusDoc = mockApprovalStatusList.find((doc) => doc.id === id);
+        if (!statusDoc) return null;
+        return {
+            ...statusDoc,
+            date: statusDoc.draftDate,
+            category: mapStatusToCategory(statusDoc.templateName),
+            content: statusDoc.content || '재상신 문서 본문입니다.',
+            attachments: statusDoc.attachments || [],
+            referrers: statusDoc.referrers || [],
+            reviewers: statusDoc.reviewers || [],
+            approvalLine: [
+                { name: statusDoc.drafter, position: '기안자', status: '기안', date: statusDoc.draftDate },
+                ...(statusDoc.approvalLine || [])
+            ]
+        };
+    }
 
+    return mockApprovalBox.find((doc) => doc.id === id) || null;
+};

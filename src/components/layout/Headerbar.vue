@@ -1,6 +1,6 @@
 <template>
   <header class="header">
-    <div class="header-logo" @click="$emit('navClick', '메인')">
+    <div class="header-logo" @click="$emit('nav-click', '메인')">
       <div class="logo-icon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
           <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
@@ -16,7 +16,7 @@
         :key="item"
         class="nav-item"
         :class="{ active: activeNav === item }"
-        @click="$emit('navClick', item)"
+        @click="$emit('nav-click', item)"
       >
         {{ item }}
       </div>
@@ -109,7 +109,7 @@ import { clearLoginSession, isAdminRole } from '@/utils/auth'
 defineProps({
   activeNav: { type: String, default: '메인' }
 })
-defineEmits(['navClick'])
+defineEmits(['nav-click'])
 
 const router = useRouter()
 const route = useRoute()

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="archive-manage">
     <section class="card head">
       <h1>{{ isEditMode ? '아카이브 문서 수정' : '아카이브 문서 등록' }}</h1>
@@ -19,10 +19,13 @@
         </label>
       </div>
 
-      <label>
-        본문
-        <textarea v-model="form.body" rows="9" placeholder="문서 본문 입력" />
-      </label>
+      <div class="editor-panel">
+        <div class="editor-head">
+          <label>본문</label>
+          <span class="editor-stat">{{ bodyTextLength }}자</span>
+        </div>
+        <KmsRichEditor v-model="form.body" placeholder="문서 본문 입력" />
+      </div>
 
       <section class="permission-card">
         <h3>읽기 권한</h3>
@@ -109,29 +112,49 @@
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EmployeePickerModal from '@/components/org/EmployeePickerModal.vue'
+import KmsRichEditor from '@/components/kms/KmsRichEditor.vue'
 import { archiveCategoryOptions } from '@/mocks/kms'
 import { createHrOrgTreeMock, sortMembersByRule } from '@/mocks/hr/organization'
 import { AUTH_KEYS } from '@/utils/auth'
+import { useKmsNotificationStore } from '@/store/kmsNotification'
 import { resolveCurrentUserOrgContext, useKmsArchiveStore } from '@/store/kmsArchive'
 
 const route = useRoute()
 const router = useRouter()
 const isEditMode = computed(() => route.params.archiveId !== 'new')
 const archiveStore = useKmsArchiveStore()
+const notificationStore = useKmsNotificationStore()
 const currentUserId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
 const userContext = computed(() => resolveCurrentUserOrgContext(currentUserId.value))
 
 const baseDoc = computed(() => archiveStore.getDocById(route.params.archiveId))
 const defaultCategory = archiveCategoryOptions[1] || ''
 
+const hasHtmlTag = (value = '') => /<\/?[a-z][\s\S]*>/i.test(value)
+const escapeHtml = (value = '') => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+const toEditorHtml = (value = '') => {
+  if (!value) return ''
+  if (hasHtmlTag(value)) return value
+  return `<p>${escapeHtml(value).replace(/\n/g, '<br />')}</p>`
+}
+const toPlainText = (value = '') => value
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/&nbsp;/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+
 const form = reactive({
   title: baseDoc.value?.title || '',
   category: baseDoc.value?.category || defaultCategory,
-  body: baseDoc.value?.body || '',
+  body: toEditorHtml(baseDoc.value?.body || ''),
   orgScope: baseDoc.value?.org || '',
   teamScope: baseDoc.value?.team || '',
   attachments: baseDoc.value?.attachments ? [...baseDoc.value.attachments] : []
 })
+const bodyTextLength = computed(() => toPlainText(form.body).length)
 
 const teamMetaById = computed(() => new Map(archiveStore.teamMetaList.map((row) => [row.teamId, row])))
 const teamMetaByName = computed(() => new Map(archiveStore.teamMetaList.map((row) => [row.teamName, row])))
@@ -238,7 +261,8 @@ const handleFileChange = (event) => {
 }
 
 const handleSave = () => {
-  if (!form.title.trim() || !form.body.trim()) {
+  const plainBody = toPlainText(form.body)
+  if (!form.title.trim() || !plainBody) {
     alert('제목과 본문을 입력해 주세요.')
     return
   }
@@ -263,6 +287,7 @@ const handleSave = () => {
     org: form.orgScope,
     team: form.teamScope,
     owner: ownerName,
+    ownerUserId: currentUserId.value,
     attachments: form.attachments,
     allowedScopes,
     allowedUserIds
@@ -278,7 +303,14 @@ const handleSave = () => {
     return
   }
 
-  alert(`아카이브 문서 ${actionText}이 완료되었습니다.`)
+  const actionLabel = isEditMode.value ? '수정' : '등록'
+  notificationStore.pushArchiveNotice({
+    action: actionLabel,
+    doc: savedDoc,
+    actorName: ownerName
+  })
+
+  alert(`아카이브 문서 ${actionText}이 완료되었습니다.\n속해있는 조직/팀원에게 알림 발송이 완료되었습니다. (데모)`)
   router.push(`/kms/archive/${savedDoc.id}`)
 }
 
@@ -296,8 +328,20 @@ p { margin-top: 6px; color: var(--gray500); font-size: 0.84rem; }
 .form-card { display: grid; gap: 10px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 label { display: grid; gap: 6px; color: var(--gray600); font-size: 0.81rem; }
-input, select, textarea { border: 1px solid var(--gray300); border-radius: 10px; padding: 10px 12px; font-size: 0.86rem; }
+input, select { border: 1px solid var(--gray300); border-radius: 10px; padding: 10px 12px; font-size: 0.86rem; }
 input[type="file"] { padding: 7px 10px; min-height: 38px; line-height: 1.2; }
+.editor-panel { display: grid; gap: 8px; }
+.editor-head { display: flex; justify-content: space-between; align-items: center; }
+.editor-head label { color: var(--gray600); font-size: 0.81rem; }
+.editor-stat {
+  border: 1px solid var(--gray200);
+  border-radius: 999px;
+  background: var(--gray50);
+  color: var(--gray600);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+}
 
 .permission-card { margin-top: 4px; border: 1px solid #dbe7ef; border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
 .permission-card h3 { margin: 0; font-size: 0.9rem; color: var(--gray800); }

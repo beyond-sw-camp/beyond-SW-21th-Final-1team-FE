@@ -55,6 +55,11 @@ export const useAttendanceStore = defineStore('attendance', () => {
         { id: 5, userId: 'user5', name: '정뷰', position: '사원', dept: '디자인', period: '02.23 - 02.27', type: '시차출퇴근', status: 'pending' },
     ])
 
+    // 4. Current User Check-in/out State
+    const checkInTime = ref(null)
+    const checkOutTime = ref(null)
+
+
     // --- Actions ---
 
     // Daily Attendance
@@ -87,6 +92,70 @@ export const useAttendanceStore = defineStore('attendance', () => {
         }
     }
 
+    const setCheckInTime = (time) => {
+        checkInTime.value = time
+    }
+
+    const setCheckOutTime = (time) => {
+        checkOutTime.value = time
+    }
+
+
+    const formatDateKey = (date) => {
+        const y = date.getFullYear()
+        const m = String(date.getMonth() + 1).padStart(2, '0')
+        const d = String(date.getDate()).padStart(2, '0')
+        return `${y}-${m}-${d}`
+    }
+
+    const parseTimeToMinutes = (timeText) => {
+        if (!timeText) return null
+        const [h, m] = String(timeText).split(':').map(Number)
+        if (Number.isNaN(h) || Number.isNaN(m)) return null
+        return h * 60 + m
+    }
+
+    const minutesToText = (minutes) => {
+        const safe = Math.max(0, Math.floor(minutes || 0))
+        const h = Math.floor(safe / 60)
+        const m = safe % 60
+        return `${h}h ${String(m).padStart(2, '0')}m`
+    }
+
+    const upsertMyDailyAttendance = ({ date = new Date(), checkIn, checkOut, status = 'normal' } = {}) => {
+        const dateKey = formatDateKey(date)
+        const targetIdx = dailyAttendance.value.findIndex((item) => item.userId === 'user1' && item.date === dateKey)
+
+        const inMin = parseTimeToMinutes(checkIn)
+        const outMin = parseTimeToMinutes(checkOut)
+        const workMinutes = inMin !== null && outMin !== null && outMin >= inMin ? outMin - inMin : null
+
+        const payload = {
+            userId: 'user1',
+            name: '김철수',
+            position: '사원',
+            deptName: '개발팀',
+            date: dateKey,
+            checkIn: checkIn || null,
+            checkOut: checkOut || null,
+            workHours: workMinutes !== null ? minutesToText(workMinutes) : '0h',
+            status
+        }
+
+        if (targetIdx !== -1) {
+            dailyAttendance.value[targetIdx] = {
+                ...dailyAttendance.value[targetIdx],
+                ...payload
+            }
+            return
+        }
+
+        dailyAttendance.value.unshift({
+            id: Date.now(),
+            ...payload
+        })
+    }
+
     // Getters for User View (assuming 'user1' is the current user)
     // In a real app, this would use the auth store to get the current user ID
     const myLeaveRequests = computed(() => {
@@ -103,6 +172,11 @@ export const useAttendanceStore = defineStore('attendance', () => {
         updateDailyAttendance,
         updateLeaveStatus,
         updateFlexibleStatus,
-        myLeaveRequests
+        myLeaveRequests,
+        checkInTime,
+        checkOutTime,
+        setCheckInTime,
+        setCheckOutTime,
+        upsertMyDailyAttendance
     }
 })
