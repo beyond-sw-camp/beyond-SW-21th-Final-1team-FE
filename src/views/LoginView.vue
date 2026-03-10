@@ -40,11 +40,12 @@
           <p v-if="loginError" class="login-error">{{ loginError }}</p>
 
           <p class="test-account-info">
-            테스트 계정: 사번 <strong>test1234</strong> / 비밀번호 <strong>test1234!</strong>
+            관리자 데모: 사번 <strong>2402040001</strong> / 비밀번호 <strong>admin1234!</strong>
           </p>
           <p class="test-account-info">
-            관리자 계정: 사번 <strong>admin1234</strong> / 비밀번호 <strong>admin1234!</strong>
+            사용자 데모: 사번 <strong>2402040002</strong> / 비밀번호 <strong>test1234!</strong>
           </p>
+
         </div>
 
         <div class="login-footer">
@@ -96,10 +97,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { changeInitialPassword, initializePassword, login } from '@/api/auth'
 import logo from '@/assets/logo-rhight.png'
 import PasswordResetModal from '@/components/user/PasswordResetModal.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
-import { setLoginSession, USER_ROLES } from '@/utils/auth'
+import { getRoleCodesFromToken, getRoleFromToken, setLoginSession } from '@/utils/auth'
 
 const router = useRouter()
 const username = ref('')
@@ -108,42 +110,11 @@ const showResetModal = ref(false)
 const showResetPasswordModal = ref(false)
 const loginError = ref('')
 const resetPasswordError = ref('')
-const pendingLoginSession = ref(null)
+const passwordChangeTicket = ref('')
 const resetPasswordForm = ref({
   newPassword: '',
   confirmPassword: ''
 })
-
-const TEST_ACCOUNT = {
-  empNo: 'test1234',
-  employeeId: '2402040001',
-  defaultPassword: 'test1234!',
-  ssn: '123456'
-}
-const ADMIN_ACCOUNT = {
-  empNo: 'admin1234',
-  defaultPassword: 'admin1234!',
-  name: '관리자',
-  ssn: '654321'
-}
-const getPasswordStorageKey = (userId) => `accountPassword:${userId}`
-const getResetRequiredKey = (userId) => `passwordResetRequired:${userId}`
-const getDefaultPassword = (userId) => {
-  if (userId === TEST_ACCOUNT.empNo) return TEST_ACCOUNT.defaultPassword
-  if (userId === ADMIN_ACCOUNT.empNo) return ADMIN_ACCOUNT.defaultPassword
-  return ''
-}
-const getCurrentPassword = (userId) => {
-  if (!userId) return ''
-  return localStorage.getItem(getPasswordStorageKey(userId)) || getDefaultPassword(userId)
-}
-const setAccountPassword = (userId, nextPassword) => {
-  localStorage.setItem(getPasswordStorageKey(userId), nextPassword)
-}
-const isResetRequired = (userId) => localStorage.getItem(getResetRequiredKey(userId)) === 'true'
-const setResetRequired = (userId, required) => {
-  localStorage.setItem(getResetRequiredKey(userId), required ? 'true' : 'false')
-}
 const completeLogin = (sessionPayload) => {
   setLoginSession({
     ...sessionPayload,
@@ -166,65 +137,62 @@ const formatLoginTimestamp = () => {
   return `${yyyy}.${mm}.${dd} ${hh}:${min}`
 }
 
-const verifyIdentity = (empNo, ssn) => {
-  if (empNo === TEST_ACCOUNT.empNo && ssn === TEST_ACCOUNT.ssn) return TEST_ACCOUNT.empNo
-  if (empNo === ADMIN_ACCOUNT.empNo && ssn === ADMIN_ACCOUNT.ssn) return ADMIN_ACCOUNT.empNo
-  return ''
-}
-
-const handleResetIdentity = ({ empNo, ssn }) => {
-  const verifiedUserId = verifyIdentity(empNo, ssn)
-  if (!verifiedUserId) {
-    alert('사번 또는 주민등록번호가 올바르지 않습니다.')
-    return
+const completeBackendLogin = (loginData, fallbackUserId = '') => {
+  if (!loginData) {
+    throw new Error('로그인 응답이 비어 있습니다.')
   }
 
-  setAccountPassword(verifiedUserId, verifiedUserId)
-  setResetRequired(verifiedUserId, true)
-  alert(`비밀번호가 ${verifiedUserId}(으)로 초기화되었습니다.`)
+  const profile = loginData.userProfile
+  const accessToken = loginData.accessToken || ''
+  completeLogin({
+    userId: profile?.employeeNum || fallbackUserId,
+    employeeId: profile?.employeeId ? String(profile.employeeId) : '',
+    userName: profile?.employeeName || fallbackUserId,
+    orgName: profile?.orgName || '',
+    positionName: profile?.positionName || '',
+    rankName: profile?.rankName || '',
+    jobName: profile?.jobName || '',
+    role: getRoleFromToken(accessToken),
+    roleCodes: getRoleCodesFromToken(accessToken),
+    accessToken,
+  })
 }
 
-const handleLogin = () => {
+const handleResetIdentity = async ({ empNo, ssn }) => {
+  try {
+    await initializePassword(empNo, ssn)
+    alert(`비밀번호가 ${empNo}(으)로 초기화되었습니다. 초기 비밀번호로 로그인 후 변경해주세요.`)
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '비밀번호 초기화에 실패했습니다.')
+  }
+}
+
+const handleLogin = async () => {
   if (!username.value || !password.value) return
   loginError.value = ''
 
   const userId = username.value.trim()
-  const isKnownAccount = [TEST_ACCOUNT.empNo, ADMIN_ACCOUNT.empNo].includes(userId)
-  if (!isKnownAccount) {
-    loginError.value = '아이디와 비밀번호가 일치하지 않습니다.'
+  try {
+    const loginData = await login(userId, password.value)
+    if (loginData?.requiresPasswordChange) {
+      passwordChangeTicket.value = loginData.passwordChangeTicket || ''
+      resetPasswordForm.value = { newPassword: '', confirmPassword: '' }
+      resetPasswordError.value = ''
+      showResetPasswordModal.value = true
+      return
+    }
+    completeBackendLogin(loginData, userId)
+  } catch (error) {
+    loginError.value = error?.response?.data?.error?.message || '아이디와 비밀번호가 일치하지 않습니다.'
     password.value = ''
-    return
   }
-
-  const expectedPassword = getCurrentPassword(userId)
-  if (password.value !== expectedPassword) {
-    loginError.value = '아이디와 비밀번호가 일치하지 않습니다.'
-    password.value = ''
-    return
-  }
-
-  const sessionPayload =
-    userId === ADMIN_ACCOUNT.empNo
-      ? { userId: ADMIN_ACCOUNT.empNo, userName: ADMIN_ACCOUNT.name, role: USER_ROLES.admin }
-      : { userId: TEST_ACCOUNT.empNo, userName: '테스트 사용자', role: USER_ROLES.user }
-
-  if (isResetRequired(userId)) {
-    pendingLoginSession.value = sessionPayload
-    resetPasswordForm.value = { newPassword: '', confirmPassword: '' }
-    resetPasswordError.value = ''
-    showResetPasswordModal.value = true
-    return
-  }
-
-  completeLogin(sessionPayload)
 }
 
-const submitResetPassword = () => {
-  const userId = pendingLoginSession.value?.userId || ''
+const submitResetPassword = async () => {
   const newPassword = resetPasswordForm.value.newPassword
   const confirmPassword = resetPasswordForm.value.confirmPassword
 
-  if (!userId) return
+  if (!passwordChangeTicket.value) return
   resetPasswordError.value = ''
 
   if (!newPassword || !confirmPassword) {
@@ -239,10 +207,20 @@ const submitResetPassword = () => {
     resetPasswordError.value = '새 비밀번호는 8자 이상이어야 합니다.'
     return
   }
-  setAccountPassword(userId, newPassword)
-  setResetRequired(userId, false)
-  showResetPasswordModal.value = false
-  completeLogin(pendingLoginSession.value)
+
+  try {
+    const loginData = await changeInitialPassword(
+      passwordChangeTicket.value,
+      newPassword,
+      confirmPassword,
+    )
+    showResetPasswordModal.value = false
+    passwordChangeTicket.value = ''
+    completeBackendLogin(loginData, username.value.trim())
+  } catch (error) {
+    resetPasswordError.value =
+      error?.response?.data?.error?.message || '비밀번호 변경에 실패했습니다.'
+  }
 }
 </script>
 
