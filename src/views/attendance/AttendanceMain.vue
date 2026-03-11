@@ -407,11 +407,7 @@ const actionModalConfirmText = computed(() => (actionType.value === 'check-out' 
 const actionModalRequiresReason = computed(() => actionType.value === 'late-check-in')
 
 const submitClockIn = async (tardyReason = null) => {
-  try {
-    await store.clockIn(tardyReason)
-  } catch (error) {
-    alert(error.response?.data?.message || '출근 처리에 실패했습니다.')
-  }
+  await store.clockIn(tardyReason)
 }
 
 const handleCheckIn = async () => {
@@ -426,7 +422,11 @@ const handleCheckIn = async () => {
     return
   }
 
-  await submitClockIn()
+  try {
+    await submitClockIn()
+  } catch (error) {
+    alert(error.response?.data?.message || '출근 처리에 실패했습니다.')
+  }
 }
 
 const handleCheckOut = async () => {
@@ -444,8 +444,10 @@ const handleActionConfirm = async () => {
     }
     actionLoading.value = true
     try {
-      showActionModal.value = false
       await submitClockIn(actionReason.value.trim())
+      showActionModal.value = false
+    } catch (error) {
+      alert(error.response?.data?.message || '출근 처리에 실패했습니다.')
     } finally {
       actionLoading.value = false
     }
@@ -455,8 +457,8 @@ const handleActionConfirm = async () => {
   if (actionType.value === 'check-out') {
     actionLoading.value = true
     try {
-      showActionModal.value = false
       await store.clockOut()
+      showActionModal.value = false
     } catch (error) {
       alert(error.response?.data?.message || '퇴근 처리에 실패했습니다.')
     } finally {
@@ -491,7 +493,11 @@ onMounted(async () => {
 })
 
 watch(displayMonth, async (value) => {
-  await store.fetchAttendanceCalendar(value.getFullYear(), value.getMonth() + 1)
+  await Promise.all([
+    store.fetchAttendanceCalendar(value.getFullYear(), value.getMonth() + 1),
+    store.fetchMonthlySummary(value.getFullYear(), value.getMonth() + 1),
+    store.fetchMonthlyRecords(value.getFullYear(), value.getMonth() + 1),
+  ])
 })
 
 onUnmounted(() => {

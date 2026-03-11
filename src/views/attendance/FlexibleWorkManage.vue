@@ -463,7 +463,7 @@ const submitAction = async () => {
 }
 
 onMounted(async () => {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toDateKey(new Date())
   await Promise.all([store.fetchTeamFlexibleWorkPlans(), store.fetchTeamWeeklyOverview(today)])
 })
 

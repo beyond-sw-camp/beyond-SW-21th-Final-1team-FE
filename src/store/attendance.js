@@ -30,6 +30,18 @@ const CURRENT_USER_ID = 'me'
 const formatDate = (value) => (value ? String(value).slice(0, 10) : '')
 const formatDateTime = (value) => (value ? String(value).replace('T', ' ').slice(0, 16) : '')
 const formatTime = (value) => (value ? String(value).slice(0, 5) : null)
+const toDateKey = (value) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const createBatchProcessError = (message, failures) => {
+  const error = new Error(message)
+  error.failures = failures
+  return error
+}
 
 const calculateWorkHours = (checkInTime, checkOutTime) => {
   if (!checkInTime || !checkOutTime) return '0h'
@@ -233,7 +245,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
   const isLoading = ref(false)
 
   const syncTodayRecord = () => {
-    const today = formatDate(new Date().toISOString())
+    const today = toDateKey(new Date())
     const todayRecord = dailyAttendance.value.find((item) => item.date === today)
     checkInTime.value = todayRecord?.checkIn || null
     checkOutTime.value = todayRecord?.checkOut || null
@@ -306,7 +318,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     const now = new Date()
     const year = now.getFullYear()
     const month = now.getMonth() + 1
-    const today = formatDate(now.toISOString())
+    const today = toDateKey(now)
     await Promise.all([
       fetchMonthlyRecords(year, month),
       fetchMonthlySummary(year, month),
@@ -392,7 +404,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
   }
 
   const processLeaveRequests = async (ids, approve, rejectReason = '') => {
-    await Promise.all(
+    const results = await Promise.allSettled(
       ids.map((leaveRequestId) =>
         processLeave({
           leaveRequestId,
@@ -402,6 +414,16 @@ export const useAttendanceStore = defineStore('attendance', () => {
       ),
     )
     await fetchAdminLeaveRequestsList()
+
+    const failures = results.filter((result) => result.status === 'rejected')
+    if (failures.length > 0) {
+      throw createBatchProcessError(
+        failures.length === ids.length
+          ? '휴가 일괄 처리에 실패했습니다.'
+          : `휴가 ${ids.length}건 중 ${failures.length}건 처리에 실패했습니다.`,
+        failures,
+      )
+    }
   }
 
   const fetchTeamFlexibleWorkPlans = async (page = 1, size = 100, status = null) => {
@@ -429,7 +451,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
   }
 
   const processFlexiblePlans = async (ids, approve, rejectReason = '') => {
-    await Promise.all(
+    const results = await Promise.allSettled(
       ids.map((weeklyId) =>
         processWeeklyWorkSchedule({
           weeklyId,
@@ -439,6 +461,16 @@ export const useAttendanceStore = defineStore('attendance', () => {
       ),
     )
     await Promise.all([fetchTeamFlexibleWorkPlans(), fetchTeamWeeklyOverview()])
+
+    const failures = results.filter((result) => result.status === 'rejected')
+    if (failures.length > 0) {
+      throw createBatchProcessError(
+        failures.length === ids.length
+          ? '유연근무 일괄 처리에 실패했습니다.'
+          : `유연근무 ${ids.length}건 중 ${failures.length}건 처리에 실패했습니다.`,
+        failures,
+      )
+    }
   }
 
   const updateDailyAttendance = async (payload) => {
