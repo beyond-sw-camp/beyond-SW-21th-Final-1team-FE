@@ -62,6 +62,12 @@ if (typeof window !== 'undefined') {
       syncSessionAuthState()
     }
   })
+  window.addEventListener('session-storage-changed', syncSessionAuthState)
+}
+
+const dispatchSessionStorageChanged = () => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('session-storage-changed'))
 }
 
 const decodeJwtPayload = (token) => {
@@ -145,6 +151,7 @@ export const setLoginSession = ({
   sessionStorage.setItem(AUTH_KEYS.accessToken, accessToken || '')
   sessionStorage.setItem(AUTH_KEYS.lastLoginAt, lastLoginAt || '')
   syncSessionAuthState()
+  dispatchSessionStorageChanged()
 }
 
 export const clearLoginSession = () => {
@@ -161,4 +168,5 @@ export const clearLoginSession = () => {
   sessionStorage.removeItem(AUTH_KEYS.accessToken)
   sessionStorage.removeItem(AUTH_KEYS.lastLoginAt)
   syncSessionAuthState()
+  dispatchSessionStorageChanged()
 }

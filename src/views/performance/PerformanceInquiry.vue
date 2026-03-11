@@ -301,6 +301,7 @@ const normalizeItem = (item) => ({
 const items = ref([])
 const teamMemberOptions = ref([])
 const loadError = ref('')
+let inquiryRequestSeq = 0
 const userId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
 const userName = computed(() => sessionStorage.getItem(AUTH_KEYS.userName) || '')
 const userRole = computed(() => sessionRoleRef.value || USER_ROLES.user)
@@ -422,7 +423,7 @@ async function submitResult() {
   }
 }
 
-async function loadInquiryItems() {
+async function loadInquiryItems(sequence = ++inquiryRequestSeq) {
   try {
     loadError.value = ''
     const params = {}
@@ -430,8 +431,10 @@ async function loadInquiryItems() {
       params.targetEmployeeId = Number(filterEmployee.value)
     }
     const response = await getPerformanceInquiryItems(params)
+    if (sequence !== inquiryRequestSeq) return
     items.value = Array.isArray(response) ? response.map((item) => normalizeItem(item)) : []
   } catch (error) {
+    if (sequence !== inquiryRequestSeq) return
     loadError.value = error?.response?.data?.error?.message || '성과 조회 API 호출에 실패했습니다.'
   }
 }
@@ -455,8 +458,9 @@ async function loadTeamMembers() {
 
 watch(filterEmployee, () => {
   if (!isPerformanceManager.value) return
+  inquiryRequestSeq += 1
   currentPage.value = 1
-  loadInquiryItems()
+  loadInquiryItems(inquiryRequestSeq)
 })
 
 watch([filterStatus, filterMonth, searchText, searchField], () => {

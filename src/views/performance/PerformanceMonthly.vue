@@ -1,5 +1,13 @@
 <template>
   <div class="monthly-wrap">
+    <div v-if="memberLoadError" class="monthly-error-banner">
+      <span>{{ memberLoadError }}</span>
+      <button type="button" class="page-btn" @click="loadMemberOptions">다시 시도</button>
+    </div>
+    <div v-if="monthlyLoadError" class="monthly-error-banner">
+      <span>{{ monthlyLoadError }}</span>
+      <button type="button" class="page-btn" @click="loadMonthly">다시 시도</button>
+    </div>
     <!-- ═══ 상단: 리포트 헤더 + 요약 지표 ═══ -->
     <div class="monthly-card">
       <!-- 헤더: 월 선택 + 등급 -->
@@ -9,12 +17,12 @@
             <button class="month-arrow" @click="prevMonth">
               <ChevronLeft :size="16" />
             </button>
-            <span class="month-label">{{ currentYear }}년 {{ currentMonth }}월 성과 리포트</span>
+            <span class="month-label">{{ adjustedYear }}년 {{ adjustedMonth }}월 성과 리포트</span>
             <button class="month-arrow" @click="nextMonth">
               <ChevronRight :size="16" />
             </button>
           </div>
-          <p class="report-period">{{ currentYear }}년 {{ currentMonth }}월 1일 - {{ currentMonth }}월 {{ lastDay }}일</p>
+          <p class="report-period">{{ adjustedYear }}년 {{ adjustedMonth }}월 1일 - {{ adjustedMonth }}월 {{ lastDay }}일</p>
         </div>
         <div v-if="isPerformanceManager" class="report-header-right">
           <label class="report-filter-label" for="member-filter">팀원 선택</label>
@@ -62,7 +70,7 @@
       <div class="detail-header">
         <h3 class="detail-title">
           <FileText :size="16" />
-          {{ currentMonth }}월 성과 상세 항목
+          {{ adjustedMonth }}월 성과 상세 항목
         </h3>
         <span class="detail-count">총 {{ detailItems.length }}건</span>
       </div>
@@ -202,8 +210,10 @@ const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
 const teamMemberOptions = ref([])
 const selectedMemberId = ref(teamMemberOptions.value[0]?.id || null)
+const memberLoadError = ref('')
+const monthlyLoadError = ref('')
 const selectedMember = computed(() => teamMemberOptions.value.find((member) => member.id === selectedMemberId.value) || null)
-const monthlyData = ref({
+const createEmptyMonthlyData = () => ({
   initialYear: new Date().getFullYear(),
   initialMonth: new Date().getMonth() + 1,
   stats: [],
@@ -212,12 +222,14 @@ const monthlyData = ref({
   teamScores: [],
   detailItems: [],
 })
+const monthlyData = ref(createEmptyMonthlyData())
 const currentOffset = ref(0)
 
-const currentYear = computed(() => monthlyData.value.initialYear)
-const currentMonth = computed(() => monthlyData.value.initialMonth)
-
-const lastDay = computed(() => new Date(currentYear.value, currentMonth.value, 0).getDate())
+const adjustedDate = computed(() =>
+  new Date((monthlyData.value?.initialYear || new Date().getFullYear()), ((monthlyData.value?.initialMonth || 1) - 1) + currentOffset.value, 1))
+const adjustedYear = computed(() => adjustedDate.value.getFullYear())
+const adjustedMonth = computed(() => adjustedDate.value.getMonth() + 1)
+const lastDay = computed(() => new Date(adjustedYear.value, adjustedMonth.value, 0).getDate())
 
 function prevMonth() {
   currentOffset.value -= 1
@@ -236,7 +248,7 @@ const personalLegendLabel = computed(() => {
 })
 
 const currentMonthDataIndex = computed(() => {
-  const monthLabel = `${currentMonth.value}월`
+  const monthLabel = `${adjustedMonth.value}월`
   const idx = recentChartLabels.value.findIndex((label) => label === monthLabel)
   return idx >= 0 ? idx : recentMyScores.value.length - 1
 })
@@ -370,6 +382,7 @@ const paginatedDetailItems = computed(() => {
 async function loadMemberOptions() {
   if (!isPerformanceManager.value) return
   try {
+    memberLoadError.value = ''
     const teamStats = await getPerformanceTeamStats()
     const members = (teamStats?.members || []).map((member) => ({
       id: member.id,
@@ -382,18 +395,32 @@ async function loadMemberOptions() {
         selectedMemberId.value = members[0].id
       }
     }
-  } catch (_error) {}
+    if (members.length === 0) {
+      teamMemberOptions.value = []
+      selectedMemberId.value = null
+    }
+  } catch (error) {
+    console.error('Failed to load performance team members.', error)
+    memberLoadError.value = '팀원 목록을 불러오지 못했습니다.'
+    teamMemberOptions.value = []
+    selectedMemberId.value = null
+  }
 }
 
 async function loadMonthly() {
   try {
+    monthlyLoadError.value = ''
     const params = { offset: currentOffset.value }
     if (isPerformanceManager.value && selectedMemberId.value) {
       params.targetEmployeeId = selectedMemberId.value
     }
     const response = await getPerformanceMonthlyReport(params)
-    if (response) monthlyData.value = response
-  } catch (_error) {}
+    monthlyData.value = response || createEmptyMonthlyData()
+  } catch (error) {
+    console.error('Failed to load monthly performance report.', error)
+    monthlyLoadError.value = '월별 성과 리포트를 불러오지 못했습니다.'
+    monthlyData.value = createEmptyMonthlyData()
+  }
 }
 
 onMounted(async () => {
@@ -430,6 +457,19 @@ watch(detailItems, () => {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 24px;
+}
+
+.monthly-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.82rem;
 }
 
 /* ════════════════════════════════

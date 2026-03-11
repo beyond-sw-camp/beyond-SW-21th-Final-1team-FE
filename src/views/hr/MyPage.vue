@@ -1,52 +1,61 @@
 <template>
   <div class="mypage">
-    <!-- 브레드크럼 -->
-    <div class="breadcrumb">인사 / 마이페이지</div>
+    <template v-if="loadError">
+      <div class="breadcrumb">인사 / 마이페이지</div>
+      <div class="mypage-error">
+        <p>{{ loadError }}</p>
+        <button type="button" class="retry-btn" @click="loadMyPage">다시 시도</button>
+      </div>
+    </template>
+    <template v-else-if="user">
+      <!-- 브레드크럼 -->
+      <div class="breadcrumb">인사 / 마이페이지</div>
 
-    <!-- 프로필 헤더 -->
-    <div class="profile-header">
-      <div class="profile-left">
-        <div class="profile-avatar">
-          <img v-if="user.profileImage" :src="user.profileImage" alt="프로필 이미지" class="avatar-image" />
-          <span v-else class="avatar-text">{{ user.name.slice(-2) }}</span>
-          <span class="status-dot online"></span>
+      <!-- 프로필 헤더 -->
+      <div class="profile-header">
+        <div class="profile-left">
+          <div class="profile-avatar">
+            <img v-if="user.profileImage" :src="user.profileImage" alt="프로필 이미지" class="avatar-image" />
+            <span v-else class="avatar-text">{{ user.name.slice(-2) }}</span>
+            <span class="status-dot online"></span>
+          </div>
+          <div class="profile-info">
+            <div class="profile-name-row">
+              <span class="profile-name">{{ user.name }}</span>
+              <span class="status-badge">정상 근무</span>
+            </div>
+            <div class="profile-dept">{{ user.team }} · {{ user.jobTitle }} · {{ user.position }}</div>
+            <div class="profile-contacts">
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> {{ user.email }}</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg> {{ user.phone }}</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="5" width="12" height="14" rx="2"/><rect x="11.5" y="8" width="7" height="2.5" rx="0.6"/><path d="M5.2 6.5h1.9a1.9 1.9 0 011.9 1.9v7.2a1.9 1.9 0 01-1.9 1.9H5.2A1.7 1.7 0 013.5 15.8V8.2A1.7 1.7 0 015.2 6.5z"/><circle cx="12.4" cy="13.1" r="0.45" fill="currentColor" stroke="none"/><circle cx="15.1" cy="13.1" r="0.45" fill="currentColor" stroke="none"/><circle cx="17.8" cy="13.1" r="0.45" fill="currentColor" stroke="none"/><circle cx="12.4" cy="15.7" r="0.45" fill="currentColor" stroke="none"/><circle cx="15.1" cy="15.7" r="0.45" fill="currentColor" stroke="none"/><circle cx="17.8" cy="15.7" r="0.45" fill="currentColor" stroke="none"/></svg> {{ user.extension }}</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> {{ user.workLocation }}</span>
+            </div>
+          </div>
         </div>
-        <div class="profile-info">
-          <div class="profile-name-row">
-            <span class="profile-name">{{ user.name }}</span>
-            <span class="status-badge">정상 근무</span>
-          </div>
-          <div class="profile-dept">{{ user.team }} · {{ user.jobTitle }} · {{ user.position }}</div>
-          <div class="profile-contacts">
-            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> {{ user.email }}</span>
-            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg> {{ user.phone }}</span>
-            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="5" width="12" height="14" rx="2"/><rect x="11.5" y="8" width="7" height="2.5" rx="0.6"/><path d="M5.2 6.5h1.9a1.9 1.9 0 011.9 1.9v7.2a1.9 1.9 0 01-1.9 1.9H5.2A1.7 1.7 0 013.5 15.8V8.2A1.7 1.7 0 015.2 6.5z"/><circle cx="12.4" cy="13.1" r="0.45" fill="currentColor" stroke="none"/><circle cx="15.1" cy="13.1" r="0.45" fill="currentColor" stroke="none"/><circle cx="17.8" cy="13.1" r="0.45" fill="currentColor" stroke="none"/><circle cx="12.4" cy="15.7" r="0.45" fill="currentColor" stroke="none"/><circle cx="15.1" cy="15.7" r="0.45" fill="currentColor" stroke="none"/><circle cx="17.8" cy="15.7" r="0.45" fill="currentColor" stroke="none"/></svg> {{ user.extension }}</span>
-            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> {{ user.workLocation }}</span>
-          </div>
+        <div class="profile-right">
+          <div class="last-login">최근 로그인: {{ user.lastLogin }}</div>
         </div>
       </div>
-      <div class="profile-right">
-        <div class="last-login">최근 로그인: {{ user.lastLogin }}</div>
+
+      <!-- 탭 메뉴 -->
+      <div class="tab-menu">
+        <div
+            v-for="tab in tabs" :key="tab.key"
+            class="tab-item"
+            :class="{ active: activeTab === tab.key }"
+            @click="activeTab = tab.key"
+        >{{ tab.label }}</div>
       </div>
-    </div>
 
-    <!-- 탭 메뉴 -->
-    <div class="tab-menu">
-      <div
-          v-for="tab in tabs" :key="tab.key"
-          class="tab-item"
-          :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
-      >{{ tab.label }}</div>
-    </div>
-
-    <!-- 탭 컨텐츠 -->
-    <TabInfo v-if="activeTab === 'info'" :user="user" @update:user="user = $event"/>
-    <TabSalary v-else-if="activeTab === 'salary'" />
-    <TabHistory v-else-if="activeTab === 'history'" :employee-id="user.empNo" />
-    <TabCertificate v-else-if="activeTab === 'certificate'" :user="user" />
-    <!-- 추후 탭 추가 -->
-    <div v-else class="tab-placeholder">{{ activeTabLabel }} 탭은 준비 중입니다.</div>
+      <!-- 탭 컨텐츠 -->
+      <TabInfo v-if="activeTab === 'info'" :user="user" @update:user="user = $event"/>
+      <TabSalary v-else-if="activeTab === 'salary'" />
+      <TabHistory v-else-if="activeTab === 'history'" :employee-id="user.empNo" />
+      <TabCertificate v-else-if="activeTab === 'certificate'" :user="user" />
+      <!-- 추후 탭 추가 -->
+      <div v-else class="tab-placeholder">{{ activeTabLabel }} 탭은 준비 중입니다.</div>
+    </template>
   </div>
 </template>
 
@@ -69,7 +78,7 @@ const tabs = [
 
 const activeTabLabel = computed(() => tabs.find(t => t.key === activeTab.value)?.label)
 
-const user = ref({
+const createEmptyUser = () => ({
   profileImage: '',
   name: '',
   team: '',
@@ -97,6 +106,8 @@ const user = ref({
   careers: [],
   skills: [],
 })
+const user = ref(createEmptyUser())
+const loadError = ref('')
 
 const toLabel = (value) => (value == null ? '' : String(value))
 
@@ -152,9 +163,14 @@ const mapMyPageToUser = (header, page) => {
 
 async function loadMyPage() {
   try {
+    loadError.value = ''
     const [header, page] = await Promise.all([getMyPageHeader(), getMyPage()])
     user.value = mapMyPageToUser(header, page)
-  } catch (_error) {}
+  } catch (error) {
+    console.error('Failed to load my page.', error)
+    user.value = null
+    loadError.value = error?.response?.data?.error?.message || '마이페이지 정보를 불러오지 못했습니다.'
+  }
 }
 
 onMounted(loadMyPage)
@@ -163,6 +179,8 @@ onMounted(loadMyPage)
 <style scoped>
 .mypage{width:100%;max-width:none;min-width:0}
 .breadcrumb{font-size:.78rem;color:var(--gray400);margin-bottom:4px}
+.mypage-error{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:320px;background:#fff;border:1px solid var(--gray200);border-radius:var(--radius);box-shadow:var(--shadow);color:var(--gray600)}
+.retry-btn{height:36px;padding:0 14px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-weight:600;cursor:pointer}
 
 /* 프로필 헤더 */
 .profile-header{display:flex;justify-content:space-between;align-items:flex-start;padding:24px;background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow);margin:12px 0 0}

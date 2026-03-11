@@ -6,6 +6,10 @@
         <h3 class="peer-sidebar-title">평가 대상</h3>
         <span class="peer-sidebar-count">{{ colleagues.length }}명</span>
       </div>
+      <div v-if="peerReviewError" class="peer-error-banner">
+        <span>{{ peerReviewError }}</span>
+        <button type="button" class="page-btn" @click="loadPeerReviewTargets">다시 시도</button>
+      </div>
       <div class="peer-list">
         <button
           v-for="c in paginatedColleagues"
@@ -106,8 +110,8 @@
         <!-- 푸터 -->
         <div class="peer-form-footer">
           <button class="btn-cancel" @click="resetForm">초기화</button>
-          <button class="btn-submit" :disabled="!isFormValid" @click="submitReview">
-            <Send :size="14" /> 평가 제출하기
+          <button class="btn-submit" :disabled="!isFormValid || isSubmitting" @click="submitReview">
+            <Send :size="14" /> {{ isSubmitting ? '제출 중...' : '평가 제출하기' }}
           </button>
         </div>
       </template>
@@ -161,6 +165,8 @@ const paginatedColleagues = computed(() => {
 const selectedColleague = ref(null)
 const showModal = ref(false)
 const comment = ref('')
+const isSubmitting = ref(false)
+const peerReviewError = ref('')
 
 const scores = reactive({})
 const scoreLabels = { 1: '미흡', 2: '부족', 3: '보통', 4: '우수', 5: '탁월' }
@@ -197,9 +203,11 @@ function closeModal() {
 }
 
 async function submitReview() {
+  if (isSubmitting.value) return
   if (!selectedColleague.value || !isFormValid.value) return
 
   try {
+    isSubmitting.value = true
     await submitPeerReview({
       appraiseeId: selectedColleague.value.id,
       communicationScore: scores[1],
@@ -213,11 +221,12 @@ async function submitReview() {
     showModal.value = true
   } catch (_error) {
     alert('동료 평가 제출에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
   }
 }
 
 function closeAndNext() {
-  markSelectedColleagueEvaluated()
   showModal.value = false
   const next = colleagues.value.find((c) => !c.evaluated)
   if (next) selectColleague(next)
@@ -226,12 +235,20 @@ function closeAndNext() {
 
 async function loadPeerReviewTargets() {
   try {
+    peerReviewError.value = ''
     const response = await getPeerReviewTargets()
-    if (Array.isArray(response) && response.length > 0) {
-      colleagues.value = response.map((item) => ({ ...item }))
-      colleagueCurrentPage.value = 1
+    colleagues.value = Array.isArray(response) ? response.map((item) => ({ ...item })) : []
+    colleagueCurrentPage.value = 1
+    if (!colleagues.value.some((item) => item.id === selectedColleague.value?.id)) {
+      selectedColleague.value = null
     }
-  } catch (_error) {}
+  } catch (error) {
+    console.error('Failed to load peer review targets.', error)
+    peerReviewError.value = '평가 대상을 불러오지 못했습니다.'
+    colleagues.value = []
+    colleagueCurrentPage.value = 1
+    selectedColleague.value = null
+  }
 }
 
 onMounted(loadPeerReviewTargets)
@@ -261,6 +278,18 @@ onMounted(loadPeerReviewTargets)
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.peer-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-bottom: 1px solid #fecaca;
+  font-size: 0.78rem;
 }
 
 .peer-sidebar-header {
