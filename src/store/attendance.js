@@ -304,9 +304,14 @@ export const useAttendanceStore = defineStore('attendance', () => {
 
   const refreshCurrentMonth = async () => {
     const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const today = formatDate(now.toISOString())
     await Promise.all([
-      fetchMonthlyRecords(now.getFullYear(), now.getMonth() + 1),
-      fetchMonthlySummary(now.getFullYear(), now.getMonth() + 1),
+      fetchMonthlyRecords(year, month),
+      fetchMonthlySummary(year, month),
+      fetchWeeklySummary(today),
+      fetchAttendanceCalendar(year, month),
     ])
   }
 
@@ -438,22 +443,6 @@ export const useAttendanceStore = defineStore('attendance', () => {
 
   const updateDailyAttendance = async (payload) => {
     await modifyAttendanceByAdmin(payload)
-    const targetDate = formatDate(payload.workDate)
-    const idx = dailyAttendance.value.findIndex(
-      (item) => item.date === targetDate && item.userId === payload.targetEmployeeId,
-    )
-    if (idx !== -1) {
-      dailyAttendance.value[idx] = {
-        ...dailyAttendance.value[idx],
-        checkIn: payload.newCheckInTime ? String(payload.newCheckInTime).slice(0, 5) : null,
-        checkOut: payload.newCheckOutTime ? String(payload.newCheckOutTime).slice(0, 5) : null,
-        status: mapAttendanceStatus(payload.newStatus),
-      }
-      dailyAttendance.value[idx].workHours = calculateWorkHours(
-        dailyAttendance.value[idx].checkIn,
-        dailyAttendance.value[idx].checkOut,
-      )
-    }
   }
 
   const setCheckInTime = (value) => {

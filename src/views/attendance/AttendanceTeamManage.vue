@@ -27,6 +27,14 @@
       </button>
     </div>
 
+    <div v-if="pageError" class="inline-alert error">
+      {{ pageError }}
+    </div>
+
+    <div v-else-if="isPageLoading" class="inline-alert info">
+      팀 근태 데이터를 불러오는 중입니다.
+    </div>
+
     <!-- Tab 1: Daily Attendance Status -->
     <div v-if="currentTab === 'daily'" class="tab-content">
       <div class="filter-card">
@@ -42,11 +50,14 @@
               <option value="all">전체</option>
               <option value="normal">정상</option>
               <option value="tardy">지각</option>
+              <option value="early_leave">조퇴</option>
               <option value="absent">결근</option>
               <option value="vacation">휴가</option>
             </select>
           </div>
-          <button class="btn-search" @click="fetchDailyRecords">조회</button>
+          <button class="btn-search" :disabled="dailyLoading" @click="fetchDailyRecords">
+            {{ dailyLoading ? '조회 중...' : '조회' }}
+          </button>
         </div>
       </div>
 
@@ -68,7 +79,10 @@
             <tr 
               v-for="record in filteredDailyRecords" 
               :key="record.id"
-              :class="{ 'row-warning': record.status === 'tardy', 'row-danger': record.status === 'absent' }"
+              :class="{
+                'row-warning': record.status === 'tardy' || record.status === 'early_leave',
+                'row-danger': record.status === 'absent',
+              }"
               @click="openEditModal(record)"
             >
               <td>
@@ -263,6 +277,7 @@
     :message="`${selectedFlexIds.length}건을 ${flexActionRequiresReason ? '반려' : '승인'}하시겠습니까?`"
     :confirm-text="flexActionRequiresReason ? '반려하기' : '승인하기'"
     :require-reason="flexActionRequiresReason"
+    :loading="flexActionLoading"
     v-model:reason="flexActionReason"
     @confirm="submitFlexAction"
   />
@@ -275,13 +290,24 @@ import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
 const store = useAttendanceStore()
 
+function toDateKey(value) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const currentTab = ref('daily')
 const flexViewMode = ref('list')
-const filterDate = ref(new Date().toISOString().slice(0, 10))
+const filterDate = ref(toDateKey(new Date()))
 const filterStatus = ref('all')
 const showFlexActionModal = ref(false)
 const flexActionReason = ref('')
 const flexActionMode = ref('approve')
+const flexActionLoading = ref(false)
+const isPageLoading = ref(false)
+const dailyLoading = ref(false)
+const pageError = ref('')
 
 const statusMap = {
   normal: '정상',
@@ -336,6 +362,7 @@ const saveRecord = async () => {
       newStatus: editingRecord.value.status.toUpperCase(),
       modifyReason: editForm.value.reason,
     })
+    await fetchDailyRecords({ propagate: true })
     alert('수정되었습니다.')
     closeEditModal()
   } catch (error) {
@@ -343,12 +370,23 @@ const saveRecord = async () => {
   }
 }
 
-const fetchDailyRecords = async () => {
-  await store.fetchAdminDailyAttendanceList({
-    startDate: filterDate.value,
-    endDate: filterDate.value,
-    status: filterStatus.value === 'all' ? null : filterStatus.value,
-  })
+const fetchDailyRecords = async ({ propagate = false } = {}) => {
+  dailyLoading.value = true
+  pageError.value = ''
+  try {
+    await store.fetchAdminDailyAttendanceList({
+      startDate: filterDate.value,
+      endDate: filterDate.value,
+      status: filterStatus.value === 'all' ? null : filterStatus.value,
+    })
+  } catch (error) {
+    pageError.value = error?.response?.data?.message || '일일 근태 현황을 불러오지 못했습니다.'
+    if (propagate) {
+      throw error
+    }
+  } finally {
+    dailyLoading.value = false
+  }
 }
 
 const selectedFlexIds = ref([])
@@ -395,17 +433,26 @@ const bulkReject = async () => {
 const flexActionRequiresReason = computed(() => flexActionMode.value === 'reject')
 
 const submitFlexAction = async () => {
+  if (flexActionLoading.value) return
   if (flexActionRequiresReason.value && !flexActionReason.value.trim()) {
     alert('반려 사유를 입력해주세요.')
     return
   }
-  await store.processFlexiblePlans(
-    selectedFlexIds.value,
-    flexActionMode.value === 'approve',
-    flexActionRequiresReason.value ? flexActionReason.value.trim() : '',
-  )
-  selectedFlexIds.value = []
-  showFlexActionModal.value = false
+  flexActionLoading.value = true
+  try {
+    await store.processFlexiblePlans(
+      selectedFlexIds.value,
+      flexActionMode.value === 'approve',
+      flexActionRequiresReason.value ? flexActionReason.value.trim() : '',
+    )
+    selectedFlexIds.value = []
+    showFlexActionModal.value = false
+    alert(`선택한 신청이 ${flexActionMode.value === 'approve' ? '승인' : '반려'}되었습니다.`)
+  } catch (error) {
+    alert(error?.response?.data?.message || `일괄 ${flexActionMode.value === 'approve' ? '승인' : '반려'}에 실패했습니다.`)
+  } finally {
+    flexActionLoading.value = false
+  }
 }
 
 const hours = Array.from({ length: 13 }, (_, i) => i + 8)
@@ -418,13 +465,6 @@ const parseIsoDate = (value) => {
 
 const formatDateNumber = (value) =>
   `${String(value.getMonth() + 1).padStart(2, '0')}.${String(value.getDate()).padStart(2, '0')}`
-
-const toDateKey = (value) => {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 const getMonday = (value) => {
   const date = new Date(value)
@@ -509,13 +549,31 @@ const getBarStyle = (day) => {
 }
 
 onMounted(async () => {
-  const today = new Date().toISOString().slice(0, 10)
-  await Promise.all([fetchDailyRecords(), store.fetchTeamFlexibleWorkPlans(), store.fetchTeamWeeklyOverview(today)])
+  const today = toDateKey(new Date())
+  isPageLoading.value = true
+  pageError.value = ''
+  const results = await Promise.allSettled([
+    fetchDailyRecords({ propagate: true }),
+    store.fetchTeamFlexibleWorkPlans(),
+    store.fetchTeamWeeklyOverview(today),
+  ])
+
+  const failedCount = results.filter((result) => result.status === 'rejected').length
+  if (failedCount > 0) {
+    pageError.value =
+      failedCount === results.length
+        ? '팀 근태 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+        : '일부 팀 근태 데이터를 불러오지 못했습니다. 다시 조회해 주세요.'
+  }
+  isPageLoading.value = false
 })
 </script>
 
 <style scoped>
 .team-manage-page { padding: 32px; background: var(--background-gray); min-height: 100vh; display: flex; flex-direction: column; gap: 24px; }
+.inline-alert { border-radius: 12px; padding: 14px 16px; font-size: 0.95rem; font-weight: 600; }
+.inline-alert.info { background: #EFF6FF; color: #1D4ED8; }
+.inline-alert.error { background: #FEF2F2; color: #B91C1C; }
 .page-header { margin-bottom: 8px; }
 .page-title { font-size: 1.5rem; font-weight: 700; color: var(--gray900); }
 .page-description { color: var(--gray600); font-size: 0.95rem; margin-top: 4px; }
@@ -548,6 +606,7 @@ onMounted(async () => {
 .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
 .status-badge.normal { background: #ECFDF5; color: #059669; }
 .status-badge.tardy { background: #FFFBEB; color: #B45309; }
+.status-badge.early_leave { background: #FFF7ED; color: #C2410C; }
 .status-badge.absent { background: #FEF2F2; color: #B91C1C; }
 .status-badge.vacation { background: #EFF6FF; color: #1D4ED8; }
 .status-badge.pending { background: #FFF7ED; color: #C2410C; }

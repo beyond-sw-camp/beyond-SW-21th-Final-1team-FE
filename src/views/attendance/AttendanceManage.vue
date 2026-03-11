@@ -267,6 +267,7 @@
       title="휴가 승인"
       :message="`${selectedLeaveIds.length}건의 휴가 신청을 승인하시겠습니까?`"
       confirm-text="승인하기"
+      :loading="approveLoading"
       @confirm="submitApprove"
     />
 
@@ -310,6 +311,7 @@ const selectedLeaveIds = ref([])
 const showRejectModal = ref(false)
 const showApproveModal = ref(false)
 const rejectReason = ref('')
+const approveLoading = ref(false)
 
 // --- Computed (Daily) ---
 const filteredList = computed(() => {
@@ -418,6 +420,7 @@ const saveChanges = async () => {
       newStatus: toBackendStatus(editForm.value.status),
       modifyReason: editForm.value.reason,
     })
+    await fetchData()
 
     alert('수정되었습니다.')
     closeModal()
@@ -441,6 +444,8 @@ const handleBulkLeaveApprove = async () => {
 }
 
 const submitApprove = async () => {
+  if (approveLoading.value) return
+  approveLoading.value = true
   try {
     await store.processLeaveRequests(selectedLeaveIds.value, true)
     selectedLeaveIds.value = []
@@ -448,6 +453,8 @@ const submitApprove = async () => {
   } catch (error) {
     const message = error?.response?.data?.message || '승인 처리에 실패했습니다. 다시 시도해 주세요.'
     alert(message)
+  } finally {
+    approveLoading.value = false
   }
 }
 

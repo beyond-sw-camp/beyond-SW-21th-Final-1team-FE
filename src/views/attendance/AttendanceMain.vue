@@ -244,6 +244,7 @@
     :message="actionModalMessage"
     :confirm-text="actionModalConfirmText"
     :require-reason="actionModalRequiresReason"
+    :loading="actionLoading"
     v-model:reason="actionReason"
     @confirm="handleActionConfirm"
   />
@@ -273,6 +274,7 @@ const calendarMonthOffset = ref(0)
 const showActionModal = ref(false)
 const actionReason = ref('')
 const actionType = ref('')
+const actionLoading = ref(false)
 const { checkInTime, checkOutTime, monthlySummary, weeklySummary, calendarEvents } = storeToRefs(store)
 
 const isCheckedIn = computed(() => {
@@ -434,22 +436,31 @@ const handleCheckOut = async () => {
 }
 
 const handleActionConfirm = async () => {
+  if (actionLoading.value) return
   if (actionType.value === 'late-check-in') {
     if (!actionReason.value.trim()) {
       alert('지각 사유는 비워둘 수 없습니다.')
       return
     }
-    showActionModal.value = false
-    await submitClockIn(actionReason.value.trim())
+    actionLoading.value = true
+    try {
+      showActionModal.value = false
+      await submitClockIn(actionReason.value.trim())
+    } finally {
+      actionLoading.value = false
+    }
     return
   }
 
   if (actionType.value === 'check-out') {
-    showActionModal.value = false
+    actionLoading.value = true
     try {
+      showActionModal.value = false
       await store.clockOut()
     } catch (error) {
       alert(error.response?.data?.message || '퇴근 처리에 실패했습니다.')
+    } finally {
+      actionLoading.value = false
     }
   }
 }
