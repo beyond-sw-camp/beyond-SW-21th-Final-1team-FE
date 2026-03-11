@@ -47,3 +47,4 @@ __screenshots__/
 ### Env ###
 .env
 .env.*
+.env-*
