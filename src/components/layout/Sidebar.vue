@@ -317,7 +317,7 @@
 import { h, computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePerformanceStore } from '@/store/performance'
-import { AUTH_KEYS } from '@/utils/auth'
+import { AUTH_KEYS, isAdminRole, isEvaluatorRole } from '@/utils/auth'
 import BaseModal from '@/components/common/BaseModal.vue'
 
 const router = useRouter()
@@ -343,8 +343,7 @@ const isKmsMode = computed(() => route.path.startsWith('/kms'))
 const currentPath = computed(() => route.path)
 const isPerformance = computed(() => route.path.startsWith('/performance'))
 const currentUserId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
-const PERFORMANCE_MANAGER_USER_IDS = ['admin1234']
-const isPerformanceManager = computed(() => PERFORMANCE_MANAGER_USER_IDS.includes(currentUserId.value))
+const isPerformanceManager = computed(() => isEvaluatorRole() || isAdminRole())
 const isAttendanceManager = computed(() => ['admin1234'].includes(currentUserId.value))
 
 // SVG icon components (inline)
