@@ -68,7 +68,7 @@
       </div>
       <div class="detail-list">
         <div
-          v-for="item in detailItems"
+          v-for="item in paginatedDetailItems"
           :key="item.id"
           class="detail-row"
           role="button"
@@ -95,6 +95,11 @@
             <span class="detail-score">{{ item.score }}점</span>
           </div>
         </div>
+      </div>
+      <div v-if="detailTotalPages > 1" class="detail-pagination">
+        <button class="page-btn" :disabled="detailCurrentPage === 1" @click="detailCurrentPage--">이전</button>
+        <span class="page-status">{{ detailCurrentPage }} / {{ detailTotalPages }}</span>
+        <button class="page-btn" :disabled="detailCurrentPage === detailTotalPages" @click="detailCurrentPage++">다음</button>
       </div>
     </div>
 
@@ -177,11 +182,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ChevronLeft, ChevronRight, BarChart3, FileText, TrendingUp, Users, Award, Star } from 'lucide-vue-next'
 import { Bar } from 'vue-chartjs'
-import { PERFORMANCE_MONTHLY, PERFORMANCE_MEMBERS } from '@/mocks/performance'
-import { AUTH_KEYS, USER_ROLES } from '@/utils/auth'
+import { getPerformanceMonthlyReport, getPerformanceTeamStats } from '@/api/performance'
+import { AUTH_KEYS, USER_ROLES, isAdminRole, isEvaluatorRole } from '@/utils/auth'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -193,63 +198,40 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 const TREND_MONTH_COUNT = 6
-const isPerformanceManager = computed(() => (sessionStorage.getItem(AUTH_KEYS.role) || USER_ROLES.user) === USER_ROLES.admin)
-const teamMemberOptions = PERFORMANCE_MEMBERS.map((member) => ({
-  id: member.id,
-  name: member.name,
-  role: member.role,
-}))
-const selectedMemberId = ref(teamMemberOptions[0]?.id || null)
-const selectedMember = computed(() => teamMemberOptions.find((member) => member.id === selectedMemberId.value) || null)
-const selectedMemberIndex = computed(() =>
-  Math.max(0, teamMemberOptions.findIndex((member) => member.id === selectedMemberId.value)),
-)
+const isPerformanceManager = computed(() => {
+  const sessionRole = sessionStorage.getItem(AUTH_KEYS.role) || USER_ROLES.user
+  return isEvaluatorRole() || isAdminRole() || sessionRole === USER_ROLES.admin
+})
+const teamMemberOptions = ref([])
+const selectedMemberId = ref(teamMemberOptions.value[0]?.id || null)
+const selectedMember = computed(() => teamMemberOptions.value.find((member) => member.id === selectedMemberId.value) || null)
+const monthlyData = ref({
+  initialYear: new Date().getFullYear(),
+  initialMonth: new Date().getMonth() + 1,
+  stats: [],
+  chartLabels: [],
+  myScores: [],
+  teamScores: [],
+  detailItems: [],
+})
+const currentOffset = ref(0)
 
-const currentYear = ref(PERFORMANCE_MONTHLY.initialYear)
-const currentMonth = ref(PERFORMANCE_MONTHLY.initialMonth)
+const currentYear = computed(() => monthlyData.value.initialYear)
+const currentMonth = computed(() => monthlyData.value.initialMonth)
 
 const lastDay = computed(() => new Date(currentYear.value, currentMonth.value, 0).getDate())
 
 function prevMonth() {
-  if (currentMonth.value === 1) {
-    currentMonth.value = 12
-    currentYear.value--
-  } else {
-    currentMonth.value--
-  }
+  currentOffset.value -= 1
 }
 
 function nextMonth() {
-  if (currentMonth.value === 12) {
-    currentMonth.value = 1
-    currentYear.value++
-  } else {
-    currentMonth.value++
-  }
+  currentOffset.value += 1
 }
 
-const recentChartLabels = computed(() => PERFORMANCE_MONTHLY.chartLabels.slice(-TREND_MONTH_COUNT))
-const activeMyScores = computed(() => {
-  if (!isPerformanceManager.value || !selectedMember.value) return PERFORMANCE_MONTHLY.myScores
-  return PERFORMANCE_MONTHLY.myScores.map((score, index) => {
-    const offset = ((selectedMemberIndex.value + 1) * 2 + index) % 7 - 3
-    return Math.max(60, Math.min(100, score + offset))
-  })
-})
-const activeDetailItems = computed(() => {
-  if (!isPerformanceManager.value || !selectedMember.value) return PERFORMANCE_MONTHLY.detailItems
-  return PERFORMANCE_MONTHLY.detailItems.map((item, index) => {
-    const offset = ((selectedMemberIndex.value + index) % 5) - 2
-    return {
-      ...item,
-      id: `${selectedMember.value.id}-${item.id}`,
-      progress: Math.max(50, Math.min(100, item.progress + offset)),
-      score: Math.max(70, Math.min(100, item.score + offset)),
-    }
-  })
-})
-const recentMyScores = computed(() => activeMyScores.value.slice(-TREND_MONTH_COUNT))
-const recentTeamScores = computed(() => PERFORMANCE_MONTHLY.teamScores.slice(-TREND_MONTH_COUNT))
+const recentChartLabels = computed(() => (monthlyData.value.chartLabels || []).slice(-TREND_MONTH_COUNT))
+const recentMyScores = computed(() => (monthlyData.value.myScores || []).slice(-TREND_MONTH_COUNT))
+const recentTeamScores = computed(() => (monthlyData.value.teamScores || []).slice(-TREND_MONTH_COUNT))
 const personalLegendLabel = computed(() => {
   if (!isPerformanceManager.value || !selectedMember.value) return '내 점수'
   return `${selectedMember.value.name} 점수`
@@ -274,18 +256,36 @@ const monthChangePercent = computed(() => {
 
 const totalScore = computed(() => currentMyScore.value)
 
-const stats = computed(() => [
-  { label: '개인 업무 달성률', value: `${currentMyScore.value}%`, icon: TrendingUp, bgColor: '#eff6ff', iconColor: '#3b82f6' },
-  { label: '팀 업무 달성률', value: `${currentTeamScore.value}%`, icon: Users, bgColor: '#f0fdf4', iconColor: '#22c55e' },
-  {
-    label: '전월 대비 점수 변화율',
-    value: `${monthChangePercent.value >= 0 ? '+' : ''}${monthChangePercent.value.toFixed(1)}%`,
-    icon: Award,
-    bgColor: '#fef3c7',
-    iconColor: '#f59e0b',
-  },
-  { label: '종합 점수', value: `${totalScore.value}점`, icon: Star, bgColor: '#faf5ff', iconColor: '#a855f7' },
-])
+const stats = computed(() => {
+  if ((monthlyData.value.stats || []).length > 0) {
+    const iconMap = [TrendingUp, Users, Award, Star]
+    const colorMap = [
+      { bgColor: '#eff6ff', iconColor: '#3b82f6' },
+      { bgColor: '#f0fdf4', iconColor: '#22c55e' },
+      { bgColor: '#fef3c7', iconColor: '#f59e0b' },
+      { bgColor: '#faf5ff', iconColor: '#a855f7' },
+    ]
+    return monthlyData.value.stats.map((stat, index) => ({
+      label: stat.label,
+      value: stat.value,
+      icon: iconMap[index] || Star,
+      ...colorMap[index % colorMap.length],
+    }))
+  }
+
+  return [
+    { label: '개인 업무 달성률', value: `${currentMyScore.value}%`, icon: TrendingUp, bgColor: '#eff6ff', iconColor: '#3b82f6' },
+    { label: '팀 업무 달성률', value: `${currentTeamScore.value}%`, icon: Users, bgColor: '#f0fdf4', iconColor: '#22c55e' },
+    {
+      label: '전월 대비 점수 변화율',
+      value: `${monthChangePercent.value >= 0 ? '+' : ''}${monthChangePercent.value.toFixed(1)}%`,
+      icon: Award,
+      bgColor: '#fef3c7',
+      iconColor: '#f59e0b',
+    },
+    { label: '종합 점수', value: `${totalScore.value}점`, icon: Star, bgColor: '#faf5ff', iconColor: '#a855f7' },
+  ]
+})
 
 const chartData = computed(() => ({
   labels: recentChartLabels.value,
@@ -341,6 +341,8 @@ const chartOptions = {
 
 const selectedDetailItem = ref(null)
 const showFeedbackModal = ref(false)
+const detailCurrentPage = ref(1)
+const detailPageSize = 4
 
 function openDetailModal(item) {
   selectedDetailItem.value = item
@@ -360,7 +362,56 @@ function closeFeedbackModal() {
   showFeedbackModal.value = false
 }
 
-const detailItems = computed(() => activeDetailItems.value)
+const detailItems = computed(() => monthlyData.value.detailItems || [])
+const detailTotalPages = computed(() => Math.max(1, Math.ceil(detailItems.value.length / detailPageSize)))
+const paginatedDetailItems = computed(() => {
+  const start = (detailCurrentPage.value - 1) * detailPageSize
+  return detailItems.value.slice(start, start + detailPageSize)
+})
+
+async function loadMemberOptions() {
+  if (!isPerformanceManager.value) return
+  try {
+    const teamStats = await getPerformanceTeamStats()
+    const members = (teamStats?.members || []).map((member) => ({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+    }))
+    if (members.length > 0) {
+      teamMemberOptions.value = members
+      if (!members.some((member) => member.id === selectedMemberId.value)) {
+        selectedMemberId.value = members[0].id
+      }
+    }
+  } catch (_error) {}
+}
+
+async function loadMonthly() {
+  try {
+    const params = { offset: currentOffset.value }
+    if (isPerformanceManager.value && selectedMemberId.value) {
+      params.targetEmployeeId = selectedMemberId.value
+    }
+    const response = await getPerformanceMonthlyReport(params)
+    if (response) monthlyData.value = response
+  } catch (_error) {}
+}
+
+onMounted(async () => {
+  await loadMemberOptions()
+  await loadMonthly()
+})
+
+watch([selectedMemberId, currentOffset], loadMonthly)
+watch([selectedMemberId, currentOffset], () => {
+  detailCurrentPage.value = 1
+})
+watch(detailItems, () => {
+  if (detailCurrentPage.value > detailTotalPages.value) {
+    detailCurrentPage.value = detailTotalPages.value
+  }
+})
 </script>
 
 <style scoped>
@@ -623,6 +674,38 @@ const detailItems = computed(() => activeDetailItems.value)
 .detail-list {
   display: flex;
   flex-direction: column;
+}
+
+.detail-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.page-btn {
+  min-width: 64px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--gray200);
+  border-radius: var(--radius-xs);
+  background: var(--gray50);
+  color: var(--gray700);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.page-status {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--gray600);
 }
 
 .detail-row {
