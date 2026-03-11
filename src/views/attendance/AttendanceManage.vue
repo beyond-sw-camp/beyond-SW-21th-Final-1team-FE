@@ -45,9 +45,10 @@
             <select v-model="filters.status" class="select-input">
               <option value="">전체 상태</option>
               <option value="normal">정상</option>
-              <option value="late">지각</option>
+              <option value="tardy">지각</option>
+              <option value="early_leave">조퇴</option>
               <option value="absent">결근</option>
-              <option value="leave">휴가</option>
+              <option value="vacation">휴가</option>
             </select>
           </div>
           <button class="btn-search" @click="fetchData">조회</button>
@@ -92,7 +93,7 @@
                     </div>
                   </div>
                 </td>
-                <td>개발팀</td>
+                <td>{{ item.deptName }}</td>
                 <td>{{ item.date }}</td>
                 <td>{{ item.checkIn || '-' }}</td>
                 <td>{{ item.checkOut || '-' }}</td>
@@ -216,9 +217,10 @@
             <label>상태 변경</label>
             <select v-model="editForm.status">
               <option value="normal">정상</option>
-              <option value="late">지각</option>
+              <option value="tardy">지각</option>
+              <option value="early_leave">조퇴</option>
               <option value="absent">결근</option>
-              <option value="leave">휴가</option>
+              <option value="vacation">휴가</option>
             </select>
           </div>
           <div class="form-group">
@@ -243,7 +245,7 @@
       <div class="modal-content sm">
         <div class="modal-header">
           <h3>반려 사유 입력</h3>
-          <button class="close-btn" @click="closeRejectModal">×</button>
+          <button class="close-btn" :disabled="rejectLoading" @click="closeRejectModal">×</button>
         </div>
         <div class="modal-body">
            <div class="info-text mb-4">
@@ -251,22 +253,33 @@
            </div>
            <div class="form-group">
             <label class="required">반려 사유</label>
-            <textarea v-model="rejectReason" rows="3" placeholder="반려 사유를 입력하세요."></textarea>
+            <textarea v-model="rejectReason" :disabled="rejectLoading" rows="3" placeholder="반려 사유를 입력하세요."></textarea>
            </div>
         </div>
         <div class="modal-footer">
-           <button class="btn-cancel" @click="closeRejectModal">취소</button>
-           <button class="btn-save red-btn" @click="submitReject">반려하기</button>
+           <button class="btn-cancel" :disabled="rejectLoading" @click="closeRejectModal">취소</button>
+           <button class="btn-save red-btn" :disabled="rejectLoading" @click="submitReject">
+             {{ rejectLoading ? '처리 중...' : '반려하기' }}
+           </button>
         </div>
       </div>
     </div>
+    <ActionConfirmModal
+      v-model="showApproveModal"
+      title="휴가 승인"
+      :message="`${selectedLeaveIds.length}건의 휴가 신청을 승인하시겠습니까?`"
+      confirm-text="승인하기"
+      :loading="approveLoading"
+      @confirm="submitApprove"
+    />
 
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
 const store = useAttendanceStore()
 const currentTab = ref('daily')
@@ -298,7 +311,10 @@ const errors = ref({})
 // --- State (Leave) ---
 const selectedLeaveIds = ref([])
 const showRejectModal = ref(false)
+const showApproveModal = ref(false)
 const rejectReason = ref('')
+const approveLoading = ref(false)
+const rejectLoading = ref(false)
 
 // --- Computed (Daily) ---
 const filteredList = computed(() => {
@@ -314,15 +330,15 @@ const filteredList = computed(() => {
   })
 })
 
-const isAbnormal = (status) => ['late', 'absent'].includes(status)
+const isAbnormal = (status) => ['tardy', 'early_leave', 'absent'].includes(status)
 
 const getStatusLabel = (status) => {
-  const map = { normal: '정상', late: '지각', absent: '결근', leave: '휴가' }
+  const map = { normal: '정상', tardy: '지각', early_leave: '조퇴', absent: '결근', vacation: '휴가' }
   return map[status] || status
 }
 
 const getStatusClass = (status) => {
-  const map = { normal: 'badge-green', late: 'badge-red', absent: 'badge-gray', leave: 'badge-blue' }
+  const map = { normal: 'badge-green', tardy: 'badge-red', early_leave: 'badge-red', absent: 'badge-gray', vacation: 'badge-blue' }
   return map[status] || ''
 }
 
@@ -344,10 +360,24 @@ const isAllLeaveSelected = computed(() => {
   return pending.length > 0 && selectedLeaveIds.value.length === pending.length
 })
 
+const today = new Date()
+const currentMonthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+const currentMonthEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+  new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(),
+).padStart(2, '0')}`
+
+filters.value.startDate = currentMonthStart
+filters.value.endDate = currentMonthEnd
+appliedFilters.value = { ...filters.value }
+
 // --- Methods (Daily) ---
-const fetchData = () => {
+const fetchData = async () => {
   appliedFilters.value = { ...filters.value }
-  console.log('Fetching data with filters:', appliedFilters.value)
+  await store.fetchAdminDailyAttendanceList({
+    startDate: appliedFilters.value.startDate || null,
+    endDate: appliedFilters.value.endDate || null,
+    status: appliedFilters.value.status || null,
+  })
 }
 
 const openEditModal = (item) => {
@@ -367,20 +397,40 @@ const closeModal = () => {
   selectedItem.value = null
 }
 
-const saveChanges = () => {
+const toBackendStatus = (status) => {
+  const map = {
+    normal: 'NORMAL',
+    tardy: 'TARDY',
+    early_leave: 'EARLY_LEAVE',
+    absent: 'ABSENT',
+    vacation: 'VACATION',
+  }
+  return map[status] || 'NORMAL'
+}
+
+const saveChanges = async () => {
   if (!editForm.value.reason.trim()) {
     errors.value.reason = true
     return
   }
-  
-  store.updateDailyAttendance(selectedItem.value.id, {
-    checkIn: editForm.value.checkIn || null,
-    checkOut: editForm.value.checkOut || null,
-    status: editForm.value.status
-  })
-  
-  alert('수정되었습니다.')
-  closeModal()
+
+  try {
+    await store.updateDailyAttendance({
+      targetEmployeeId: selectedItem.value.userId,
+      workDate: selectedItem.value.date,
+      newCheckInTime: editForm.value.checkIn || null,
+      newCheckOutTime: editForm.value.checkOut || null,
+      newStatus: toBackendStatus(editForm.value.status),
+      modifyReason: editForm.value.reason,
+    })
+    await fetchData()
+
+    alert('수정되었습니다.')
+    closeModal()
+  } catch (error) {
+    const message = error?.response?.data?.message || '수정에 실패했습니다. 다시 시도해 주세요.'
+    alert(message)
+  }
 }
 
 // --- Methods (Leave) ---
@@ -392,14 +442,23 @@ const toggleAllLeave = (e) => {
   }
 }
 
-const handleBulkLeaveApprove = () => {
-  if (!confirm(`${selectedLeaveIds.value.length}건을 승인하시겠습니까?`)) return
-  
-  selectedLeaveIds.value.forEach(id => {
-    store.updateLeaveStatus(id, 'approved')
-  })
-  
-  selectedLeaveIds.value = []
+const handleBulkLeaveApprove = async () => {
+  showApproveModal.value = true
+}
+
+const submitApprove = async () => {
+  if (approveLoading.value) return
+  approveLoading.value = true
+  try {
+    await store.processLeaveRequests(selectedLeaveIds.value, true)
+    selectedLeaveIds.value = []
+    showApproveModal.value = false
+  } catch (error) {
+    const message = error?.response?.data?.message || '승인 처리에 실패했습니다. 다시 시도해 주세요.'
+    alert(message)
+  } finally {
+    approveLoading.value = false
+  }
 }
 
 const handleBulkLeaveReject = () => {
@@ -408,23 +467,37 @@ const handleBulkLeaveReject = () => {
 }
 
 const closeRejectModal = () => {
+  if (rejectLoading.value) return
   showRejectModal.value = false
 }
 
-const submitReject = () => {
+const submitReject = async () => {
+  if (rejectLoading.value) return
   if (!rejectReason.value.trim()) {
     alert('반려 사유를 입력해주세요.')
     return
   }
-  
-  selectedLeaveIds.value.forEach(id => {
-    store.updateLeaveStatus(id, 'rejected', rejectReason.value)
-  })
-  
-  selectedLeaveIds.value = []
-  showRejectModal.value = false
-  alert('반려 처리되었습니다.')
+
+  rejectLoading.value = true
+  try {
+    await store.processLeaveRequests(selectedLeaveIds.value, false, rejectReason.value)
+    selectedLeaveIds.value = []
+    showRejectModal.value = false
+    alert('반려 처리되었습니다.')
+  } catch (error) {
+    const message = error?.response?.data?.message || '반려 처리에 실패했습니다. 다시 시도해 주세요.'
+    alert(message)
+  } finally {
+    rejectLoading.value = false
+  }
 }
+
+onMounted(async () => {
+  await Promise.all([
+    fetchData(),
+    store.fetchAdminLeaveRequestsList(),
+  ])
+})
 </script>
 
 <style scoped>
