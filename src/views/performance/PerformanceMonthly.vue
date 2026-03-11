@@ -186,7 +186,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ChevronLeft, ChevronRight, BarChart3, FileText, TrendingUp, Users, Award, Star } from 'lucide-vue-next'
 import { Bar } from 'vue-chartjs'
 import { getPerformanceMonthlyReport, getPerformanceTeamStats } from '@/api/performance'
-import { AUTH_KEYS, USER_ROLES, isAdminRole, isEvaluatorRole } from '@/utils/auth'
+import { isAdminRole, isEvaluatorRole, sessionRoleCodesRef, sessionRoleRef } from '@/utils/auth'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -198,10 +198,8 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 const TREND_MONTH_COUNT = 6
-const isPerformanceManager = computed(() => {
-  const sessionRole = sessionStorage.getItem(AUTH_KEYS.role) || USER_ROLES.user
-  return isEvaluatorRole() || isAdminRole() || sessionRole === USER_ROLES.admin
-})
+const isPerformanceManager = computed(() =>
+  isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
 const teamMemberOptions = ref([])
 const selectedMemberId = ref(teamMemberOptions.value[0]?.id || null)
 const selectedMember = computed(() => teamMemberOptions.value.find((member) => member.id === selectedMemberId.value) || null)
@@ -403,8 +401,8 @@ onMounted(async () => {
   await loadMonthly()
 })
 
-watch([selectedMemberId, currentOffset], loadMonthly)
 watch([selectedMemberId, currentOffset], () => {
+  loadMonthly()
   detailCurrentPage.value = 1
 })
 watch(detailItems, () => {

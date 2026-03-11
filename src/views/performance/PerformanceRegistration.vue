@@ -189,8 +189,14 @@ const form = reactive({
 })
 
 async function handleSubmit(){
-  if (form.startDate && form.endDate && form.endDate < form.startDate) return
-  if (Number(form.difficultyScore) < 1 || Number(form.difficultyScore) > 5) return
+  if (form.startDate && form.endDate && form.endDate < form.startDate) {
+    alert('종료일은 시작일보다 이후여야 합니다.')
+    return
+  }
+  if (Number(form.difficultyScore) < 1 || Number(form.difficultyScore) > 5) {
+    alert('난이도는 1점에서 5점 사이여야 합니다.')
+    return
+  }
   try {
     await registerPerformance({
       type: step.value === 'team-form' ? 'team' : 'individual',

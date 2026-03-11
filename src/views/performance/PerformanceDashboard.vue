@@ -1,5 +1,9 @@
 <template>
   <div class="perf-dashboard">
+    <div v-if="dashboardError" class="dashboard-error">
+      <span>{{ dashboardError }}</span>
+      <button type="button" class="dashboard-retry" @click="loadDashboard">다시 시도</button>
+    </div>
     <!-- Top Section: Key Metrics -->
     <div class="perf-metrics" :class="{ 'perf-metrics--manager': isPerformanceManager }">
       <!-- Metric 1 -->
@@ -158,7 +162,7 @@ import { computed, onMounted, ref } from 'vue'
 import { TrendingUp, Target, Award, MessageSquare } from 'lucide-vue-next'
 import { Line } from 'vue-chartjs'
 import { usePerformanceStore } from '@/store/performance'
-import { isAdminRole, isEvaluatorRole } from '@/utils/auth'
+import { isAdminRole, isEvaluatorRole, sessionRoleCodesRef, sessionRoleRef } from '@/utils/auth'
 import { getPerformanceDashboard, getPerformanceInquiryItems } from '@/api/performance'
 import {
   Chart as ChartJS,
@@ -173,7 +177,9 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
 const perfStore = usePerformanceStore()
-const isPerformanceManager = computed(() => isEvaluatorRole() || isAdminRole())
+const isPerformanceManager = computed(() =>
+  isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
+const dashboardError = ref('')
 const dashboard = ref({
   pendingApprovalCount: 0,
   trendLabels: [],
@@ -263,13 +269,17 @@ function closeFeedbackModal() {
 
 async function loadDashboard() {
   try {
+    dashboardError.value = ''
     const [dashboardData, inquiryData] = await Promise.all([
       getPerformanceDashboard(),
       getPerformanceInquiryItems(),
     ])
     if (dashboardData) dashboard.value = dashboardData
     inquiryItems.value = Array.isArray(inquiryData) ? inquiryData : []
-  } catch (_error) {}
+  } catch (error) {
+    console.error('Failed to load performance dashboard.', error)
+    dashboardError.value = '대시보드를 불러오지 못했습니다.'
+  }
 }
 
 onMounted(loadDashboard)

@@ -175,6 +175,13 @@ const criteria = [
 
 const isFormValid = computed(() => criteria.every(c => scores[c.id]))
 
+function markSelectedColleagueEvaluated() {
+  if (!selectedColleague.value) return
+  selectedColleague.value.evaluated = true
+  const target = colleagues.value.find((colleague) => colleague.id === selectedColleague.value.id)
+  if (target) target.evaluated = true
+}
+
 function selectColleague(c) {
   selectedColleague.value = c
   resetForm()
@@ -202,6 +209,7 @@ async function submitReview() {
       cultureContributionScore: scores[5],
       comment: comment.value,
     })
+    markSelectedColleagueEvaluated()
     showModal.value = true
   } catch (_error) {
     alert('동료 평가 제출에 실패했습니다.')
@@ -209,7 +217,7 @@ async function submitReview() {
 }
 
 function closeAndNext() {
-  if (selectedColleague.value) selectedColleague.value.evaluated = true
+  markSelectedColleagueEvaluated()
   showModal.value = false
   const next = colleagues.value.find((c) => !c.evaluated)
   if (next) selectColleague(next)

@@ -16,8 +16,16 @@ export const getPerformanceInquiryItems = (params = {}) =>
 export const getPerformanceInquiryTeamMembers = () =>
   unwrap(api.get('/performance/team-evaluation/targets'))
 
-export const updatePerformanceResult = async (performanceId, request) =>
-  api.post(`/performance/result/${performanceId}`, request)
+export const updatePerformanceResult = async (performanceId, request, files = []) => {
+  const form = new FormData()
+  Object.entries(request || {}).forEach(([key, value]) => {
+    form.append(key, value ?? '')
+  })
+  files.forEach((file) => {
+    form.append('files', file)
+  })
+  return api.post(`/performance/result/${performanceId}`, form)
+}
 
 export const getPerformanceApprovalItems = () => unwrap(api.get('/performance/approvals'))
 

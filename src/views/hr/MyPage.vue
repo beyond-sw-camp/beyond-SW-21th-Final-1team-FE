@@ -51,13 +51,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import TabInfo from './tabs/TabInfo.vue'
 import TabSalary from './tabs/TabSalary.vue'
 import TabHistory from './tabs/TabHistory.vue'
 import TabCertificate from './tabs/TabCertificate.vue'
-import { createHrMyPageUserMock } from '@/mocks/hr/myPageUser'
 import { AUTH_KEYS } from '@/utils/auth'
+import { getMyPage, getMyPageHeader } from '@/api/hr'
 
 const activeTab = ref('info')
 const tabs = [
@@ -69,11 +69,95 @@ const tabs = [
 
 const activeTabLabel = computed(() => tabs.find(t => t.key === activeTab.value)?.label)
 
-const user = ref(createHrMyPageUserMock())
-const sessionLastLogin = sessionStorage.getItem(AUTH_KEYS.lastLoginAt)
-if (sessionLastLogin) {
-  user.value.lastLogin = sessionLastLogin
+const user = ref({
+  profileImage: '',
+  name: '',
+  team: '',
+  jobTitle: '',
+  position: '',
+  email: '',
+  phone: '',
+  extension: '',
+  workLocation: '',
+  lastLogin: '',
+  empNo: '',
+  birthDate: '',
+  address: '',
+  ssn: '',
+  bankAccount: '',
+  orgPosition: '',
+  jobRole: '',
+  rank: '',
+  status: '',
+  hireDate: '',
+  tenure: '',
+  workType: '',
+  workRegion: '',
+  hireType: '',
+  careers: [],
+  skills: [],
+})
+
+const toLabel = (value) => (value == null ? '' : String(value))
+
+const mapMyPageToUser = (header, page) => {
+  const basic = page?.basicInfo || {}
+  const hr = page?.hrInfo || {}
+  const sessionLastLogin = sessionStorage.getItem(AUTH_KEYS.lastLoginAt)
+
+  return {
+    profileImage: basic.profileFileUrl || header?.profileFileUrl || '',
+    name: basic.employeeName || header?.employeeName || '',
+    team: hr.orgName || header?.orgName || '',
+    jobTitle: hr.jobName || header?.jobName || '',
+    position: hr.positionName || header?.positionName || '',
+    email: basic.email || header?.email || '',
+    phone: basic.phone || header?.phone || '',
+    extension: basic.extensionNum || header?.extensionNum || '',
+    workLocation: hr.areaName || header?.areaName || '',
+    lastLogin: sessionLastLogin || '',
+    empNo: basic.employeeNum || '',
+    birthDate: basic.birthDate || '',
+    address: basic.address || '',
+    ssn: basic.residentNumberMasked || '',
+    bankAccount: [basic.bankName, basic.accountNumberMasked].filter(Boolean).join(' '),
+    orgPosition: [hr.orgName, hr.positionName].filter(Boolean).join(' · '),
+    jobRole: [hr.jobName, toLabel(hr.employType)].filter(Boolean).join(' · '),
+    rank: hr.rankName || '',
+    status: toLabel(hr.employeeState),
+    hireDate: hr.hireDate || '',
+    tenure: hr.tenureText || '',
+    workType: toLabel(hr.employType),
+    workRegion: hr.areaName || '',
+    hireType: toLabel(hr.recruitType),
+    careers: (page?.careers || []).map((career) => ({
+      id: career.careerId,
+      hrFileId: career.hrFileId,
+      company: career.companyName,
+      role: career.orgName,
+      period: [career.startDate, career.endDate || '재직중'].filter(Boolean).join(' ~ '),
+      duration: '',
+    })),
+    skills: (page?.skills || []).map((skill) => ({
+      id: skill.skillId,
+      hrFileId: skill.hrFileId,
+      type: toLabel(skill.category),
+      name: skill.skillName,
+      issuer: '',
+      date: skill.acquisitionDate,
+      status: '유효',
+    })),
+  }
 }
+
+async function loadMyPage() {
+  try {
+    const [header, page] = await Promise.all([getMyPageHeader(), getMyPage()])
+    user.value = mapMyPageToUser(header, page)
+  } catch (_error) {}
+}
+
+onMounted(loadMyPage)
 </script>
 
 <style scoped>

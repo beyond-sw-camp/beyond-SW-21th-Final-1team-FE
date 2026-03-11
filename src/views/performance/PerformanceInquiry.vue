@@ -256,8 +256,8 @@
               </template>
               <template v-else>
                 <button class="btn-outline" @click="modalTab = 'detail'">이전</button>
-                <button class="btn-primary" @click="submitResult">
-                  <CheckCircle :size="14" /> 최종 결과 제출
+                <button class="btn-primary" :disabled="isSubmitting" @click="submitResult">
+                  <CheckCircle :size="14" /> {{ isSubmitting ? '제출 중...' : '최종 결과 제출' }}
                 </button>
               </template>
             </div>
@@ -272,7 +272,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { Search, Filter, X, Upload, CheckCircle, AlertCircle, User } from 'lucide-vue-next'
 import { getPerformanceInquiryItems, getPerformanceInquiryTeamMembers, updatePerformanceResult } from '@/api/performance'
-import { AUTH_KEYS, USER_ROLES, isAdminRole, isEvaluatorRole } from '@/utils/auth'
+import { AUTH_KEYS, USER_ROLES, isAdminRole, isEvaluatorRole, sessionRoleCodesRef, sessionRoleRef } from '@/utils/auth'
 
 const selectedItem = ref(null)
 const modalTab = ref('detail')
@@ -283,6 +283,7 @@ const resultSummary = ref('')
 const resultNote = ref('')
 const growthPoint = ref('')
 const improvementPoint = ref('')
+const isSubmitting = ref(false)
 
 const filterStatus = ref('')
 const filterEmployee = ref('')
@@ -302,8 +303,9 @@ const teamMemberOptions = ref([])
 const loadError = ref('')
 const userId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
 const userName = computed(() => sessionStorage.getItem(AUTH_KEYS.userName) || '')
-const userRole = computed(() => sessionStorage.getItem(AUTH_KEYS.role) || USER_ROLES.user)
-const isPerformanceManager = computed(() => isEvaluatorRole() || isAdminRole() || userRole.value === USER_ROLES.admin)
+const userRole = computed(() => sessionRoleRef.value || USER_ROLES.user)
+const isPerformanceManager = computed(() =>
+  isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, userRole.value))
 const currentEmployeeId = computed(() => sessionStorage.getItem(AUTH_KEYS.employeeId) || '')
 
 const visibleItems = computed(() => {
@@ -389,6 +391,7 @@ function handleEdit() {
 }
 
 async function submitResult() {
+  if (isSubmitting.value) return
   if (!selectedItem.value) return
   if (!resultSummary.value.trim()) {
     alert('성과 요약을 입력해주세요.')
@@ -396,6 +399,7 @@ async function submitResult() {
   }
   const target = items.value.find((item) => item.id === selectedItem.value.id)
   if (!target) return
+  isSubmitting.value = true
   try {
     await updatePerformanceResult(selectedItem.value.id, {
       progress: Number(resultProgress.value) || 0,
@@ -413,6 +417,8 @@ async function submitResult() {
     alert('결과가 등록되었고 평가자 승인 대기 상태로 변경되었습니다.')
   } catch (_error) {
     alert('성과 결과 등록에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
   }
 }
 

@@ -6,6 +6,10 @@
         <h3 class="eval-sidebar-title">팀원 목록</h3>
         <p class="eval-sidebar-desc">평가할 팀원을 선택해주세요.</p>
       </div>
+      <div v-if="teamLoadError" class="eval-load-error">
+        <span>{{ teamLoadError }}</span>
+        <button type="button" class="page-btn" @click="loadTeamEvaluationTargets">다시 시도</button>
+      </div>
       <div class="eval-list">
         <button
           v-for="member in paginatedTeamMembers"
@@ -73,8 +77,8 @@
               시스템 평가점수 <strong>{{ selectedMember.systemScore }}점</strong>
             </div>
             <button class="btn-save" @click="handleTempSave">임시 저장</button>
-            <button class="btn-submit" @click="handleSubmitEvaluation">
-              <Send :size="14" /> 평가 제출
+            <button class="btn-submit" :disabled="isSubmitting || selectedMember.status === '완료'" @click="handleSubmitEvaluation">
+              <Send :size="14" /> {{ isSubmitting ? '제출 중...' : '평가 제출' }}
             </button>
           </div>
         </div>
@@ -160,6 +164,8 @@ const DEFAULT_AVATAR =
 const teamMembers = ref([])
 const teamMemberCurrentPage = ref(1)
 const teamMemberPageSize = 10
+const isSubmitting = ref(false)
+const teamLoadError = ref('')
 
 const evaluationCriteria = [
   { id: 'performance', label: '업무 성과', description: '목표 달성도 및 업무의 질적/양적 성과' },
@@ -221,6 +227,7 @@ const handleTempSave = () => {
 }
 
 const handleSubmitEvaluation = async () => {
+  if (isSubmitting.value) return
   if (!selectedMember.value) return
   if (selectedMember.value.status === '완료') {
     alert('이미 제출된 팀평가입니다.')
@@ -238,6 +245,7 @@ const handleSubmitEvaluation = async () => {
   if (!confirm(`${selectedMember.value.name}님 평가를 제출하시겠습니까?`)) return
 
   try {
+    isSubmitting.value = true
     await submitTeamEvaluation({
       appraiseeId: selectedMember.value.id,
       performanceScore: Number(form.scores.performance || 0),
@@ -252,6 +260,8 @@ const handleSubmitEvaluation = async () => {
   } catch (_error) {
     alert('평가 제출에 실패했습니다.')
     return
+  } finally {
+    isSubmitting.value = false
   }
 
   const target = teamMembers.value.find((member) => member.id === selectedMemberId.value)
@@ -262,16 +272,21 @@ const handleSubmitEvaluation = async () => {
 
 async function loadTeamEvaluationTargets() {
   try {
+    teamLoadError.value = ''
     const response = await getTeamEvaluationTargets()
-    if (Array.isArray(response) && response.length > 0) {
-      teamMembers.value = response.map((member) => ({
-        ...member,
-        image: DEFAULT_AVATAR,
-      }))
-      teamMemberCurrentPage.value = 1
-      selectedMemberId.value = response[0].id
-    }
-  } catch (_error) {}
+    const members = Array.isArray(response)
+      ? response.map((member) => ({
+          ...member,
+          image: DEFAULT_AVATAR,
+        }))
+      : []
+    teamMembers.value = members
+    teamMemberCurrentPage.value = 1
+    selectedMemberId.value = members[0]?.id ?? null
+  } catch (error) {
+    console.error('Failed to load team evaluation targets.', error)
+    teamLoadError.value = '팀원 목록을 불러오지 못했습니다.'
+  }
 }
 
 onMounted(loadTeamEvaluationTargets)
