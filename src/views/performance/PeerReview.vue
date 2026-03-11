@@ -8,7 +8,7 @@
       </div>
       <div class="peer-list">
         <button
-          v-for="c in colleagues"
+          v-for="c in paginatedColleagues"
           :key="c.name"
           class="peer-item"
           :class="{ active: selectedColleague?.name === c.name }"
@@ -21,6 +21,11 @@
           </div>
           <span v-if="c.evaluated" class="peer-done-badge">완료</span>
         </button>
+      </div>
+      <div v-if="colleagueTotalPages > 1" class="peer-pagination">
+        <button class="page-btn" :disabled="colleagueCurrentPage === 1" @click="colleagueCurrentPage--">이전</button>
+        <span class="page-status">{{ colleagueCurrentPage }} / {{ colleagueTotalPages }}</span>
+        <button class="page-btn" :disabled="colleagueCurrentPage === colleagueTotalPages" @click="colleagueCurrentPage++">다음</button>
       </div>
       <div class="peer-sidebar-footer">
         <div class="peer-progress-label">
@@ -101,7 +106,7 @@
         <!-- 푸터 -->
         <div class="peer-form-footer">
           <button class="btn-cancel" @click="resetForm">초기화</button>
-          <button class="btn-submit" :disabled="!isFormValid" @click="showModal = true">
+          <button class="btn-submit" :disabled="!isFormValid" @click="submitReview">
             <Send :size="14" /> 평가 제출하기
           </button>
         </div>
@@ -135,16 +140,23 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { Users, Shield, MessageSquare, Send, CheckCircle2 } from 'lucide-vue-next'
-import { PEER_REVIEW_COLLEAGUES } from '@/mocks/performance'
+import { getPeerReviewTargets, submitPeerReview } from '@/api/performance'
 
 const DEFAULT_AVATAR =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23eef2f7'/><circle cx='40' cy='31' r='14' fill='%2394a3b8'/><path d='M16 68c4-12 14-18 24-18s20 6 24 18' fill='%2394a3b8'/></svg>"
 
-const colleagues = ref(PEER_REVIEW_COLLEAGUES.map((item) => ({ ...item })))
+const colleagues = ref([])
+const colleagueCurrentPage = ref(1)
+const colleaguePageSize = 10
 
 const evaluatedCount = computed(() => colleagues.value.filter((c) => c.evaluated).length)
+const colleagueTotalPages = computed(() => Math.max(1, Math.ceil(colleagues.value.length / colleaguePageSize)))
+const paginatedColleagues = computed(() => {
+  const start = (colleagueCurrentPage.value - 1) * colleaguePageSize
+  return colleagues.value.slice(start, start + colleaguePageSize)
+})
 
 const selectedColleague = ref(null)
 const showModal = ref(false)
@@ -177,6 +189,25 @@ function closeModal() {
   showModal.value = false
 }
 
+async function submitReview() {
+  if (!selectedColleague.value || !isFormValid.value) return
+
+  try {
+    await submitPeerReview({
+      appraiseeId: selectedColleague.value.id,
+      communicationScore: scores[1],
+      solvingScore: scores[2],
+      responsibilityScore: scores[3],
+      teamContributionScore: scores[4],
+      cultureContributionScore: scores[5],
+      comment: comment.value,
+    })
+    showModal.value = true
+  } catch (_error) {
+    alert('동료 평가 제출에 실패했습니다.')
+  }
+}
+
 function closeAndNext() {
   if (selectedColleague.value) selectedColleague.value.evaluated = true
   showModal.value = false
@@ -184,6 +215,18 @@ function closeAndNext() {
   if (next) selectColleague(next)
   else selectedColleague.value = null
 }
+
+async function loadPeerReviewTargets() {
+  try {
+    const response = await getPeerReviewTargets()
+    if (Array.isArray(response) && response.length > 0) {
+      colleagues.value = response.map((item) => ({ ...item }))
+      colleagueCurrentPage.value = 1
+    }
+  } catch (_error) {}
+}
+
+onMounted(loadPeerReviewTargets)
 </script>
 
 <style scoped>
@@ -239,6 +282,38 @@ function closeAndNext() {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+}
+
+.peer-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px 0;
+}
+
+.page-btn {
+  min-width: 64px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--gray200);
+  border-radius: var(--radius-xs);
+  background: var(--gray50);
+  color: var(--gray700);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.page-status {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--gray600);
 }
 
 .peer-item {
