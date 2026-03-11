@@ -118,7 +118,7 @@ const handleAction = (type) => {
   }
   
   alert(`[알림/이메일 전송]\n${message}`);
-  emit('action', { type, id: props.item.id, reason: rejectReason.value });
+  emit('action', { type, id: props.item.approvalId || props.item.id, reason: rejectReason.value });
   close();
 };
 </script>
