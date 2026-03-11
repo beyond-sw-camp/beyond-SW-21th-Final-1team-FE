@@ -237,7 +237,7 @@
                   <div v-if="selectedFiles.length > 0" class="upload-file-list">
                     <div
                       v-for="file in selectedFiles"
-                      :key="`${file.name}-${file.size}`"
+                      :key="`${file.name}-${file.size}-${file.lastModified}`"
                       class="upload-file-item"
                     >
                       <span class="upload-file-name">{{ file.name }}</span>
@@ -391,7 +391,11 @@ function handleFileChange(event) {
 
 function removeFile(targetFile) {
   selectedFiles.value = selectedFiles.value.filter(
-    (file) => !(file.name === targetFile.name && file.size === targetFile.size),
+    (file) => !(
+      file.name === targetFile.name &&
+      file.size === targetFile.size &&
+      file.lastModified === targetFile.lastModified
+    ),
   )
 }
 
@@ -436,13 +440,15 @@ async function loadInquiryItems(sequence = ++inquiryRequestSeq) {
     loadError.value = ''
     const params = {}
     if (isPerformanceManager.value && filterEmployee.value) {
-      params.targetEmployeeId = Number(filterEmployee.value)
+      params.targetEmployeeId = filterEmployee.value
     }
     const response = await getPerformanceInquiryItems(params)
     if (sequence !== inquiryRequestSeq) return
     items.value = Array.isArray(response) ? response.map((item) => normalizeItem(item)) : []
   } catch (error) {
     if (sequence !== inquiryRequestSeq) return
+    items.value = []
+    selectedItem.value = null
     loadError.value = error?.response?.data?.error?.message || '성과 조회 API 호출에 실패했습니다.'
   }
 }
@@ -471,6 +477,12 @@ watch(filterEmployee, () => {
   inquiryRequestSeq += 1
   currentPage.value = 1
   loadInquiryItems(inquiryRequestSeq)
+})
+
+watch(isPerformanceManager, (isManager) => {
+  if (!isManager) return
+  loadTeamMembers()
+  loadInquiryItems()
 })
 
 watch([filterStatus, filterMonth, searchText, searchField], () => {
