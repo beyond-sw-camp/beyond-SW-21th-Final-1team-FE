@@ -42,30 +42,30 @@
              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
           </span>
         </div>
-        <div class="period-info">02.09 - 02.15 (법정 52h)</div>
+        <div class="period-info">{{ weeklyPeriodLabel }} (법정 52h)</div>
 
         <div class="weekly-stat">
           <div class="hours-display">
-            <span class="hours-num">42</span>
+            <span class="hours-num">{{ weeklyHoursDisplay }}</span>
             <span class="hours-unit">h</span>
           </div>
           <div class="progress-info">
-            <span>표준 40h 달성</span>
-            <span class="percent">105%</span>
+            <span>{{ weeklyProgressLabel }}</span>
+            <span class="percent">{{ weeklyProgressPercent }}%</span>
           </div>
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width: 100%"></div>
+            <div class="progress-bar-fill" :style="{ width: `${weeklyProgressBarWidth}%` }"></div>
           </div>
         </div>
 
         <div class="weekly-breakdown">
           <div class="bd-item">
             <span class="label">기본 근무</span>
-            <span class="value">40 / 40h</span>
+            <span class="value">{{ regularHoursDisplay }} / 40h</span>
           </div>
           <div class="bd-item">
             <span class="label">연장 근무</span>
-            <span class="value blue">2 / 12h</span>
+            <span class="value blue">{{ overtimeHoursDisplay }} / 12h</span>
           </div>
         </div>
       </div>
@@ -78,7 +78,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
           </span>
         </div>
-        <div class="period-info">2026년 2월 기준</div>
+        <div class="period-info">{{ monthPeriodLabel }} 기준</div>
 
         <div class="monthly-grid">
           <!-- Item 1 -->
@@ -137,12 +137,12 @@
               <span class="card-title">근무 일정</span>
               <div class="cal-badge">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                2026.02
+                {{ monthBadgeLabel }}
               </div>
             </div>
             <div class="cal-nav">
-              <button class="icon-btn">&lt;</button>
-              <button class="icon-btn">&gt;</button>
+              <button class="icon-btn" @click.stop="moveCalendarMonth(-1)">&lt;</button>
+              <button class="icon-btn" @click.stop="moveCalendarMonth(1)">&gt;</button>
             </div>
           </div>
 
@@ -150,75 +150,24 @@
             <div class="cal-head">
               <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
             </div>
-            <!-- Week 1: Feb 1 is Sunday -->
-            <div class="cal-week week-flex">
-              <div class="day sun">1</div>
-              <div class="day">2</div>
-              <div class="day">3</div>
-              <div class="day">4</div>
-              <div class="day">5</div>
-              <div class="day">6</div>
-              <div class="day sat">7</div>
-            </div>
-            <!-- Week 2 -->
-            <div class="cal-week week-flex">
-              <div class="day sun">8</div>
-              <div class="day">9</div>
-              <div class="day has-schedule">
-                10
-                <div class="bar-blue">8h 00m</div>
+            <div v-for="(week, weekIndex) in calendarWeeks" :key="weekIndex" class="cal-week week-flex">
+              <div
+                v-for="day in week"
+                :key="day.date"
+                class="day"
+                :class="{
+                  sun: day.dayOfWeek === 0,
+                  sat: day.dayOfWeek === 6,
+                  today: day.isToday,
+                  'other-month': !day.isCurrentMonth,
+                  'has-schedule': day.label,
+                }"
+              >
+                {{ day.day }}
+                <div v-if="day.label" :class="day.variant === 'blue' ? 'bar-blue' : 'bar-orange'">
+                  {{ day.label }}
+                </div>
               </div>
-              <div class="day has-schedule">
-                11
-                <div class="bar-blue">8h 10m</div>
-              </div>
-              <div class="day has-schedule">
-                12
-                <div class="bar-blue">8h 05m</div>
-              </div>
-              <div class="day has-schedule">
-                13
-                <div class="bar-blue">8h 15m</div>
-              </div>
-              <div class="day sat">14</div>
-            </div>
-             <!-- Week 3 -->
-             <div class="cal-week week-flex">
-              <div class="day sun">15</div>
-              <div class="day has-schedule">
-                16
-                <div class="bar-blue">8h 30m</div>
-              </div>
-              <div class="day has-schedule">
-                17
-                <div class="bar-blue">8h 20m</div>
-              </div>
-              <div class="day today has-schedule">
-                18
-                <div class="bar-blue">Working</div>
-              </div>
-              <div class="day has-schedule">
-                19
-                <div class="bar-blue">Plan</div>
-              </div>
-              <div class="day">20</div>
-              <div class="day sat">21</div>
-            </div>
-            <!-- Week 4 -->
-            <div class="cal-week week-flex">
-              <div class="day sun">22</div>
-              <div class="day">23</div>
-              <div class="day has-schedule">
-                24
-                <div class="bar-orange">Meeting</div>
-              </div>
-              <div class="day">25</div>
-              <div class="day">26</div>
-              <div class="day has-schedule">
-                27
-                <div class="bar-blue">Wrap-up</div>
-              </div>
-              <div class="day sat">28</div>
             </div>
           </div>
         </div>
@@ -277,7 +226,7 @@
              <div class="history-item" v-for="app in recentApplications" :key="app.id">
               <div class="h-top">
                 <span class="status-badge-sm" :class="getApprStatusClass(app.status)">{{ getApprStatusLabel(app.status) }}</span>
-                <span class="h-date">{{ app.appliedAt.substring(5).replace('-', '.') }}</span>
+                <span class="h-date">{{ formatHistoryDate(app.appliedAt) }}</span>
               </div>
               <div class="h-title">{{ app.title }}</div>
             </div>
@@ -289,12 +238,22 @@
       </div>
     </div>
   </div>
+  <ActionConfirmModal
+    v-model="showActionModal"
+    :title="actionModalTitle"
+    :message="actionModalMessage"
+    :confirm-text="actionModalConfirmText"
+    :require-reason="actionModalRequiresReason"
+    v-model:reason="actionReason"
+    @confirm="handleActionConfirm"
+  />
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import { storeToRefs } from 'pinia'
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
 const store = useAttendanceStore()
 
@@ -310,7 +269,11 @@ const getApprStatusClass = (s) => ({ pending: 'warning', approved: 'success', re
 // -- Clock Logic --
 const currentDate = ref('')
 const currentTime = ref('')
-const { checkInTime, checkOutTime, monthlySummary } = storeToRefs(store)
+const calendarMonthOffset = ref(0)
+const showActionModal = ref(false)
+const actionReason = ref('')
+const actionType = ref('')
+const { checkInTime, checkOutTime, monthlySummary, weeklySummary, calendarEvents } = storeToRefs(store)
 
 const isCheckedIn = computed(() => {
   return !!checkInTime.value && !checkOutTime.value
@@ -334,21 +297,114 @@ const isLateCheckIn = (timeText) => {
   return h > 9 || (h === 9 && m > 0)
 }
 
-const handleCheckIn = async () => {
-  let tardyReason = null
-  const now = new Date()
-  const hh = now.getHours()
-  const mm = now.getMinutes()
+const moveCalendarMonth = (delta) => {
+  calendarMonthOffset.value += delta
+}
 
-  if (hh > 9 || (hh === 9 && mm > 0)) {
-    tardyReason = prompt('지각 사유를 입력해주세요.')
-    if (tardyReason === null) return
-    if (!tardyReason.trim()) {
-      alert('지각 사유는 비워둘 수 없습니다.')
-      return
-    }
-  }
+const formatHours = (minutes) => (minutes / 60).toFixed(1).replace(/\.0$/, '')
 
+const getWeekStart = (date) => {
+  const result = new Date(date)
+  const day = result.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  result.setDate(result.getDate() + diff)
+  result.setHours(0, 0, 0, 0)
+  return result
+}
+
+const formatMonthDate = (date) =>
+  `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
+
+const weeklyPeriodLabel = computed(() => {
+  if (!weeklySummary.value?.weekStartDate || !weeklySummary.value?.weekEndDate) return '-'
+  const weekStart = new Date(`${weeklySummary.value.weekStartDate}T00:00:00`)
+  const weekEnd = new Date(`${weeklySummary.value.weekEndDate}T00:00:00`)
+  return `${formatMonthDate(weekStart)} - ${formatMonthDate(weekEnd)}`
+})
+
+const weeklyHoursDisplay = computed(() => formatHours(weeklySummary.value?.totalWorkedMinutes || 0))
+const regularHoursDisplay = computed(() => formatHours(weeklySummary.value?.regularWorkedMinutes || 0))
+const overtimeHoursDisplay = computed(() => formatHours(weeklySummary.value?.overtimeWorkedMinutes || 0))
+const weeklyProgressPercent = computed(() => weeklySummary.value?.progressPercent || 0)
+const weeklyProgressBarWidth = computed(() => Math.min(100, weeklyProgressPercent.value))
+const weeklyProgressLabel = computed(() =>
+  (weeklySummary.value?.totalWorkedMinutes || 0) >= 40 * 60
+    ? '표준 40h 달성'
+    : `표준 40h까지 ${formatHours(40 * 60 - (weeklySummary.value?.totalWorkedMinutes || 0))}h 남음`,
+)
+
+const displayMonth = computed(() => {
+  const base = new Date()
+  return new Date(base.getFullYear(), base.getMonth() + calendarMonthOffset.value, 1)
+})
+
+const monthPeriodLabel = computed(() =>
+  `${displayMonth.value.getFullYear()}년 ${displayMonth.value.getMonth() + 1}월`,
+)
+
+const monthBadgeLabel = computed(
+  () => `${displayMonth.value.getFullYear()}.${String(displayMonth.value.getMonth() + 1).padStart(2, '0')}`,
+)
+
+const eventLabelMap = computed(() => {
+  const map = new Map()
+  calendarEvents.value.forEach((event) => {
+    if (!event.targetDate) return
+    if (map.has(event.targetDate)) return
+    const blueCategories = ['ATTENDANCE', 'OVERTIME', 'WEEKLY_SCHEDULE']
+    map.set(event.targetDate, {
+      label: event.title,
+      variant: blueCategories.includes(event.category) ? 'blue' : 'orange',
+    })
+  })
+  return map
+})
+
+const calendarWeeks = computed(() => {
+  const year = displayMonth.value.getFullYear()
+  const month = displayMonth.value.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const start = new Date(firstDay)
+  start.setDate(1 - firstDay.getDay())
+  const todayKey = new Date().toISOString().slice(0, 10)
+
+  return Array.from({ length: 6 }, (_, weekIndex) =>
+    Array.from({ length: 7 }, (_, dayIndex) => {
+      const date = new Date(start)
+      date.setDate(start.getDate() + weekIndex * 7 + dayIndex)
+      const key = date.toISOString().slice(0, 10)
+      const labelInfo = eventLabelMap.value.get(key)
+      return {
+        date: key,
+        day: date.getDate(),
+        dayOfWeek: dayIndex,
+        isToday: key === todayKey,
+        isCurrentMonth: date.getMonth() === month,
+        label: labelInfo?.label || '',
+        variant: labelInfo?.variant || 'blue',
+      }
+    }),
+  )
+})
+
+const formatHistoryDate = (value) => String(value || '').slice(5, 10).replace('-', '.')
+
+const actionModalTitle = computed(() => {
+  if (actionType.value === 'late-check-in') return '지각 사유 입력'
+  if (actionType.value === 'check-out') return '퇴근 처리'
+  return '확인'
+})
+
+const actionModalMessage = computed(() => {
+  if (actionType.value === 'late-check-in') return '지각 사유를 입력한 뒤 출근 처리합니다.'
+  if (actionType.value === 'check-out') return '퇴근 처리하시겠습니까?'
+  return ''
+})
+
+const actionModalConfirmText = computed(() => (actionType.value === 'check-out' ? '퇴근하기' : '확인'))
+const actionModalRequiresReason = computed(() => actionType.value === 'late-check-in')
+
+const submitClockIn = async (tardyReason = null) => {
   try {
     await store.clockIn(tardyReason)
   } catch (error) {
@@ -356,12 +412,45 @@ const handleCheckIn = async () => {
   }
 }
 
+const handleCheckIn = async () => {
+  const now = new Date()
+  const hh = now.getHours()
+  const mm = now.getMinutes()
+
+  if (hh > 9 || (hh === 9 && mm > 0)) {
+    actionType.value = 'late-check-in'
+    actionReason.value = ''
+    showActionModal.value = true
+    return
+  }
+
+  await submitClockIn()
+}
+
 const handleCheckOut = async () => {
-  if (!confirm('퇴근 처리하시겠습니까?')) return
-  try {
-    await store.clockOut()
-  } catch (error) {
-    alert(error.response?.data?.message || '퇴근 처리에 실패했습니다.')
+  actionType.value = 'check-out'
+  actionReason.value = ''
+  showActionModal.value = true
+}
+
+const handleActionConfirm = async () => {
+  if (actionType.value === 'late-check-in') {
+    if (!actionReason.value.trim()) {
+      alert('지각 사유는 비워둘 수 없습니다.')
+      return
+    }
+    showActionModal.value = false
+    await submitClockIn(actionReason.value.trim())
+    return
+  }
+
+  if (actionType.value === 'check-out') {
+    showActionModal.value = false
+    try {
+      await store.clockOut()
+    } catch (error) {
+      alert(error.response?.data?.message || '퇴근 처리에 실패했습니다.')
+    }
   }
 }
 
@@ -370,8 +459,6 @@ const updateTime = () => {
   const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
   currentDate.value = now.toLocaleDateString('ko-KR', options)
   
-  const h = String(now.getHours()).padStart(2, '0') // 24-hour format logic check? Design shows "9시 14분 10초"
-  // For design match "9시 14분 10초"
   const hours = now.getHours()
   const minutes = now.getMinutes()
   const seconds = now.getSeconds()
@@ -386,8 +473,14 @@ onMounted(async () => {
   await Promise.all([
     store.fetchMonthlyRecords(now.getFullYear(), now.getMonth() + 1),
     store.fetchMonthlySummary(now.getFullYear(), now.getMonth() + 1),
+    store.fetchWeeklySummary(now.toISOString().slice(0, 10)),
+    store.fetchAttendanceCalendar(now.getFullYear(), now.getMonth() + 1),
     store.refreshRequestHistory(),
   ])
+})
+
+watch(displayMonth, async (value) => {
+  await store.fetchAttendanceCalendar(value.getFullYear(), value.getMonth() + 1)
 })
 
 onUnmounted(() => {

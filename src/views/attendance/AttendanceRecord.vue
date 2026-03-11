@@ -466,9 +466,10 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
   border-radius: 6px; font-size: 0.75rem; font-weight: 600;
 }
 .status-tag.normal { background: #E3F2FD; color: #1E88E5; }
-.status-tag.late { background: #FFF3E0; color: #FB8C00; }
-.status-tag.remote { background: #F3E8FF; color: #7E22CE; }
-.status-tag.leave { background: #FEE2E2; color: #DC2626; }
+.status-tag.tardy { background: #FFF3E0; color: #FB8C00; }
+.status-tag.early_leave { background: #FFF3E0; color: #FB8C00; }
+.status-tag.absent { background: #F3F4F6; color: #4B5563; }
+.status-tag.vacation { background: #FEE2E2; color: #DC2626; }
 .memo {
   color: var(--gray500); font-size: 0.85rem;
 }

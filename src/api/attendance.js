@@ -2,9 +2,13 @@ import api from './index'
 
 export const getAttendanceSummary = (params) => api.get('/attendance/summary', { params })
 export const getAttendanceRecords = (params) => api.get('/attendance/records', { params })
+export const getAttendanceWeeklySummary = (params) => api.get('/attendance/weekly-summary', { params })
+export const getAttendanceCalendar = (params) => api.get('/attendance/calendar', { params })
 export const clockIn = (payload) => api.post('/attendance/clock-in', payload)
 export const clockOut = () => api.put('/attendance/clock-out')
 export const modifyAttendanceByAdmin = (payload) => api.put('/attendance/admin/modify', payload)
+export const getAdminDailyAttendanceRecords = (params) =>
+  api.get('/attendance/admin/daily-records', { params })
 
 export const getLeaveBalance = () => api.get('/leaves/balance')
 export const getMyLeaveRequests = (params) => api.get('/leaves/my-requests', { params })
@@ -34,4 +38,5 @@ export const getMyWeeklyWorkSchedules = (params) => api.get('/attendance/weekly/
 export const getWeeklyWorkScheduleStatusCounts = () => api.get('/attendance/weekly/status-counts')
 export const cancelWeeklyWorkSchedule = (weeklyId) => api.put(`/attendance/weekly/${weeklyId}/cancel`)
 export const getTeamWeeklyWorkSchedules = (params) => api.get('/attendance/weekly/team', { params })
+export const getTeamWeeklyOverview = (params) => api.get('/attendance/weekly/team-overview', { params })
 export const processWeeklyWorkSchedule = (payload) => api.put('/attendance/weekly/process', payload)
