@@ -152,6 +152,7 @@ const mapMyPageToUser = (header, page) => {
     skills: (page?.skills || []).map((skill) => ({
       id: skill.skillId,
       hrFileId: skill.hrFileId,
+      fileUrl: skill.fileUrl || '',
       type: toLabel(skill.category),
       name: skill.skillName,
       issuer: '',

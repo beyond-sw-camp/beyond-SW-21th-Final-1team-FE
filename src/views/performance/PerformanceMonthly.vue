@@ -425,7 +425,9 @@ async function loadMonthly() {
 
 onMounted(async () => {
   await loadMemberOptions()
-  await loadMonthly()
+  if (!isPerformanceManager.value || !selectedMemberId.value) {
+    await loadMonthly()
+  }
 })
 
 watch([selectedMemberId, currentOffset], () => {

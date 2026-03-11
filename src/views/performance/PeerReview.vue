@@ -13,9 +13,9 @@
       <div class="peer-list">
         <button
           v-for="c in paginatedColleagues"
-          :key="c.name"
+          :key="c.id"
           class="peer-item"
-          :class="{ active: selectedColleague?.name === c.name }"
+          :class="{ active: selectedColleague?.id === c.id }"
           @click="selectColleague(c)"
         >
           <img :src="DEFAULT_AVATAR" :alt="`${c.name} 프로필`" class="peer-avatar" />
@@ -37,7 +37,7 @@
           <span class="peer-progress-num">{{ evaluatedCount }}/{{ colleagues.length }}</span>
         </div>
         <div class="peer-progress-bar">
-          <div class="peer-progress-fill" :style="{ width: (evaluatedCount / colleagues.length * 100) + '%' }"></div>
+          <div class="peer-progress-fill" :style="{ width: `${progressPercent}%` }"></div>
         </div>
       </div>
     </div>
@@ -156,6 +156,11 @@ const colleagueCurrentPage = ref(1)
 const colleaguePageSize = 10
 
 const evaluatedCount = computed(() => colleagues.value.filter((c) => c.evaluated).length)
+const progressPercent = computed(() => {
+  if (!colleagues.value.length) return 0
+  const percent = (evaluatedCount.value / colleagues.value.length) * 100
+  return Math.min(100, Math.max(0, percent))
+})
 const colleagueTotalPages = computed(() => Math.max(1, Math.ceil(colleagues.value.length / colleaguePageSize)))
 const paginatedColleagues = computed(() => {
   const start = (colleagueCurrentPage.value - 1) * colleaguePageSize
@@ -239,9 +244,8 @@ async function loadPeerReviewTargets() {
     const response = await getPeerReviewTargets()
     colleagues.value = Array.isArray(response) ? response.map((item) => ({ ...item })) : []
     colleagueCurrentPage.value = 1
-    if (!colleagues.value.some((item) => item.id === selectedColleague.value?.id)) {
-      selectedColleague.value = null
-    }
+    const refreshedSelected = colleagues.value.find((item) => item.id === selectedColleague.value?.id)
+    selectedColleague.value = refreshedSelected || null
   } catch (error) {
     console.error('Failed to load peer review targets.', error)
     peerReviewError.value = '평가 대상을 불러오지 못했습니다.'

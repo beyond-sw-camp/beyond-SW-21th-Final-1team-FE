@@ -370,14 +370,19 @@ function handleFileChange(event) {
   const files = Array.from(event.target?.files || [])
   if (!files.length) return
 
-  const oversized = files.find((file) => file.size > 50 * 1024 * 1024)
-  if (oversized) {
-    alert(`50MB를 초과한 파일은 업로드할 수 없습니다: ${oversized.name}`)
-    event.target.value = ''
-    return
+  const oversizedFiles = files.filter((file) => file.size > 50 * 1024 * 1024)
+  const validFiles = files.filter((file) => file.size <= 50 * 1024 * 1024)
+
+  if (oversizedFiles.length > 0) {
+    alert(`50MB를 초과한 파일은 업로드할 수 없습니다: ${oversizedFiles.map((file) => file.name).join(', ')}`)
   }
 
-  selectedFiles.value = files
+  if (validFiles.length > 0) {
+    const mergedFiles = [...selectedFiles.value, ...validFiles]
+    const dedupedFiles = mergedFiles.filter((file, index, array) =>
+      array.findIndex((item) => item.name === file.name && item.size === file.size) === index)
+    selectedFiles.value = dedupedFiles
+  }
   event.target.value = ''
 }
 
@@ -452,7 +457,9 @@ async function loadTeamMembers() {
           .filter((member) => member.employeeId && member.employeeName)
       : []
   } catch (_error) {
+    console.error('Failed to load team members for performance inquiry.', _error)
     teamMemberOptions.value = []
+    alert(_error?.response?.data?.error?.message || '팀원 목록을 불러오지 못했습니다.')
   }
 }
 

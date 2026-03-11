@@ -56,13 +56,21 @@ const syncSessionAuthState = () => {
   sessionRoleCodesRef.value = readSessionRoleCodes()
 }
 
+const handleStorageEvent = (event) => {
+  if (!event.key || event.key === AUTH_KEYS.role || event.key === AUTH_KEYS.roleCodes) {
+    syncSessionAuthState()
+  }
+}
+
+const handleSessionStorageChanged = () => {
+  syncSessionAuthState()
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (event) => {
-    if (!event.key || event.key === AUTH_KEYS.role || event.key === AUTH_KEYS.roleCodes) {
-      syncSessionAuthState()
-    }
-  })
-  window.addEventListener('session-storage-changed', syncSessionAuthState)
+  window.removeEventListener('storage', handleStorageEvent)
+  window.addEventListener('storage', handleStorageEvent)
+  window.removeEventListener('session-storage-changed', handleSessionStorageChanged)
+  window.addEventListener('session-storage-changed', handleSessionStorageChanged)
 }
 
 const dispatchSessionStorageChanged = () => {
