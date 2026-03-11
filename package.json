@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:local": "vite",
+    "dev:local": "vite --mode devlocal",
     "dev:dev": "vite --mode dev",
     "dev:prod": "vite --mode prod",
     "build": "vite build",
-    "build:local": "vite build",
+    "build:local": "vite build --mode devlocal",
     "build:dev": "vite build --mode dev",
     "build:prod": "vite build --mode prod",
     "preview": "vite preview"
