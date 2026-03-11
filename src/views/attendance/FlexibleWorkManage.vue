@@ -246,6 +246,7 @@
       :message="actionModalMessage"
       :confirm-text="actionModalConfirmText"
       :require-reason="actionRequiresReason"
+      :loading="actionLoading"
       v-model:reason="actionReason"
       @confirm="submitAction"
     />
@@ -271,6 +272,7 @@ const showActionModal = ref(false)
 const actionReason = ref('')
 const actionMode = ref('')
 const actionIds = ref([])
+const actionLoading = ref(false)
 
 const handleViewDetail = (item) => {
   selectedPlan.value = item
@@ -434,20 +436,29 @@ const actionModalMessage = computed(() =>
 const actionModalConfirmText = computed(() => (actionRequiresReason.value ? '반려하기' : '승인하기'))
 
 const submitAction = async () => {
+  if (actionLoading.value) return
   if (actionRequiresReason.value && !actionReason.value.trim()) {
     alert('반려 사유를 입력해주세요.')
     return
   }
-  await store.processFlexiblePlans(
-    actionIds.value,
-    !actionRequiresReason.value,
-    actionRequiresReason.value ? actionReason.value.trim() : '',
-  )
-  showActionModal.value = false
-  if (actionMode.value.startsWith('bulk')) {
-    selectedIds.value = []
-  } else {
-    showDetailModal.value = false
+  actionLoading.value = true
+  try {
+    await store.processFlexiblePlans(
+      actionIds.value,
+      !actionRequiresReason.value,
+      actionRequiresReason.value ? actionReason.value.trim() : '',
+    )
+    showActionModal.value = false
+    if (actionMode.value.startsWith('bulk')) {
+      selectedIds.value = []
+    } else {
+      showDetailModal.value = false
+    }
+    alert(`신청이 ${actionRequiresReason.value ? '반려' : '승인'}되었습니다.`)
+  } catch (error) {
+    alert(error?.response?.data?.message || `${actionRequiresReason.value ? '반려' : '승인'} 처리에 실패했습니다.`)
+  } finally {
+    actionLoading.value = false
   }
 }
 

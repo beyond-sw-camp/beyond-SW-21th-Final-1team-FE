@@ -12,13 +12,16 @@
           class="form-textarea"
           rows="3"
           :placeholder="placeholder"
+          :disabled="loading"
           @input="emit('update:reason', $event.target.value)"
         ></textarea>
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" @click="emit('update:modelValue', false)">취소</button>
-      <button class="btn-confirm" @click="emit('confirm')">{{ confirmText }}</button>
+      <button class="btn-cancel" :disabled="loading" @click="emit('update:modelValue', false)">취소</button>
+      <button class="btn-confirm" :disabled="loading || confirmDisabled" @click="emit('confirm')">
+        {{ loading ? '처리 중...' : confirmText }}
+      </button>
     </div>
   </BaseModal>
 </template>
@@ -31,6 +34,8 @@ defineProps({
   title: { type: String, default: '확인' },
   message: { type: String, default: '' },
   confirmText: { type: String, default: '확인' },
+  loading: { type: Boolean, default: false },
+  confirmDisabled: { type: Boolean, default: false },
   requireReason: { type: Boolean, default: false },
   reason: { type: String, default: '' },
   reasonLabel: { type: String, default: '사유' },
@@ -92,6 +97,13 @@ const emit = defineEmits(['update:modelValue', 'update:reason', 'confirm'])
   border: none;
   cursor: pointer;
   font-weight: 600;
+}
+
+.btn-cancel:disabled,
+.btn-confirm:disabled,
+.form-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-cancel {
