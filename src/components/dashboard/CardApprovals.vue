@@ -49,75 +49,82 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router';
-import ApprovalDetailModal from '@/views/approval/components/ApprovalDetailModal.vue';
-import { findApprovalDocument, mockMainApprovalDocuments } from '@/utils/approvalData';
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import ApprovalDetailModal from '@/views/approval/components/ApprovalDetailModal.vue'
+import { getApprovalDetail, getApprovalMainSummary, markApprovalAsRead } from '@/api/approval'
+import { mapApprovalDetailToItem, mapMainSummaryItem } from '@/utils/approvalMapper'
 
-const router = useRouter();
-const activeTab = ref('pending');
-const sortOrder = ref('desc');
-const sourceItems = ref([...mockMainApprovalDocuments]);
-const isDetailOpen = ref(false);
-const selectedItem = ref({});
+const router = useRouter()
+const activeTab = ref('pending')
+const sortOrder = ref('desc')
+const sourceItems = ref([])
+const isDetailOpen = ref(false)
+const selectedItem = ref({})
 
-const pendingCount = computed(() => sourceItems.value.filter((item) => item.type === 'pending').length);
-const progressCount = computed(() => sourceItems.value.filter((item) => item.type === 'progress').length);
+const pendingCount = computed(() => sourceItems.value.filter((item) => item.type === 'pending').length)
+const progressCount = computed(() => sourceItems.value.filter((item) => item.type === 'progress').length)
 const tabs = computed(() => ([
   { key: 'pending', label: `결재 대기 문서 ${pendingCount.value}건` },
   { key: 'progress', label: `결재 진행 문서 ${progressCount.value}건` },
-]));
+]))
 
-const sortButtonTitle = computed(() => sortOrder.value === 'desc' ? '정렬: 최신순' : '정렬: 오래된순');
+const sortButtonTitle = computed(() => (sortOrder.value === 'desc' ? '정렬: 최신순' : '정렬: 오래된순'))
 
 const visibleItems = computed(() => {
-  const filtered = sourceItems.value.filter((item) => item.type === activeTab.value);
+  const filtered = sourceItems.value.filter((item) => item.type === activeTab.value)
   return [...filtered].sort((a, b) => {
-    const dateA = new Date(a.date).getTime();
-    const dateB = new Date(b.date).getTime();
-    return sortOrder.value === 'desc' ? dateB - dateA : dateA - dateB;
-  });
-});
+    const dateA = new Date(a.date).getTime()
+    const dateB = new Date(b.date).getTime()
+    return sortOrder.value === 'desc' ? dateB - dateA : dateA - dateB
+  })
+})
 
 const toggleSortOrder = () => {
-  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc';
-};
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+}
 
-const refreshItems = () => {
-  sourceItems.value = [...mockMainApprovalDocuments];
-};
+const refreshItems = async () => {
+  try {
+    const response = await getApprovalMainSummary()
+    sourceItems.value = [
+      ...(response?.pendingDocuments || []).map((item) => mapMainSummaryItem(item, 'pending')),
+      ...(response?.inProgressDocuments || []).map((item) => mapMainSummaryItem(item, 'progress')),
+    ]
+  } catch (_error) {
+    sourceItems.value = []
+  }
+}
 
 const goToDraft = () => {
-  router.push('/approval/draft');
-};
+  router.push('/approval/draft')
+}
 
 const goToStatus = () => {
-  router.push('/approval/status');
-};
+  router.push('/approval/status')
+}
 
-const openDetail = (item) => {
-  const matched = findApprovalDocument(item.docId, 'box');
-  selectedItem.value = matched || {
-    id: item.docId || item.id,
-    title: item.title,
-    drafter: item.who,
-    date: item.date,
-    status: item.type === 'pending' ? '진행중' : '완료',
-    category: '-',
-    content: '상세 본문 데이터가 없습니다.',
-    attachments: []
-  };
-  isDetailOpen.value = true;
-};
+const openDetail = async (item) => {
+  try {
+    await markApprovalAsRead(item.approvalId)
+    const detail = await getApprovalDetail(item.approvalId)
+    selectedItem.value = mapApprovalDetailToItem(detail)
+    isDetailOpen.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
+  }
+}
 
 const handleModalAction = (action) => {
   if (action.type === 'redraft' || action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
   } else if (action.type === 'review') {
-    router.push({ name: 'approval-review' });
+    router.push({ name: 'approval-review' })
   }
-  isDetailOpen.value = false;
-};
+  isDetailOpen.value = false
+}
+
+onMounted(refreshItems)
 </script>
 
 <style scoped>

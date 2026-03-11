@@ -113,7 +113,7 @@ defineEmits(['nav-click'])
 
 const router = useRouter()
 const route = useRoute()
-const navItems = ['메인', '인사', '근태', '급여', '성과', '전자결재', 'KMS']
+const navItems = ['메인', '인사', '근태', '급여', '성과', '전자결재']
 const showOrgSearchModal = ref(false)
 const headerSearchKeyword = ref('')
 const isAdmin = computed(() => isAdminRole())

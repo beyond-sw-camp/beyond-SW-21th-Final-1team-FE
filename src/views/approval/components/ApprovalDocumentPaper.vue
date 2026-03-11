@@ -90,7 +90,7 @@
       <div class="file-list">
         <button
           v-for="file in item.attachments"
-          :key="file"
+          :key="file?.fileId || file?.name || file"
           type="button"
           class="file-tag"
           @click="downloadAttachment(file)"
@@ -109,6 +109,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { downloadApprovalAttachment } from '@/api/approval';
 
 const props = defineProps({
   item: {
@@ -170,39 +171,22 @@ const formatShortDate = (dateStr) => {
   return dateOnly;
 };
 
-const triggerDownload = (blob, filename) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename || 'attachment';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-};
-
 const downloadAttachment = async (file) => {
-  const fileName = typeof file === 'string' ? file : (file?.name || 'attachment.txt');
-  const rawUrl = typeof file === 'object' ? (file?.url || file?.path || '') : '';
-  const encodedName = encodeURIComponent(fileName);
-  const candidates = [rawUrl, `/attachments/${encodedName}`, `/files/${encodedName}`].filter(Boolean);
-
-  for (const url of candidates) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) continue;
-      const blob = await response.blob();
-      triggerDownload(blob, fileName);
-      return;
-    } catch (error) {
-      // Fallback to mock download below.
-    }
+  if (!file?.approvalId || !file?.fileId) return
+  try {
+    const { blob, filename } = await downloadApprovalAttachment(file.approvalId, file.fileId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename || file?.name || 'attachment'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '첨부파일 다운로드에 실패했습니다.')
   }
-
-  const fallbackText = `첨부파일: ${fileName}\n실서버 연동 전 목데이터 다운로드입니다.`;
-  const blob = new Blob([fallbackText], { type: 'text/plain;charset=utf-8' });
-  triggerDownload(blob, fileName.endsWith('.txt') ? fileName : `${fileName}.txt`);
-};
+}
 </script>
 
 <style scoped>

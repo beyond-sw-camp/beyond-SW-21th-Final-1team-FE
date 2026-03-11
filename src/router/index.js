@@ -50,12 +50,6 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true, section: 'admin' }
   },
   {
-    path: '/admin/kms-permissions-history',
-    name: 'admin-kms-permissions-history',
-    component: () => import('@/views/kms/KmsPermissionHistoryView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, section: 'admin' }
-  },
-  {
     path: '/admin/notices',
     name: 'admin-notices',
     component: () => import('@/views/admin/AdminNoticesView.vue'),
@@ -143,30 +137,6 @@ const routes = [
     name: 'performance',
     meta: { requiresAuth: true },
     component: () => import('@/views/performance/Performance.vue')
-  },
-  {
-    path: '/kms',
-    meta: { requiresAuth: true },
-    children: [
-      { path: '', name: 'kms-main', component: () => import('@/views/kms/KmsMainView.vue') },
-      { path: 'search', name: 'kms-search', component: () => import('@/views/kms/KmsSearchView.vue') },
-      { path: 'permissions/history', name: 'kms-permission-history', component: () => import('@/views/kms/KmsPermissionHistoryView.vue'), meta: { requiresAdmin: true } },
-      { path: 'manuals', name: 'kms-manuals', component: () => import('@/views/kms/KmsManualDashboardView.vue') },
-      { path: 'manuals/my', name: 'kms-manuals-my', component: () => import('@/views/kms/KmsMyManualsView.vue') },
-      { path: 'manuals/trash', name: 'kms-manuals-trash', component: () => import('@/views/kms/KmsManualTrashView.vue') },
-      { path: 'manuals/category/:categoryKey', name: 'kms-manual-category', component: () => import('@/views/kms/KmsManualCategoryView.vue') },
-      { path: 'manuals/detail/:manualId', name: 'kms-manual-detail', component: () => import('@/views/kms/KmsManualDetailView.vue') },
-      { path: 'manuals/history/:manualId', name: 'kms-manual-history', component: () => import('@/views/kms/KmsManualHistoryView.vue') },
-      { path: 'manuals/upload', name: 'kms-manual-upload', component: () => import('@/views/kms/KmsManualUploadView.vue') },
-      { path: 'manuals/edit/:manualId', name: 'kms-manual-edit', component: () => import('@/views/kms/KmsManualEditView.vue') },
-      { path: 'archive', name: 'kms-archive', component: () => import('@/views/kms/KmsArchiveView.vue') },
-      { path: 'archive/my', name: 'kms-archive-my', component: () => import('@/views/kms/KmsMyArchiveView.vue') },
-      { path: 'archive/trash', name: 'kms-archive-trash', component: () => import('@/views/kms/KmsArchiveTrashView.vue') },
-      { path: 'archive/history/:archiveId', name: 'kms-archive-history', component: () => import('@/views/kms/KmsArchiveHistoryView.vue') },
-      { path: 'archive/manage/:archiveId', name: 'kms-archive-manage', component: () => import('@/views/kms/KmsArchiveManageView.vue') },
-      { path: 'archive/:archiveId', name: 'kms-archive-detail', component: () => import('@/views/kms/KmsArchiveDetailView.vue') },
-      { path: 'compare/:type/:docId', name: 'kms-doc-compare', component: () => import('@/views/kms/KmsDocumentCompareView.vue') },
-    ]
   },
   {
     path: '/attendance',

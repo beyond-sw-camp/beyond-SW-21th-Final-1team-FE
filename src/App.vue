@@ -43,7 +43,6 @@ const handleNavClick = (nav) => {
   }
   else if (nav === '근태') router.push('/attendance/my')
   else if (nav === '급여') router.push('/salary/my')
-  else if (nav === 'KMS') router.push('/kms')
 }
 
 // 라우트 변경 감지하여 헤더 메뉴 활성화 상태 동기화
@@ -58,8 +57,6 @@ watch(() => route.path, (newPath) => {
     activeNav.value = '성과'
   } else if (newPath.startsWith('/salary')) {
     activeNav.value = '급여'
-  } else if (newPath.startsWith('/kms')) {
-    activeNav.value = 'KMS'
   } else if (newPath.startsWith('/notices')) {
     activeNav.value = '메인'
   } else if (newPath === '/' || newPath === '/main') {
