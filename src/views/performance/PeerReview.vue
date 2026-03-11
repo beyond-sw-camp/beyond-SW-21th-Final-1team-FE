@@ -111,7 +111,7 @@
         <!-- 푸터 -->
         <div class="peer-form-footer">
           <button class="btn-cancel" @click="resetForm">초기화</button>
-          <button class="btn-submit" :disabled="!isFormValid || isSubmitting" @click="submitReview">
+          <button class="btn-submit" :disabled="!isFormValid || isSubmitting || hasSubmittedForPeer" @click="submitReview">
             <Send :size="14" /> {{ isSubmitting ? '제출 중...' : '평가 제출하기' }}
           </button>
         </div>
@@ -187,6 +187,7 @@ const criteria = [
 ]
 
 const isFormValid = computed(() => criteria.every(c => scores[c.id]))
+const hasSubmittedForPeer = computed(() => Boolean(selectedColleague.value?.evaluated))
 const reviewPeriod = computed(() =>
   selectedColleague.value?.reviewPeriod ||
   selectedColleague.value?.evaluationPeriod ||
@@ -225,6 +226,7 @@ function closeModal() {
 
 async function submitReview() {
   if (isSubmitting.value) return
+  if (hasSubmittedForPeer.value) return
   if (!selectedColleague.value || !isFormValid.value) return
 
   try {

@@ -256,7 +256,7 @@
               </template>
               <template v-else>
                 <button class="btn-outline" @click="modalTab = 'detail'">이전</button>
-                <button class="btn-primary" :disabled="isSubmitting" @click="submitResult">
+                <button class="btn-primary" :disabled="isSubmitting || isSubmissionLocked" @click="submitResult">
                   <CheckCircle :size="14" /> {{ isSubmitting ? '제출 중...' : '최종 결과 제출' }}
                 </button>
               </template>
@@ -344,6 +344,13 @@ const paginatedItems = computed(() => {
 })
 
 const isTeamResult = computed(() => selectedItem.value?.type === 'Team' || selectedItem.value?.type === '팀 성과')
+const isSubmissionLocked = computed(() => selectedItem.value?.status === '대기')
+
+const normalizeSelectedFiles = (files = []) => files.filter((file, index, array) =>
+  array.findIndex((item) =>
+    item.name === file.name &&
+    item.size === file.size &&
+    item.lastModified === file.lastModified) === index)
 
 function statusClass(status) {
   if (status === '완료') return 'badge-gray'
@@ -379,12 +386,7 @@ function handleFileChange(event) {
 
   if (validFiles.length > 0) {
     const mergedFiles = [...selectedFiles.value, ...validFiles]
-    const dedupedFiles = mergedFiles.filter((file, index, array) =>
-      array.findIndex((item) =>
-        item.name === file.name &&
-        item.size === file.size &&
-        item.lastModified === file.lastModified) === index)
-    selectedFiles.value = dedupedFiles
+    selectedFiles.value = normalizeSelectedFiles(mergedFiles)
   }
   event.target.value = ''
 }
@@ -406,6 +408,14 @@ function handleEdit() {
 async function submitResult() {
   if (isSubmitting.value) return
   if (!selectedItem.value) return
+  if (isSubmissionLocked.value) return
+  const normalizedFiles = normalizeSelectedFiles(selectedFiles.value)
+  selectedFiles.value = normalizedFiles
+  if (!normalizedFiles.length) {
+    alert('증빙 자료를 한 개 이상 첨부해주세요.')
+    openFilePicker()
+    return
+  }
   if (!resultSummary.value.trim()) {
     alert('성과 요약을 입력해주세요.')
     return
@@ -420,7 +430,7 @@ async function submitResult() {
       resultNote: resultNote.value,
       growthPoint: growthPoint.value,
       improvementPoint: improvementPoint.value,
-    }, selectedFiles.value)
+    }, normalizedFiles)
     target.progress = Number(resultProgress.value) || 0
     target.status = '대기'
     target.achievement = resultSummary.value

@@ -212,6 +212,8 @@ const teamMemberOptions = ref([])
 const selectedMemberId = ref(null)
 const memberLoadError = ref('')
 const monthlyLoadError = ref('')
+const isInitializingState = ref(false)
+let monthlyRequestSeq = 0
 const selectedMember = computed(() => teamMemberOptions.value.find((member) => member.id === selectedMemberId.value) || null)
 const createEmptyMonthlyData = () => ({
   initialYear: new Date().getFullYear(),
@@ -408,33 +410,64 @@ async function loadMemberOptions() {
 }
 
 async function loadMonthly() {
+  const requestSeq = ++monthlyRequestSeq
   try {
-    monthlyLoadError.value = ''
+    if (requestSeq === monthlyRequestSeq) {
+      monthlyLoadError.value = ''
+    }
     const params = { offset: currentOffset.value }
     if (isPerformanceManager.value && selectedMemberId.value) {
       params.targetEmployeeId = selectedMemberId.value
     }
     const response = await getPerformanceMonthlyReport(params)
+    if (requestSeq !== monthlyRequestSeq) return
     monthlyData.value = response || createEmptyMonthlyData()
   } catch (error) {
+    if (requestSeq !== monthlyRequestSeq) return
     console.error('Failed to load monthly performance report.', error)
     monthlyLoadError.value = '월별 성과 리포트를 불러오지 못했습니다.'
     monthlyData.value = createEmptyMonthlyData()
   }
 }
 
+function resetManagerState() {
+  teamMemberOptions.value = []
+  selectedMemberId.value = null
+  memberLoadError.value = ''
+}
+
+async function initializeMonthlyState() {
+  isInitializingState.value = true
+  try {
+    if (!isPerformanceManager.value) {
+      resetManagerState()
+      await loadMonthly()
+      return
+    }
+
+    resetManagerState()
+    await loadMemberOptions()
+    if (!selectedMemberId.value) {
+      await loadMonthly()
+    }
+  } finally {
+    isInitializingState.value = false
+  }
+}
+
 // 초기 진입 시 관리자라면 loadMemberOptions가 selectedMemberId를 세팅하고,
 // 그 변경을 감지한 watcher가 loadMonthly를 호출한다.
 // 관리자 대상이 아니거나 선택 가능한 팀원이 없을 때만 여기서 직접 loadMonthly를 호출해 중복 요청을 막는다.
-onMounted(async () => {
-  await loadMemberOptions()
-  if (!isPerformanceManager.value || !selectedMemberId.value) {
-    await loadMonthly()
-  }
+onMounted(initializeMonthlyState)
+
+watch(isPerformanceManager, (isManager, wasManager) => {
+  if (isManager === wasManager) return
+  initializeMonthlyState()
 })
 
 // selectedMemberId/currentOffset 변경 시 리포트를 다시 불러오고 상세 목록 페이지를 첫 페이지로 되돌린다.
 watch([selectedMemberId, currentOffset], () => {
+  if (isInitializingState.value) return
   loadMonthly()
   detailCurrentPage.value = 1
 })
