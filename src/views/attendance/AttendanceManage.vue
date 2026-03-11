@@ -45,9 +45,10 @@
             <select v-model="filters.status" class="select-input">
               <option value="">전체 상태</option>
               <option value="normal">정상</option>
-              <option value="late">지각</option>
+              <option value="tardy">지각</option>
+              <option value="early_leave">조퇴</option>
               <option value="absent">결근</option>
-              <option value="leave">휴가</option>
+              <option value="vacation">휴가</option>
             </select>
           </div>
           <button class="btn-search" @click="fetchData">조회</button>
@@ -216,9 +217,10 @@
             <label>상태 변경</label>
             <select v-model="editForm.status">
               <option value="normal">정상</option>
-              <option value="late">지각</option>
+              <option value="tardy">지각</option>
+              <option value="early_leave">조퇴</option>
               <option value="absent">결근</option>
-              <option value="leave">휴가</option>
+              <option value="vacation">휴가</option>
             </select>
           </div>
           <div class="form-group">
@@ -265,7 +267,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 
 const store = useAttendanceStore()
@@ -314,15 +316,15 @@ const filteredList = computed(() => {
   })
 })
 
-const isAbnormal = (status) => ['late', 'absent'].includes(status)
+const isAbnormal = (status) => ['tardy', 'early_leave', 'absent'].includes(status)
 
 const getStatusLabel = (status) => {
-  const map = { normal: '정상', late: '지각', absent: '결근', leave: '휴가' }
+  const map = { normal: '정상', tardy: '지각', early_leave: '조퇴', absent: '결근', vacation: '휴가' }
   return map[status] || status
 }
 
 const getStatusClass = (status) => {
-  const map = { normal: 'badge-green', late: 'badge-red', absent: 'badge-gray', leave: 'badge-blue' }
+  const map = { normal: 'badge-green', tardy: 'badge-red', early_leave: 'badge-red', absent: 'badge-gray', vacation: 'badge-blue' }
   return map[status] || ''
 }
 
@@ -347,7 +349,6 @@ const isAllLeaveSelected = computed(() => {
 // --- Methods (Daily) ---
 const fetchData = () => {
   appliedFilters.value = { ...filters.value }
-  console.log('Fetching data with filters:', appliedFilters.value)
 }
 
 const openEditModal = (item) => {
@@ -367,18 +368,37 @@ const closeModal = () => {
   selectedItem.value = null
 }
 
-const saveChanges = () => {
+const toBackendStatus = (status) => {
+  const map = {
+    normal: 'NORMAL',
+    tardy: 'TARDY',
+    early_leave: 'EARLY_LEAVE',
+    absent: 'ABSENT',
+    vacation: 'VACATION',
+  }
+  return map[status] || 'NORMAL'
+}
+
+const saveChanges = async () => {
   if (!editForm.value.reason.trim()) {
     errors.value.reason = true
     return
   }
-  
-  store.updateDailyAttendance(selectedItem.value.id, {
-    checkIn: editForm.value.checkIn || null,
-    checkOut: editForm.value.checkOut || null,
-    status: editForm.value.status
+
+  if (typeof selectedItem.value.userId !== 'number') {
+    alert('attendance 모듈에는 관리자용 팀 일별 조회 API가 없어 이 화면의 수정은 연결할 수 없습니다.')
+    return
+  }
+
+  await store.updateDailyAttendance({
+    targetEmployeeId: selectedItem.value.userId,
+    workDate: selectedItem.value.date,
+    newCheckInTime: editForm.value.checkIn || null,
+    newCheckOutTime: editForm.value.checkOut || null,
+    newStatus: toBackendStatus(editForm.value.status),
+    modifyReason: editForm.value.reason,
   })
-  
+
   alert('수정되었습니다.')
   closeModal()
 }
@@ -392,13 +412,9 @@ const toggleAllLeave = (e) => {
   }
 }
 
-const handleBulkLeaveApprove = () => {
+const handleBulkLeaveApprove = async () => {
   if (!confirm(`${selectedLeaveIds.value.length}건을 승인하시겠습니까?`)) return
-  
-  selectedLeaveIds.value.forEach(id => {
-    store.updateLeaveStatus(id, 'approved')
-  })
-  
+  await store.processLeaveRequests(selectedLeaveIds.value, true)
   selectedLeaveIds.value = []
 }
 
@@ -411,20 +427,25 @@ const closeRejectModal = () => {
   showRejectModal.value = false
 }
 
-const submitReject = () => {
+const submitReject = async () => {
   if (!rejectReason.value.trim()) {
     alert('반려 사유를 입력해주세요.')
     return
   }
-  
-  selectedLeaveIds.value.forEach(id => {
-    store.updateLeaveStatus(id, 'rejected', rejectReason.value)
-  })
-  
+
+  await store.processLeaveRequests(selectedLeaveIds.value, false, rejectReason.value)
   selectedLeaveIds.value = []
   showRejectModal.value = false
   alert('반려 처리되었습니다.')
 }
+
+onMounted(async () => {
+  const now = new Date()
+  await Promise.all([
+    store.fetchMonthlyRecords(now.getFullYear(), now.getMonth() + 1),
+    store.fetchAdminLeaveRequestsList(),
+  ])
+})
 </script>
 
 <style scoped>

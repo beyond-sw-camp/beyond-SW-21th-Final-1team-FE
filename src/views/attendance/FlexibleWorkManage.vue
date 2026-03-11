@@ -242,7 +242,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
 
@@ -262,16 +262,15 @@ const handleViewDetail = (item) => {
   showDetailModal.value = true
 }
 
-const handleModalApprove = () => {
+const handleModalApprove = async () => {
   if (!confirm('승인하시겠습니까?')) return
-  store.updateFlexibleStatus(selectedPlan.value.id, 'approved')
+  await store.processFlexiblePlans([selectedPlan.value.id], true)
   showDetailModal.value = false
 }
 
-const handleModalReject = () => {
-  const reason = prompt('반려 사유를 입력하세요')
-  if (!reason) return
-  store.updateFlexibleStatus(selectedPlan.value.id, 'rejected', reason)
+const handleModalReject = async () => {
+  if (!confirm('반려하시겠습니까?')) return
+  await store.processFlexiblePlans([selectedPlan.value.id], false)
   showDetailModal.value = false
 }
 
@@ -363,22 +362,21 @@ const toggleAll = (e) => {
 
 const getStatusLabel = (s) => ({ pending: '승인 대기', approved: '승인됨', rejected: '반려됨' }[s])
 
-const handleBulkApprove = () => {
+const handleBulkApprove = async () => {
   if (!confirm(`${selectedIds.value.length}건을 승인하시겠습니까?`)) return
-  selectedIds.value.forEach(id => {
-    store.updateFlexibleStatus(id, 'approved')
-  })
+  await store.processFlexiblePlans(selectedIds.value, true)
   selectedIds.value = []
 }
 
-const handleBulkReject = () => {
-  const reason = prompt('반려 사유를 입력하세요 (필수)')
-  if (!reason) return
-  selectedIds.value.forEach(id => {
-    store.updateFlexibleStatus(id, 'rejected', reason)
-  })
+const handleBulkReject = async () => {
+  if (!confirm(`${selectedIds.value.length}건을 반려하시겠습니까?`)) return
+  await store.processFlexiblePlans(selectedIds.value, false)
   selectedIds.value = []
 }
+
+onMounted(async () => {
+  await store.fetchTeamFlexibleWorkPlans()
+})
 
 // --- Timeline Helpers ---
 const getTimeClass = (day) => {

@@ -68,7 +68,6 @@ const parseWorkHours = (text) => {
 
 const myRecords = computed(() => {
   return store.dailyAttendance
-    .filter((item) => item.userId === 'user1')
     .map((item) => ({ ...item, dateObj: parseDateKey(item.date) }))
 })
 

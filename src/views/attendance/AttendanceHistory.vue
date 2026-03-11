@@ -129,27 +129,22 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
 
 const store = useAttendanceStore()
 
-// Computes history list from store data
 const historyList = computed(() => {
-  // We want to show all requests for the current user (user1)
-  // Store has filtered logic `myLeaveRequests` but let's just use state directly if needed or use the getter.
-  // The store getter `myLeaveRequests` returns items where userId === 'user0' (wait, I set user0? Let me check store again)
-  // Store: userId: i === 0 ? 'user1' : ... -> So 'user1' is index 0.
-  // Getter: filter(req => req.userId === 'user1')
-  
-  return store.leaveRequests.filter(req => req.userId === 'user1').map(item => ({
-    date: item.appliedAt.replace(/-/g, '.'),
+  return store.requestHistory.map(item => ({
+    id: item.id,
+    date: String(item.appliedAt || '').replace(/-/g, '.').replace('T', ' '),
     type: item.type,
-    title: item.title || `${item.type} 신청`, // Fallback title
-    targetDate: item.targetDate ? item.targetDate.replace(/-/g, '.') : item.period,
-    approver: item.approver || 'Steve 매니저',
-    status: mapStatus(item.status)
+    title: item.title || `${item.type} 신청`,
+    targetDate: item.targetDate ? String(item.targetDate).replace(/-/g, '.') : item.period,
+    approver: item.approver || '-',
+    status: mapStatus(item.status),
+    rejectReason: item.rejectReason || item.rejectionReason || '',
   }))
 })
 
@@ -185,12 +180,12 @@ const mapStatus = (status) => {
   return map[status] || status
 }
 
-// Stats from the list
 const stats = computed(() => {
-  const pending = historyList.value.filter(i => i.status === '대기').length
-  const approved = historyList.value.filter(i => i.status === '승인').length
-  const rejected = historyList.value.filter(i => i.status === '반려').length
-  return { pending, approved, rejected }
+  return {
+    pending: store.requestCounts.pending,
+    approved: store.requestCounts.approved,
+    rejected: store.requestCounts.rejected,
+  }
 })
 
 const getTypeColor = (type) => {
@@ -212,13 +207,18 @@ const showReasonModal = ref(false)
 const rejectionReason = ref('')
 
 const handleStatusClick = (item) => {
-  console.log('Status clicked:', item.status)
   if (item.status === '반려' || item.status.includes('반려')) {
-    // In a real app, this should come from the store item
-    rejectionReason.value = '거래처 미팅이 있습니다.'
+    rejectionReason.value = item.rejectReason || '사유가 없습니다.'
     showReasonModal.value = true
   }
 }
+
+onMounted(async () => {
+  await Promise.all([
+    store.refreshRequestHistory(),
+    store.refreshRequestCounts(),
+  ])
+})
 </script>
 
 <style scoped>
