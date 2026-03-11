@@ -40,7 +40,7 @@
 <script setup>
 import { computed } from 'vue';
 import ApprovalDocumentPaper from './ApprovalDocumentPaper.vue';
-import { mockUsers } from '@/utils/approvalData';
+import { AUTH_KEYS } from '@/utils/auth';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -52,7 +52,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'action']);
 
-const currentUser = mockUsers.find((user) => user.id === 'u1') || { name: '' };
+const currentUser = {
+  name: typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(AUTH_KEYS.userName) || '' : '',
+}
 
 const isDrafter = computed(() => {
   if (typeof props.item.isDrafter === 'boolean') return props.item.isDrafter;
@@ -80,7 +82,7 @@ const close = () => {
 };
 
 const handleAction = (type) => {
-  emit('action', { type, id: props.item.id, data: props.item });
+  emit('action', { type, id: props.item.approvalId || props.item.id, data: props.item });
 };
 </script>
 

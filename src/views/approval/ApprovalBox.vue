@@ -72,86 +72,84 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { mockApprovalBox } from '@/utils/approvalData';
-import DashboardCard from './components/DashboardCard.vue';
-import ApprovalDetailModal from './components/ApprovalDetailModal.vue';
-import {
-  getCurrentApprovalUser,
-  isUserRelatedApprovalDocument,
-  matchesCurrentApprovalUser,
-  isCurrentUserDrafterDocument
-} from './utils/approvalVisibility';
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import DashboardCard from './components/DashboardCard.vue'
+import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
+import { deleteApproval, getApprovalBoxes, getApprovalDetail, markApprovalAsRead } from '@/api/approval'
+import { mapApprovalDetailToItem, mapBoxItem } from '@/utils/approvalMapper'
 
-const router = useRouter();
-const allDocuments = ref([...mockApprovalBox]);
-const currentUser = getCurrentApprovalUser();
+const router = useRouter()
+const boxItems = ref({
+  all: [],
+  received: [],
+  issue: [],
+  completed: [],
+  temp: [],
+  reference: [],
+})
+const isDetailOpen = ref(false)
+const selectedItem = ref({})
 
-const visibleDocuments = computed(() => allDocuments.value.filter((doc) => isUserRelatedApprovalDocument(doc, currentUser)));
-const drafterDocuments = computed(() => allDocuments.value.filter((doc) => isCurrentUserDrafterDocument(doc, currentUser)));
-const totalItems = computed(() => visibleDocuments.value.slice(0, 10));
-const issueItems = computed(() => visibleDocuments.value.filter(d => d.status === '반려' || d.status === '보류').slice(0, 10));
-const completedItems = computed(() => visibleDocuments.value.filter(d => d.status === '완료').slice(0, 10));
-const tempItems = computed(() => drafterDocuments.value.filter(d => d.status === '임시저장').slice(0, 10));
+const totalItems = computed(() => boxItems.value.all)
+const receivedItems = computed(() => boxItems.value.received)
+const issueItems = computed(() => boxItems.value.issue)
+const completedItems = computed(() => boxItems.value.completed)
+const tempItems = computed(() => boxItems.value.temp)
+const referenceItems = computed(() => boxItems.value.reference)
 
-const isReferenceDocumentForCurrentUser = (doc) => {
-  if (doc?.status !== '완료') return false;
-  if (!Array.isArray(doc?.referrers) || doc.referrers.length === 0) return false;
-  return doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser));
-};
-
-const isReceivedDocumentForCurrentUser = (doc) => {
-  if (isCurrentUserDrafterDocument(doc, currentUser)) return false;
-  if (matchesCurrentApprovalUser(doc?.currentApprover, currentUser)) return true;
-
-  if (Array.isArray(doc?.approvalLine) && doc.approvalLine.some((line) => {
-    if (!line) return false;
-    return matchesCurrentApprovalUser(`${line.name || ''} ${line.position || ''}`, currentUser)
-      || matchesCurrentApprovalUser(line.name, currentUser);
-  })) {
-    return true;
+async function loadBoxes() {
+  const boxTypeMap = {
+    all: 'ALL',
+    received: 'INBOX',
+    issue: 'REJECTED',
+    completed: 'COMPLETED',
+    temp: 'TEMP',
+    reference: 'REFERENCE',
   }
+  const entries = await Promise.all(
+    Object.entries(boxTypeMap).map(async ([key, boxType]) => {
+      try {
+        const response = await getApprovalBoxes({ boxType, size: 10 })
+        return [key, (response?.content || []).map(mapBoxItem)]
+      } catch (_error) {
+        return [key, []]
+      }
+    }),
+  )
+  boxItems.value = Object.fromEntries(entries)
+}
 
-  if (Array.isArray(doc?.referrers) && doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser))) {
-    return true;
+const openDetail = async (item) => {
+  try {
+    if (!item.isRead) {
+      await markApprovalAsRead(item.approvalId)
+      item.isRead = true
+    }
+    const detail = await getApprovalDetail(item.approvalId)
+    selectedItem.value = mapApprovalDetailToItem(detail)
+    isDetailOpen.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
   }
-
-  return false;
-};
-
-const referenceItems = computed(() => visibleDocuments.value.filter(isReferenceDocumentForCurrentUser).slice(0, 10));
-const receivedItems = computed(() => visibleDocuments.value.filter(isReceivedDocumentForCurrentUser).slice(0, 10));
-
-const isDetailOpen = ref(false);
-const selectedItem = ref({});
-
-const openDetail = (item) => {
-  selectedItem.value = item;
-  isDetailOpen.value = true;
-  
-  // Mark as read locally for the demo
-  if (!item.isRead) {
-    const doc = allDocuments.value.find(d => d.id === item.id);
-    if (doc) doc.isRead = true;
-  }
-};
+}
 
 const handleModalAction = (action) => {
-  console.log('Action performed:', action);
-  if (action.type === 'redraft') {
-    // Navigate to draft with pre-filled state
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
-  } else if (action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
+  if (action.type === 'redraft' || action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
   } else if (action.type === 'delete' || action.type === 'cancel') {
-    // Remove from mock list locally
-    allDocuments.value = allDocuments.value.filter(d => d.id !== action.id);
+    deleteApproval(action.id)
+      .then(loadBoxes)
+      .catch((error) => {
+        alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
+      })
   } else if (action.type === 'review') {
-    router.push({ name: 'approval-review' });
+    router.push({ name: 'approval-review' })
   }
-  isDetailOpen.value = false;
-};
+  isDetailOpen.value = false
+}
+
+onMounted(loadBoxes)
 </script>
 
 <style scoped>

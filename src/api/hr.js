@@ -5,17 +5,23 @@ const unwrap = async (request) => {
   return response.data?.data
 }
 
+const appendJsonRequest = (formData, payload) => {
+  formData.append(
+    'request',
+    new Blob([JSON.stringify(payload)], { type: 'application/json' }),
+  )
+}
+
 export const getMyPage = () => unwrap(api.get('/mypage'))
 export const getMyPageHeader = () => unwrap(api.get('/mypage/header'))
+export const getSkillEvidence = (skillId) => unwrap(api.get(`/mypage/skills/${skillId}/evidence`))
+export const getCareerEvidence = (careerId) => unwrap(api.get(`/mypage/careers/${careerId}/evidence`))
 
 export const changeMyPassword = (payload) => api.patch('/mypage/password', payload)
 
 export const updateBasicInfo = async ({ email, phone, address, profileImage }) => {
   const formData = new FormData()
-  formData.append(
-    'request',
-    new Blob([JSON.stringify({ email, phone, address })], { type: 'application/json' }),
-  )
+  appendJsonRequest(formData, { email, phone, address })
   if (profileImage instanceof File) {
     formData.append('profileImage', profileImage)
   }
@@ -23,4 +29,38 @@ export const updateBasicInfo = async ({ email, phone, address, profileImage }) =
   await api.patch('/mypage/basic-info', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+}
+
+export const createSkill = async ({ category, skillName, acquisitionDate, licenseNumber, file }) => {
+  const formData = new FormData()
+  appendJsonRequest(formData, {
+    category,
+    skillName,
+    acquisitionDate,
+    licenseNumber: licenseNumber || null,
+  })
+  formData.append('file', file)
+
+  return unwrap(
+    api.post('/mypage/skills', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  )
+}
+
+export const createCareer = async ({ companyName, orgName, startDate, endDate, file }) => {
+  const formData = new FormData()
+  appendJsonRequest(formData, {
+    companyName,
+    orgName,
+    startDate,
+    endDate: endDate || null,
+  })
+  formData.append('file', file)
+
+  return unwrap(
+    api.post('/mypage/careers', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  )
 }

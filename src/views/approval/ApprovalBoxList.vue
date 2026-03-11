@@ -91,57 +91,23 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { mockApprovalBox } from '@/utils/approvalData';
-import ApprovalDetailModal from './components/ApprovalDetailModal.vue';
-import {
-  getCurrentApprovalUser,
-  isUserRelatedApprovalDocument,
-  matchesCurrentApprovalUser,
-  isCurrentUserDrafterDocument
-} from './utils/approvalVisibility';
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
+import { deleteApproval, getApprovalBoxes, getApprovalDetail, markApprovalAsRead } from '@/api/approval'
+import { mapApprovalDetailToItem, mapBoxItem } from '@/utils/approvalMapper'
 
-const route = useRoute();
-const router = useRouter();
+const route = useRoute()
+const router = useRouter()
 
-const currentType = ref(route.params.type || 'all');
-const allDocuments = ref([...mockApprovalBox]);
-const searchQuery = ref('');
-const currentFilter = ref('전체');
-const sortBy = ref('date-desc');
-const currentUser = getCurrentApprovalUser();
+const currentType = ref(route.params.type || 'all')
+const allDocuments = ref([])
+const searchQuery = ref('')
+const currentFilter = ref('전체')
+const sortBy = ref('date-desc')
 
-const isDetailOpen = ref(false);
-const selectedItem = ref({});
-
-const visibleDocuments = computed(() => allDocuments.value.filter((doc) => isUserRelatedApprovalDocument(doc, currentUser)));
-const drafterDocuments = computed(() => allDocuments.value.filter((doc) => isCurrentUserDrafterDocument(doc, currentUser)));
-
-const isReferenceDocumentForCurrentUser = (doc) => {
-  if (doc?.status !== '완료') return false;
-  if (!Array.isArray(doc?.referrers) || doc.referrers.length === 0) return false;
-  return doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser));
-};
-
-const isReceivedDocumentForCurrentUser = (doc) => {
-  if (isCurrentUserDrafterDocument(doc, currentUser)) return false;
-  if (matchesCurrentApprovalUser(doc?.currentApprover, currentUser)) return true;
-
-  if (Array.isArray(doc?.approvalLine) && doc.approvalLine.some((line) => {
-    if (!line) return false;
-    return matchesCurrentApprovalUser(`${line.name || ''} ${line.position || ''}`, currentUser)
-      || matchesCurrentApprovalUser(line.name, currentUser);
-  })) {
-    return true;
-  }
-
-  if (Array.isArray(doc?.referrers) && doc.referrers.some((referrer) => matchesCurrentApprovalUser(referrer, currentUser))) {
-    return true;
-  }
-
-  return false;
-};
+const isDetailOpen = ref(false)
+const selectedItem = ref({})
 
 const pageTitle = computed(() => {
   switch (currentType.value) {
@@ -188,17 +154,8 @@ const getStatusClass = (status) => {
 };
 
 const baseList = computed(() => {
-  let list = [...visibleDocuments.value];
-  
-  // Type filtering
-  if (currentType.value === 'received' || currentType.value === 'ing') list = list.filter(isReceivedDocumentForCurrentUser);
-  else if (currentType.value === 'issue') list = list.filter(d => d.status === '반려' || d.status === '보류');
-  else if (currentType.value === 'completed') list = list.filter(d => d.status === '완료');
-  else if (currentType.value === 'temp') list = drafterDocuments.value.filter(d => d.status === '임시저장');
-  else if (currentType.value === 'reference') list = list.filter(isReferenceDocumentForCurrentUser);
-  
-  return list;
-});
+  return [...allDocuments.value]
+})
 
 const filteredList = computed(() => {
   let list = [...baseList.value];
@@ -227,32 +184,64 @@ const filteredList = computed(() => {
   return list;
 });
 
-const openDetail = (item) => {
-  selectedItem.value = item;
-  isDetailOpen.value = true;
-  
-  if (!item.isRead) {
-    const doc = allDocuments.value.find(d => d.id === item.id);
-    if (doc) doc.isRead = true;
+const openDetail = async (item) => {
+  try {
+    if (!item.isRead) {
+      await markApprovalAsRead(item.approvalId)
+      item.isRead = true
+    }
+    const detail = await getApprovalDetail(item.approvalId)
+    selectedItem.value = mapApprovalDetailToItem(detail)
+    isDetailOpen.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
   }
-};
+}
 
 const handleModalAction = (action) => {
   if (action.type === 'redraft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
   } else if (action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
   } else if (action.type === 'delete' || action.type === 'cancel') {
-    allDocuments.value = allDocuments.value.filter(d => d.id !== action.id);
+    deleteApproval(action.id)
+      .then(loadBoxList)
+      .catch((error) => {
+        alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
+      })
   } else if (action.type === 'review') {
-    router.push({ name: 'approval-review' });
+    router.push({ name: 'approval-review' })
   }
-  isDetailOpen.value = false;
-};
+  isDetailOpen.value = false
+}
 
 watch(() => route.params.type, (newType) => {
-  currentType.value = newType || 'all';
-});
+  currentType.value = newType || 'all'
+  loadBoxList()
+})
+
+async function loadBoxList() {
+  const boxTypeMap = {
+    all: 'ALL',
+    received: 'INBOX',
+    ing: 'INBOX',
+    issue: 'REJECTED',
+    completed: 'COMPLETED',
+    temp: 'TEMP',
+    reference: 'REFERENCE',
+  }
+  try {
+    const response = await getApprovalBoxes({
+      boxType: boxTypeMap[currentType.value] || 'ALL',
+      size: 100,
+    })
+    allDocuments.value = (response?.content || []).map(mapBoxItem)
+  } catch (_error) {
+    allDocuments.value = []
+  }
+}
+
+onMounted(loadBoxList)
 </script>
 
 <style scoped>

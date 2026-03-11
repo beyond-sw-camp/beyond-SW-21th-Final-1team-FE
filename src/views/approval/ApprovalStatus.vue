@@ -1,17 +1,22 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { mockApprovalStatusList } from '@/utils/approvalData';
-import ApprovalDetailModal from './components/ApprovalDetailModal.vue';
-import { getCurrentApprovalUser, isUserRelatedApprovalDocument } from './utils/approvalVisibility';
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
+import {
+  getApprovalDetail,
+  getApprovalProgressOverview,
+  markApprovalAsRead,
+  searchApprovalProgress,
+} from '@/api/approval'
+import { mapApprovalDetailToItem, mapProgressItem } from '@/utils/approvalMapper'
 
-const router = useRouter();
-const searchQuery = ref('');
-const activeTab = ref('all'); // 'all', 'drafting', 'pending', 'rejected'
-const isModalOpen = ref(false);
-const selectedItem = ref({});
-const currentUser = getCurrentApprovalUser();
-const visibleStatusDocs = computed(() => mockApprovalStatusList.filter((item) => isUserRelatedApprovalDocument(item, currentUser)));
+const router = useRouter()
+const searchQuery = ref('')
+const activeTab = ref('all')
+const isModalOpen = ref(false)
+const selectedItem = ref({})
+const visibleStatusDocs = ref([])
+const statusCounts = ref({ allCount: 0, draftCount: 0, inProgressCount: 0, rejectedCount: 0 })
 
 const isDrafting = (status) => status === '기안중';
 const isPending = (status) => status === '진행중';
@@ -19,25 +24,18 @@ const isRejected = (status) => status === '반려';
 const isCompleted = (status) => status === '완료';
 
 const tabs = computed(() => [
-  { id: 'all', label: '전체', count: visibleStatusDocs.value.length },
-  { id: 'drafting', label: '기안중', count: visibleStatusDocs.value.filter(i => isDrafting(i.status)).length },
-  { id: 'pending', label: '진행중', count: visibleStatusDocs.value.filter(i => isPending(i.status)).length },
-  { id: 'rejected', label: '반려', count: visibleStatusDocs.value.filter(i => isRejected(i.status)).length }
-]);
+  { id: 'all', label: '전체', count: statusCounts.value.allCount },
+  { id: 'drafting', label: '기안중', count: statusCounts.value.draftCount },
+  { id: 'pending', label: '진행중', count: statusCounts.value.inProgressCount },
+  { id: 'rejected', label: '반려', count: statusCounts.value.rejectedCount }
+])
 
 const filteredList = computed(() => {
-  return visibleStatusDocs.value.filter(item => {
-    const matchesTab = activeTab.value === 'all' ||
-      (activeTab.value === 'drafting' && isDrafting(item.status)) ||
-      (activeTab.value === 'pending' && isPending(item.status)) ||
-      (activeTab.value === 'rejected' && isRejected(item.status));
-
-    const q = searchQuery.value.toLowerCase();
-    const matchesSearch = item.title.toLowerCase().includes(q) || item.id.toLowerCase().includes(q);
-
-    return matchesTab && matchesSearch;
-  });
-});
+  return visibleStatusDocs.value.filter((item) => {
+    const q = searchQuery.value.toLowerCase()
+    return item.title.toLowerCase().includes(q) || String(item.id).toLowerCase().includes(q)
+  })
+})
 
 const getStatusClass = (status) => {
   if (isDrafting(status)) return 'status-draft';
@@ -47,24 +45,52 @@ const getStatusClass = (status) => {
   return '';
 };
 
-const openModal = (item) => {
-  selectedItem.value = {
-    ...item,
-    category: item.templateName || '-',
-    date: item.draftDate || '-',
-    content: item.content || '상세 본문 데이터가 없습니다.',
-    attachments: Array.isArray(item.attachments) ? item.attachments : [],
-    referrers: Array.isArray(item.referrers) ? item.referrers : [],
-    department: item.department || '-',
-    isDrafter: true,
-    statusClass: getStatusClass(item.status)
-  };
-  isModalOpen.value = true;
-};
+async function loadStatusOverview() {
+  try {
+    const response = await getApprovalProgressOverview({ size: 50 })
+    statusCounts.value = response?.counts || statusCounts.value
+    visibleStatusDocs.value = (response?.page?.content || []).map(mapProgressItem)
+  } catch (_error) {
+    visibleStatusDocs.value = []
+  }
+}
+
+async function loadStatusSearch() {
+  const tabMap = {
+    all: 'ALL',
+    drafting: 'DRAFT',
+    pending: 'IN_PROGRESS',
+    rejected: 'REJECTED',
+  }
+  try {
+    const response = await searchApprovalProgress({
+      tabType: tabMap[activeTab.value] || 'ALL',
+      keyword: searchQuery.value || undefined,
+      size: 50,
+    })
+    visibleStatusDocs.value = (response?.content || []).map(mapProgressItem)
+  } catch (_error) {
+    visibleStatusDocs.value = []
+  }
+}
+
+const openModal = async (item) => {
+  try {
+    if (!item.isRead) {
+      await markApprovalAsRead(item.approvalId)
+      item.isRead = true
+    }
+    const detail = await getApprovalDetail(item.approvalId)
+    selectedItem.value = mapApprovalDetailToItem(detail)
+    isModalOpen.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
+  }
+}
 
 const closeModal = () => {
-  isModalOpen.value = false;
-};
+  isModalOpen.value = false
+}
 
 const handleModalAction = (action) => {
   if (action.type === 'redraft') {
@@ -76,8 +102,11 @@ const handleModalAction = (action) => {
 };
 
 const handleRedraft = (item) => {
-  router.push({ name: 'approval-draft', query: { from: item.id, source: 'status' } });
-};
+  router.push({ name: 'approval-draft', query: { from: item.approvalId, source: 'status' } })
+}
+
+onMounted(loadStatusOverview)
+watch([activeTab, searchQuery], loadStatusSearch)
 </script>
 
 <template>

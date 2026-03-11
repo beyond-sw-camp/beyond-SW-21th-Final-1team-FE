@@ -8,7 +8,7 @@
         <div class="card-bg red-bg"></div>
         <div class="card-content">
           <h3 class="stat-label">결재 대기</h3>
-          <div class="stat-value">3<span class="unit">건</span></div>
+          <div class="stat-value">{{ counts.pendingReviewCount }}<span class="unit">건</span></div>
         </div>
         <div class="card-footer red-text">
           <span class="status-marker danger"></span> 처리 필요
@@ -20,7 +20,7 @@
         <div class="card-bg blue-bg"></div>
         <div class="card-content">
           <h3 class="stat-label">결재 진행</h3>
-          <div class="stat-value">8<span class="unit">건</span></div>
+          <div class="stat-value">{{ counts.inProgressCount }}<span class="unit">건</span></div>
         </div>
         <div class="card-footer blue-text">
           <span class="status-marker progress"></span> 진행 중
@@ -32,7 +32,7 @@
         <div class="card-bg green-bg"></div>
         <div class="card-content">
           <h3 class="stat-label">완료 문서</h3>
-          <div class="stat-value">152<span class="unit">건</span></div>
+          <div class="stat-value">{{ counts.completedThisMonthCount }}<span class="unit">건</span></div>
         </div>
         <div class="card-footer green-text">
           <span class="status-marker complete"></span> 이번 달
@@ -71,12 +71,11 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in mockPendingApprovals" :key="item.id" @click="$router.push('/approval/review')">
+              <tr v-for="item in pendingApprovals" :key="item.approvalId" @click="$router.push('/approval/review')">
                 <td>
                   <div class="title-cell">
                     <span class="tag">{{ item.templateName }}</span>
                     <span class="title-text">{{ item.title }}</span>
-                    <span v-if="item.isNew" class="new-dot"></span>
                   </div>
                 </td>
                 <td class="text-gray text-center">{{ item.drafter }}</td>
@@ -105,7 +104,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in mockMyDrafts" :key="item.id" @click="$router.push('/approval/status')">
+              <tr v-for="item in myDrafts" :key="item.approvalId" @click="$router.push('/approval/status')">
                 <td>
                   <span class="title-text">{{ item.title }}</span>
                 </td>
@@ -130,7 +129,31 @@
 </template>
 
 <script setup>
-import { mockPendingApprovals, mockMyDrafts } from '@/utils/approvalData';
+import { onMounted, ref } from 'vue'
+import { getApprovalDashboard } from '@/api/approval'
+import { mapDashboardDraftItem, mapDashboardPendingItem } from '@/utils/approvalMapper'
+
+const counts = ref({
+  pendingReviewCount: 0,
+  inProgressCount: 0,
+  completedThisMonthCount: 0,
+})
+const pendingApprovals = ref([])
+const myDrafts = ref([])
+
+async function loadDashboard() {
+  try {
+    const response = await getApprovalDashboard()
+    counts.value = response?.counts || counts.value
+    pendingApprovals.value = (response?.pendingReviewDocuments || []).map(mapDashboardPendingItem)
+    myDrafts.value = (response?.myDrafts || []).map(mapDashboardDraftItem)
+  } catch (_error) {
+    pendingApprovals.value = []
+    myDrafts.value = []
+  }
+}
+
+onMounted(loadDashboard)
 </script>
 
 <style scoped>

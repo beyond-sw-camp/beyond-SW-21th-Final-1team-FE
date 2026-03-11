@@ -3,13 +3,13 @@ import { ref, computed, reactive, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   templates,
-  mockUsers,
   mockApprovalLine,
   findApprovalDocument
 } from '@/utils/approvalData';
 import OrgChartModal from './components/OrgChartModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import { useRoute } from 'vue-router';
+import { getLoginSession } from '@/utils/auth';
 
 // State
 const router = useRouter();
@@ -21,8 +21,14 @@ const isConfirmModalOpen = ref(false);
 const modalMode = ref('approval'); // 'approval' | 'receiver' | 'referrer'
 const templateSelectorRef = ref(null);
 
-// Current User Mock
-const currentUser = mockUsers.find(u => u.id === 'u1') || mockUsers[0]; // 홍길동 사원
+const loginSession = getLoginSession()
+const currentUser = {
+  id: loginSession.employeeId || '',
+  employeeId: loginSession.employeeId || '',
+  name: loginSession.userName || '',
+  position: loginSession.positionName || loginSession.rankName || '',
+  department: loginSession.orgName || '',
+}
 
 // Document Info State
 const docInfo = reactive({
@@ -143,11 +149,10 @@ const loadFromData = (id, source) => {
       approvalLine.value = doc.approvalLine
       .filter((a) => a.status !== '기안')
       .map(a => ({
-        ...(mockUsers.find((u) => u.name === a.name && u.position === a.position) || {}),
-        id: mockUsers.find((u) => u.name === a.name && u.position === a.position)?.id || '',
+        id: '',
         name: a.name,
         position: a.position,
-        department: mockUsers.find((u) => u.name === a.name && u.position === a.position)?.department || '소속팀'
+        department: '소속팀'
       }));
     }
 
@@ -1321,7 +1326,6 @@ const vacationDurationLabel = computed(() => {
 }
 
 </style>
-
 
 
 

@@ -67,32 +67,61 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { mockReviewList } from '@/utils/approvalData';
-import ReviewModal from './components/ReviewModal.vue';
-import { getCurrentApprovalUser, isUserRelatedApprovalDocument } from './utils/approvalVisibility';
+import { onMounted, ref } from 'vue'
+import ReviewModal from './components/ReviewModal.vue'
+import {
+  getApprovalDetail,
+  getApprovalReviews,
+  markApprovalAsRead,
+  processApproval,
+} from '@/api/approval'
+import { mapApprovalDetailToItem, mapReviewItem } from '@/utils/approvalMapper'
 
-const currentUser = getCurrentApprovalUser();
-const reviewList = ref(mockReviewList.filter((item) => isUserRelatedApprovalDocument(item, currentUser)));
-const isModalOpen = ref(false);
-const selectedItem = ref({});
+const reviewList = ref([])
+const isModalOpen = ref(false)
+const selectedItem = ref({})
 
-const openModal = (item) => {
-  selectedItem.value = item;
-  isModalOpen.value = true;
-  
-  // Mark as read after opening
-  const index = reviewList.value.findIndex(r => r.id === item.id);
-  if (index !== -1 && !reviewList.value[index].isRead) {
-    reviewList.value[index].isRead = true;
+async function loadReviewList() {
+  try {
+    const response = await getApprovalReviews({ size: 50 })
+    reviewList.value = (response?.content || []).map(mapReviewItem)
+  } catch (_error) {
+    reviewList.value = []
   }
-};
+}
 
-const handleReviewAction = (data) => {
-  console.log('Review action:', data);
-  // Remove from list after action for demonstration
-  reviewList.value = reviewList.value.filter(r => r.id !== data.id);
-};
+const openModal = async (item) => {
+  try {
+    if (!item.isRead) {
+      await markApprovalAsRead(item.approvalId)
+      item.isRead = true
+    }
+    const detail = await getApprovalDetail(item.approvalId)
+    selectedItem.value = mapApprovalDetailToItem(detail)
+    isModalOpen.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
+  }
+}
+
+const handleReviewAction = async (data) => {
+  if (data.type !== 'approve' && data.type !== 'reject') {
+    alert('현재는 승인/반려만 지원합니다.')
+    return
+  }
+  try {
+    await processApproval(data.id, {
+      approve: data.type === 'approve',
+      reason: data.reason || null,
+    })
+    isModalOpen.value = false
+    await loadReviewList()
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 처리에 실패했습니다.')
+  }
+}
+
+onMounted(loadReviewList)
 </script>
 
 <style scoped>
