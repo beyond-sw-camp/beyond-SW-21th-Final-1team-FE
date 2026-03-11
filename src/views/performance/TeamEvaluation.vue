@@ -8,7 +8,7 @@
       </div>
       <div class="eval-list">
         <button
-          v-for="member in teamMembers"
+          v-for="member in paginatedTeamMembers"
           :key="member.id"
           class="eval-item"
           :class="{ active: selectedMemberId === member.id }"
@@ -39,6 +39,11 @@
             {{ member.status }}
           </span>
         </button>
+      </div>
+      <div v-if="teamMemberTotalPages > 1" class="eval-pagination">
+        <button class="page-btn" :disabled="teamMemberCurrentPage === 1" @click="teamMemberCurrentPage--">이전</button>
+        <span class="page-status">{{ teamMemberCurrentPage }} / {{ teamMemberTotalPages }}</span>
+        <button class="page-btn" :disabled="teamMemberCurrentPage === teamMemberTotalPages" @click="teamMemberCurrentPage++">다음</button>
       </div>
       <div class="eval-sidebar-footer">
         <div class="eval-progress-label">
@@ -143,19 +148,18 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { User, Star, Send } from 'lucide-vue-next'
-import { TEAM_EVALUATION_MEMBERS } from '@/mocks/performance'
+import { getTeamEvaluationTargets, submitTeamEvaluation } from '@/api/performance'
 
-const selectedMemberId = ref(1)
+const selectedMemberId = ref(null)
 const evaluationForms = reactive({})
 const DEFAULT_AVATAR =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23eef2f7'/><circle cx='40' cy='31' r='14' fill='%2394a3b8'/><path d='M16 68c4-12 14-18 24-18s20 6 24 18' fill='%2394a3b8'/></svg>"
 
-const teamMembers = ref(TEAM_EVALUATION_MEMBERS.map((member) => ({
-  ...member,
-  image: DEFAULT_AVATAR,
-})))
+const teamMembers = ref([])
+const teamMemberCurrentPage = ref(1)
+const teamMemberPageSize = 10
 
 const evaluationCriteria = [
   { id: 'performance', label: '업무 성과', description: '목표 달성도 및 업무의 질적/양적 성과' },
@@ -166,6 +170,11 @@ const evaluationCriteria = [
 
 const selectedMember = computed(() => teamMembers.value.find((m) => m.id === selectedMemberId.value))
 const completedCount = computed(() => teamMembers.value.filter((m) => m.status === '완료').length)
+const teamMemberTotalPages = computed(() => Math.max(1, Math.ceil(teamMembers.value.length / teamMemberPageSize)))
+const paginatedTeamMembers = computed(() => {
+  const start = (teamMemberCurrentPage.value - 1) * teamMemberPageSize
+  return teamMembers.value.slice(start, start + teamMemberPageSize)
+})
 const peerReviewAverageText = computed(() => Number(selectedMember.value?.peerReviewScore || 0).toFixed(1))
 const getCriteriaPeerAverageText = (criteriaId) =>
   Number(selectedMember.value?.peerCriteriaAverages?.[criteriaId] || 0).toFixed(1)
@@ -211,21 +220,61 @@ const handleTempSave = () => {
   alert('평가 내용이 임시 저장되었습니다.')
 }
 
-const handleSubmitEvaluation = () => {
+const handleSubmitEvaluation = async () => {
   if (!selectedMember.value) return
+  if (selectedMember.value.status === '완료') {
+    alert('이미 제출된 팀평가입니다.')
+    return
+  }
   const form = currentForm.value
-  const hasAllScores = evaluationCriteria.every((criteria) => Number(form.scores[criteria.id] || 0) > 0)
+  const hasAllScores = evaluationCriteria.every((criteria) => {
+    const score = Number(form.scores[criteria.id] || 0)
+    return score >= 1 && score <= 5
+  })
   if (!hasAllScores) {
-    alert('모든 평가 항목의 점수를 입력해주세요.')
+    alert('모든 평가 항목의 점수를 1점에서 5점 사이로 입력해주세요.')
     return
   }
   if (!confirm(`${selectedMember.value.name}님 평가를 제출하시겠습니까?`)) return
+
+  try {
+    await submitTeamEvaluation({
+      appraiseeId: selectedMember.value.id,
+      performanceScore: Number(form.scores.performance || 0),
+      performanceComment: form.comments.performance || '',
+      attitudeScore: Number(form.scores.attitude || 0),
+      attitudeComment: form.comments.attitude || '',
+      collaborationScore: Number(form.scores.collaboration || 0),
+      collaborationComment: form.comments.collaboration || '',
+      creativityScore: Number(form.scores.creativity || 0),
+      creativityComment: form.comments.creativity || '',
+    })
+  } catch (_error) {
+    alert('평가 제출에 실패했습니다.')
+    return
+  }
 
   const target = teamMembers.value.find((member) => member.id === selectedMemberId.value)
   if (target) target.status = '완료'
   form.savedAt = new Date().toISOString()
   alert('평가가 제출되었습니다.')
 }
+
+async function loadTeamEvaluationTargets() {
+  try {
+    const response = await getTeamEvaluationTargets()
+    if (Array.isArray(response) && response.length > 0) {
+      teamMembers.value = response.map((member) => ({
+        ...member,
+        image: DEFAULT_AVATAR,
+      }))
+      teamMemberCurrentPage.value = 1
+      selectedMemberId.value = response[0].id
+    }
+  } catch (_error) {}
+}
+
+onMounted(loadTeamEvaluationTargets)
 </script>
 
 <style scoped>
@@ -275,6 +324,38 @@ const handleSubmitEvaluation = () => {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+}
+
+.eval-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px 0;
+}
+
+.page-btn {
+  min-width: 64px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--gray200);
+  border-radius: var(--radius-xs);
+  background: var(--gray50);
+  color: var(--gray700);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.page-status {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--gray600);
 }
 
 /* 팀원 아이템 */
