@@ -1,62 +1,46 @@
-name: Build(Node24) and Deploy to Dev Server
+name: Build and Deploy to S3 (Dev)
 
 on:
   push:
     branches: [ "dev" ]
 
 jobs:
-  # JOB 1: 빌드 및 도커 허브 푸시 (GitHub 서버에서 수행)
-  build-and-push:
+  deploy-to-s3:
     runs-on: ubuntu-latest
+    env:
+      CLOUDFRONT_DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          node-version: 22
+          cache: npm
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+      - name: Build (dev mode)
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL_DEV }}
+        run: npm run build:dev
+
+      - name: Configure AWS credentials (Access Key)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          # 태그: latest (버전 관리 필요 시 ${{ github.sha }} 등 추가 가능)
-          tags: ${{ secrets.DOCKER_USERNAME }}/rhight-fe:latest
-          # 중요: 우분투 서버가 일반 PC(Intel/AMD)라면 linux/amd64
-          # 만약 우분투 서버가 ARM(라즈베리파이 등)이라면 linux/arm64 로 수정 필요
-          # (지금은 일반적인 우분투 서버라고 가정하고 amd64로 설정)
-          platforms: linux/amd64
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-  # JOB 2: 개발 서버 배포 (Self-hosted Runner에서 수행)
-  deploy-to-server:
-    needs: build-and-push
-    runs-on: self-hosted
-    steps:
-      - name: Pull latest image
+      - name: Deploy static files to S3
+        run: aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_DEV }} --delete
+
+      - name: Invalidate CloudFront cache
+        if: ${{ env.CLOUDFRONT_DIST_ID != '' }}
         run: |
-          docker pull ${{ secrets.DOCKER_USERNAME }}/rhight-fe:latest
-
-      - name: Stop and remove existing container
-        run: |
-          docker stop rhight-fe-app || true
-          docker rm rhight-fe-app || true
-
-      - name: Run new container
-        # 80번 포트로 서비스 (개발 서버의 80포트 점유)
-        run: |
-          docker run -d \
-            --name rhight-fe-app \
-            --restart always \
-            -p 2060:80 \
-            ${{ secrets.DOCKER_USERNAME }}/rhight-fe:latest
-
-      - name: Prune unused images
-        # 디스크 공간 확보를 위해 사용하지 않는 이미지 정리
-        run: docker image prune -f
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ env.CLOUDFRONT_DIST_ID }}" \
+            --paths "/*"
