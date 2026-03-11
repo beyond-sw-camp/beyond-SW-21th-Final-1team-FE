@@ -380,7 +380,10 @@ function handleFileChange(event) {
   if (validFiles.length > 0) {
     const mergedFiles = [...selectedFiles.value, ...validFiles]
     const dedupedFiles = mergedFiles.filter((file, index, array) =>
-      array.findIndex((item) => item.name === file.name && item.size === file.size) === index)
+      array.findIndex((item) =>
+        item.name === file.name &&
+        item.size === file.size &&
+        item.lastModified === file.lastModified) === index)
     selectedFiles.value = dedupedFiles
   }
   event.target.value = ''

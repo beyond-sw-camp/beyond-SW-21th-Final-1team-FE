@@ -10,7 +10,8 @@
         <span>{{ peerReviewError }}</span>
         <button type="button" class="page-btn" @click="loadPeerReviewTargets">다시 시도</button>
       </div>
-      <div class="peer-list">
+      <div v-if="isLoadingTargets" class="peer-loading">평가 대상을 불러오는 중입니다.</div>
+      <div v-else class="peer-list">
         <button
           v-for="c in paginatedColleagues"
           :key="c.id"
@@ -61,7 +62,7 @@
             <img :src="DEFAULT_AVATAR" :alt="`${selectedColleague.name} 프로필`" class="peer-form-avatar" />
             <div>
               <h2 class="peer-form-name">{{ selectedColleague.name }}<span>님에 대한 평가</span></h2>
-              <p class="peer-form-meta">{{ selectedColleague.team }} · 평가 기간: 2023년 상반기</p>
+              <p class="peer-form-meta">{{ selectedColleague.team }} · 평가 기간: {{ reviewPeriod }}</p>
             </div>
           </div>
           <div class="peer-anonymous-badge">
@@ -172,6 +173,7 @@ const showModal = ref(false)
 const comment = ref('')
 const isSubmitting = ref(false)
 const peerReviewError = ref('')
+const isLoadingTargets = ref(false)
 
 const scores = reactive({})
 const scoreLabels = { 1: '미흡', 2: '부족', 3: '보통', 4: '우수', 5: '탁월' }
@@ -185,6 +187,19 @@ const criteria = [
 ]
 
 const isFormValid = computed(() => criteria.every(c => scores[c.id]))
+const reviewPeriod = computed(() =>
+  selectedColleague.value?.reviewPeriod ||
+  selectedColleague.value?.evaluationPeriod ||
+  '미정')
+
+function syncColleaguePage(colleague) {
+  if (!colleague) {
+    colleagueCurrentPage.value = 1
+    return
+  }
+  const index = colleagues.value.findIndex((item) => item.id === colleague.id)
+  colleagueCurrentPage.value = index >= 0 ? Math.floor(index / colleaguePageSize) + 1 : 1
+}
 
 function markSelectedColleagueEvaluated() {
   if (!selectedColleague.value) return
@@ -195,6 +210,7 @@ function markSelectedColleagueEvaluated() {
 
 function selectColleague(c) {
   selectedColleague.value = c
+  syncColleaguePage(c)
   resetForm()
 }
 
@@ -240,18 +256,21 @@ function closeAndNext() {
 
 async function loadPeerReviewTargets() {
   try {
+    isLoadingTargets.value = true
     peerReviewError.value = ''
     const response = await getPeerReviewTargets()
     colleagues.value = Array.isArray(response) ? response.map((item) => ({ ...item })) : []
-    colleagueCurrentPage.value = 1
     const refreshedSelected = colleagues.value.find((item) => item.id === selectedColleague.value?.id)
     selectedColleague.value = refreshedSelected || null
+    syncColleaguePage(selectedColleague.value)
   } catch (error) {
     console.error('Failed to load peer review targets.', error)
     peerReviewError.value = '평가 대상을 불러오지 못했습니다.'
     colleagues.value = []
     colleagueCurrentPage.value = 1
     selectedColleague.value = null
+  } finally {
+    isLoadingTargets.value = false
   }
 }
 
@@ -282,6 +301,15 @@ onMounted(loadPeerReviewTargets)
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.peer-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: var(--gray500);
+  font-size: 0.82rem;
 }
 
 .peer-error-banner {

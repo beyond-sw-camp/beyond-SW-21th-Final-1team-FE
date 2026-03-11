@@ -209,7 +209,7 @@ const TREND_MONTH_COUNT = 6
 const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
 const teamMemberOptions = ref([])
-const selectedMemberId = ref(teamMemberOptions.value[0]?.id || null)
+const selectedMemberId = ref(null)
 const memberLoadError = ref('')
 const monthlyLoadError = ref('')
 const selectedMember = computed(() => teamMemberOptions.value.find((member) => member.id === selectedMemberId.value) || null)
@@ -423,6 +423,9 @@ async function loadMonthly() {
   }
 }
 
+// 초기 진입 시 관리자라면 loadMemberOptions가 selectedMemberId를 세팅하고,
+// 그 변경을 감지한 watcher가 loadMonthly를 호출한다.
+// 관리자 대상이 아니거나 선택 가능한 팀원이 없을 때만 여기서 직접 loadMonthly를 호출해 중복 요청을 막는다.
 onMounted(async () => {
   await loadMemberOptions()
   if (!isPerformanceManager.value || !selectedMemberId.value) {
@@ -430,10 +433,13 @@ onMounted(async () => {
   }
 })
 
+// selectedMemberId/currentOffset 변경 시 리포트를 다시 불러오고 상세 목록 페이지를 첫 페이지로 되돌린다.
 watch([selectedMemberId, currentOffset], () => {
   loadMonthly()
   detailCurrentPage.value = 1
 })
+
+// 상세 데이터 수가 줄어든 경우 현재 페이지가 총 페이지 수를 넘지 않도록 보정한다.
 watch(detailItems, () => {
   if (detailCurrentPage.value > detailTotalPages.value) {
     detailCurrentPage.value = detailTotalPages.value
