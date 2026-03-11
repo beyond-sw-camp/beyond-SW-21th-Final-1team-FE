@@ -8,13 +8,13 @@
         <div class="metric-body">
           <h3 class="metric-label">개인 KPI 달성률</h3>
           <div class="metric-value-row">
-            <span class="metric-num">98%</span>
+            <span class="metric-num">{{ personalKpiAchievementRate }}%</span>
             <span class="metric-change blue">
-              <TrendingUp :size="13" /> +3.2%
+              <TrendingUp :size="13" /> 종합 반영
             </span>
           </div>
           <div class="metric-bar">
-            <div class="metric-fill blue" style="width: 98%"></div>
+            <div class="metric-fill blue" :style="{ width: `${personalKpiAchievementRate}%` }"></div>
           </div>
         </div>
       </div>
@@ -25,13 +25,13 @@
         <div class="metric-body">
           <h3 class="metric-label">팀 KPI 달성률</h3>
           <div class="metric-value-row">
-            <span class="metric-num">84%</span>
+            <span class="metric-num">{{ teamKpiAchievementRate }}%</span>
             <span class="metric-change green">
-              <Target :size="13" /> On Track
+              <Target :size="13" /> 월간 집계
             </span>
           </div>
           <div class="metric-bar">
-            <div class="metric-fill green" style="width: 84%"></div>
+            <div class="metric-fill green" :style="{ width: `${teamKpiAchievementRate}%` }"></div>
           </div>
         </div>
       </div>
@@ -42,13 +42,13 @@
         <div class="metric-body">
           <h3 class="metric-label">이번 달 핵심 목표 진행률</h3>
           <div class="metric-value-row">
-            <span class="metric-num">85%</span>
+            <span class="metric-num">{{ monthlyCoreGoalProgressRate }}%</span>
             <span class="metric-change purple">
-              <Award :size="13" /> +4.1%
+              <Award :size="13" /> {{ scoreChangeRateText }}
             </span>
           </div>
           <div class="metric-bar">
-            <div class="metric-fill purple" style="width: 85%"></div>
+            <div class="metric-fill purple" :style="{ width: `${monthlyCoreGoalProgressRate}%` }"></div>
           </div>
         </div>
       </div>
@@ -154,12 +154,12 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { TrendingUp, Target, Award, MessageSquare } from 'lucide-vue-next'
 import { Line } from 'vue-chartjs'
 import { usePerformanceStore } from '@/store/performance'
-import { AUTH_KEYS } from '@/utils/auth'
-import { PERFORMANCE_DASHBOARD, PERFORMANCE_INQUIRY_ITEMS } from '@/mocks/performance'
+import { isAdminRole, isEvaluatorRole } from '@/utils/auth'
+import { getPerformanceDashboard, getPerformanceInquiryItems } from '@/api/performance'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -173,17 +173,39 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
 const perfStore = usePerformanceStore()
-const PERFORMANCE_MANAGER_USER_IDS = ['admin1234']
-const currentUserId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
-const isPerformanceManager = computed(() => PERFORMANCE_MANAGER_USER_IDS.includes(currentUserId.value))
-const pendingApprovalCount = PERFORMANCE_DASHBOARD.pendingApprovalCount
+const isPerformanceManager = computed(() => isEvaluatorRole() || isAdminRole())
+const dashboard = ref({
+  pendingApprovalCount: 0,
+  trendLabels: [],
+  trendScores: [],
+  feedbacks: [],
+})
+const inquiryItems = ref([])
+const pendingApprovalCount = computed(() => dashboard.value.pendingApprovalCount || 0)
+const summary = computed(() => dashboard.value.summary || {})
+const personalKpiAchievementRate = computed(() => Number(summary.value.personalKpiAchievementRate || 0))
+const teamKpiAchievementRate = computed(() => Number(summary.value.teamKpiAchievementRate || 0))
+const monthlyCoreGoalProgressRate = computed(() => Number(summary.value.monthlyCoreGoalProgressRate || 0))
+const scoreChangeRate = computed(() => Number(summary.value.scoreChangeRate || 0))
+const scoreChangeRateText = computed(() => {
+  const value = scoreChangeRate.value
+  if (value > 0) return `+${value}%`
+  if (value < 0) return `${value}%`
+  return '변동 없음'
+})
 
-const chartData = {
-  labels: PERFORMANCE_DASHBOARD.trendLabels,
+const chartData = computed(() => ({
+  labels:
+    Array.isArray(dashboard.value.trendLabels) && dashboard.value.trendLabels.length > 0
+      ? dashboard.value.trendLabels
+      : ['데이터 없음'],
   datasets: [
     {
       label: '성과',
-      data: PERFORMANCE_DASHBOARD.trendScores,
+      data:
+        Array.isArray(dashboard.value.trendScores) && dashboard.value.trendScores.length > 0
+          ? dashboard.value.trendScores
+          : [0],
       borderColor: '#3b82f6',
       borderWidth: 3,
       pointBackgroundColor: '#3b82f6',
@@ -195,7 +217,7 @@ const chartData = {
       fill: false,
     },
   ],
-}
+}))
 
 const chartOptions = {
   responsive: true,
@@ -224,11 +246,11 @@ const chartOptions = {
   },
 }
 
-const feedbacks = PERFORMANCE_DASHBOARD.feedbacks
+const feedbacks = computed(() => dashboard.value.feedbacks || [])
 const selectedFeedback = ref(null)
 const selectedInquiryItem = computed(() => {
   if (!selectedFeedback.value) return null
-  return PERFORMANCE_INQUIRY_ITEMS.find((item) => item.id === selectedFeedback.value.inquiryItemId) || null
+  return inquiryItems.value.find((item) => item.id === selectedFeedback.value.inquiryItemId) || null
 })
 
 function openFeedbackModal(item) {
@@ -238,6 +260,19 @@ function openFeedbackModal(item) {
 function closeFeedbackModal() {
   selectedFeedback.value = null
 }
+
+async function loadDashboard() {
+  try {
+    const [dashboardData, inquiryData] = await Promise.all([
+      getPerformanceDashboard(),
+      getPerformanceInquiryItems(),
+    ])
+    if (dashboardData) dashboard.value = dashboardData
+    inquiryItems.value = Array.isArray(inquiryData) ? inquiryData : []
+  } catch (_error) {}
+}
+
+onMounted(loadDashboard)
 </script>
 
 <style scoped>
