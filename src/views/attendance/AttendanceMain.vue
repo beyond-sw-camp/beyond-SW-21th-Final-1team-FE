@@ -87,7 +87,7 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
             <div class="m-stat">
-              <span class="num">12</span>
+              <span class="num">{{ monthlySummary.normalCount }}</span>
               <span class="label">정상 출근</span>
             </div>
           </div>
@@ -98,7 +98,7 @@
                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             </div>
             <div class="m-stat">
-              <span class="num">1</span>
+              <span class="num">{{ monthlySummary.tardyCount + monthlySummary.earlyLeaveCount }}</span>
               <span class="label">지각/조퇴</span>
             </div>
           </div>
@@ -109,8 +109,8 @@
                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             </div>
             <div class="m-stat">
-              <span class="num">2</span>
-              <span class="label">재택/외근</span>
+              <span class="num">{{ monthlySummary.absentCount }}</span>
+              <span class="label">결근</span>
             </div>
           </div>
           <!-- Item 4 -->
@@ -119,7 +119,7 @@
                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
             </div>
             <div class="m-stat">
-              <span class="num">0.5</span>
+              <span class="num">{{ monthlySummary.vacationCount }}</span>
               <span class="label">휴가 사용</span>
             </div>
           </div>
@@ -292,16 +292,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import { storeToRefs } from 'pinia'
 
 const store = useAttendanceStore()
 
 const recentApplications = computed(() => {
-  // Sort by appliedAt desc
-  return [...store.myLeaveRequests]
-    .sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt))
+  return [...store.requestHistory]
+    .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0))
     .slice(0, 2)
 })
 
@@ -311,7 +310,7 @@ const getApprStatusClass = (s) => ({ pending: 'warning', approved: 'success', re
 // -- Clock Logic --
 const currentDate = ref('')
 const currentTime = ref('')
-const { checkInTime, checkOutTime } = storeToRefs(store)
+const { checkInTime, checkOutTime, monthlySummary } = storeToRefs(store)
 
 const isCheckedIn = computed(() => {
   return !!checkInTime.value && !checkOutTime.value
@@ -335,30 +334,35 @@ const isLateCheckIn = (timeText) => {
   return h > 9 || (h === 9 && m > 0)
 }
 
-const handleCheckIn = () => {
+const handleCheckIn = async () => {
+  let tardyReason = null
   const now = new Date()
-  const h = String(now.getHours()).padStart(2, '0')
-  const m = String(now.getMinutes()).padStart(2, '0')
-  const checkIn = `${h}:${m}`
-  const status = isLateCheckIn(checkIn) ? 'late' : 'normal'
-  // New check-in should start a fresh work session.
-  store.setCheckOutTime(null)
-  store.setCheckInTime(checkIn)
-  store.upsertMyDailyAttendance({ date: now, checkIn, checkOut: null, status })
+  const hh = now.getHours()
+  const mm = now.getMinutes()
+
+  if (hh > 9 || (hh === 9 && mm > 0)) {
+    tardyReason = prompt('지각 사유를 입력해주세요.')
+    if (tardyReason === null) return
+    if (!tardyReason.trim()) {
+      alert('지각 사유는 비워둘 수 없습니다.')
+      return
+    }
+  }
+
+  try {
+    await store.clockIn(tardyReason)
+  } catch (error) {
+    alert(error.response?.data?.message || '출근 처리에 실패했습니다.')
+  }
 }
 
-const handleCheckOut = () => {
-  const now = new Date()
-  const h = String(now.getHours()).padStart(2, '0')
-  const m = String(now.getMinutes()).padStart(2, '0')
-  const checkOut = `${h}:${m}`
-  store.setCheckOutTime(checkOut)
-  store.upsertMyDailyAttendance({
-    date: now,
-    checkIn: checkInTime.value,
-    checkOut,
-    status: isLateCheckIn(checkInTime.value) ? 'late' : 'normal'
-  })
+const handleCheckOut = async () => {
+  if (!confirm('퇴근 처리하시겠습니까?')) return
+  try {
+    await store.clockOut()
+  } catch (error) {
+    alert(error.response?.data?.message || '퇴근 처리에 실패했습니다.')
+  }
 }
 
 const updateTime = () => {
@@ -375,9 +379,15 @@ const updateTime = () => {
 }
 
 let timer = null
-onMounted(() => {
+onMounted(async () => {
   updateTime()
   timer = setInterval(updateTime, 1000)
+  const now = new Date()
+  await Promise.all([
+    store.fetchMonthlyRecords(now.getFullYear(), now.getMonth() + 1),
+    store.fetchMonthlySummary(now.getFullYear(), now.getMonth() + 1),
+    store.refreshRequestHistory(),
+  ])
 })
 
 onUnmounted(() => {
