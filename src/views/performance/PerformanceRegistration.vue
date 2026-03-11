@@ -56,7 +56,7 @@
             <label class="form-label">
               <Calendar :size="14" /> 시작 날짜
             </label>
-            <input v-model="form.endDate" type="date" class="form-input" :min="form.startDate" required />
+            <input v-model="form.startDate" type="date" class="form-input" required />
           </div>
           <div class="form-group">
             <label class="form-label">
@@ -66,12 +66,19 @@
           </div>
         </div>
 
-        <!-- 가중치 (팀만) -->
-        <div v-if="step === 'team-form'" class="form-group">
+        <div class="form-group">
           <label class="form-label">
-            <Percent :size="14" /> 가중치 (%)
+            <BarChart3 :size="14" /> 난이도 점수
           </label>
-          <input v-model="form.weight" type="number" min="0" max="100" placeholder="0 ~ 100" class="form-input" />
+          <input
+            v-model="form.difficultyScore"
+            type="number"
+            min="1"
+            max="5"
+            placeholder="1 ~ 5"
+            class="form-input"
+            required
+          />
         </div>
 
         <!-- 제목 -->
@@ -162,7 +169,8 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { Users, User, ArrowLeft, ArrowRight, Calendar, FileText, Percent, CheckCircle2 } from 'lucide-vue-next'
+import { Users, User, ArrowLeft, ArrowRight, Calendar, FileText, CheckCircle2, BarChart3 } from 'lucide-vue-next'
+import { registerPerformance } from '@/api/performance'
 import { usePerformanceStore } from '@/store/performance'
 
 const perfStore = usePerformanceStore()
@@ -173,19 +181,41 @@ const showModal = ref(false)
 const form = reactive({
   startDate: '',
   endDate: '',
-  weight: '',
+  difficultyScore: 5,
   title: '',
   coreTask: '',
   content: '',
   value: '',
 })
 
-function handleSubmit(){
-  if (form.startDate && form.endDate && form.endDate < form.startDate) return
-  showModal.value = true
+async function handleSubmit(){
+  if (form.startDate && form.endDate && form.endDate < form.startDate) {
+    alert('종료일은 시작일보다 이후여야 합니다.')
+    return
+  }
+  if (Number(form.difficultyScore) < 1 || Number(form.difficultyScore) > 5) {
+    alert('난이도는 1점에서 5점 사이여야 합니다.')
+    return
+  }
+  try {
+    await registerPerformance({
+      type: step.value === 'team-form' ? 'team' : 'individual',
+      startDate: form.startDate,
+      endDate: form.endDate,
+      difficultyScore: Number(form.difficultyScore),
+      title: form.title,
+      coreTask: form.coreTask,
+      content: form.content,
+      value: form.value,
+    })
+    showModal.value = true
+  } catch (error) {
+    const message = error?.response?.data?.error?.message || '성과 등록에 실패했습니다.'
+    alert(message)
+  }
 }
 function resetForm() {
-  Object.assign(form, { startDate: '', endDate: '', weight: '', title: '', coreTask: '', content: '', value: '' })
+  Object.assign(form, { startDate: '', endDate: '', difficultyScore: 5, title: '', coreTask: '', content: '', value: '' })
 }
 
 function closeModal() {

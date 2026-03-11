@@ -64,7 +64,7 @@
       <div class="list-body">
         <ul class="item-list">
           <li
-            v-for="item in currentItems"
+            v-for="item in paginatedItems"
             :key="item.id"
             class="item-row"
             @click="handleItemClick(item)"
@@ -106,6 +106,11 @@
             승인 대기 항목이 없습니다.
           </li>
         </ul>
+      </div>
+      <div v-if="totalPages > 1" class="approval-pagination">
+        <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
+        <span class="page-status">{{ currentPage }} / {{ totalPages }}</span>
+        <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
       </div>
     </div>
 
@@ -251,15 +256,17 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Search, Filter, CheckCircle, FileText, User, ChevronRight, X, AlertCircle } from 'lucide-vue-next'
-import { PERFORMANCE_APPROVAL } from '@/mocks/performance'
+import { approvePerformance, getPerformanceApprovalItems, rejectPerformance } from '@/api/performance'
 
 const activeTab = ref('plan')
 const selectedItem = ref(null)
 const modalTab = ref('detail')
 const searchText = ref('')
 const reviewComment = ref('')
+const currentPage = ref(1)
+const pageSize = 8
 const currentDate = new Date()
 const currentYear = currentDate.getFullYear()
 const quarter = Math.floor(currentDate.getMonth() / 3)
@@ -270,8 +277,8 @@ const pad2 = (value) => String(value).padStart(2, '0')
 const formatDate = (date) => `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
 const approvalPeriodLabel = `${formatDate(periodStart)} ~ ${formatDate(periodEnd)}`
 
-const planItems = ref(PERFORMANCE_APPROVAL.planItems.map((item) => ({ ...item })))
-const resultItems = ref(PERFORMANCE_APPROVAL.resultItems.map((item) => ({ ...item })))
+const planItems = ref([])
+const resultItems = ref([])
 
 const currentItems = computed(() => {
   const items = activeTab.value === 'plan' ? planItems.value : resultItems.value
@@ -279,6 +286,12 @@ const currentItems = computed(() => {
   return items.filter(
     (item) => item.user.includes(searchText.value) || item.title.includes(searchText.value),
   )
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(currentItems.value.length / pageSize)))
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return currentItems.value.slice(start, start + pageSize)
 })
 
 const handleItemClick = (item) => {
@@ -292,21 +305,39 @@ const removeItemById = (id) => {
   source.value = source.value.filter((item) => item.id !== id)
 }
 
-const handleQuickApprove = (item) => {
+const handleQuickApprove = async (item) => {
   if (!confirm(`${item.user}님의 항목을 승인하시겠습니까?`)) return
+  try {
+    await approvePerformance(item.id, null)
+  } catch (_error) {
+    alert('승인 처리에 실패했습니다.')
+    return
+  }
   removeItemById(item.id)
   alert('승인 처리되었습니다.')
 }
 
-const handleQuickReject = (item) => {
+const handleQuickReject = async (item) => {
   if (!confirm(`${item.user}님의 항목을 반려하시겠습니까?`)) return
+  try {
+    await rejectPerformance(item.id, null)
+  } catch (_error) {
+    alert('반려 처리에 실패했습니다.')
+    return
+  }
   removeItemById(item.id)
   alert('반려 처리되었습니다.')
 }
 
-const handleApprove = () => {
+const handleApprove = async () => {
   if (!selectedItem.value) return
   if (!confirm('최종 승인하시겠습니까?')) return
+  try {
+    await approvePerformance(selectedItem.value.id, reviewComment.value.trim() || null)
+  } catch (_error) {
+    alert('최종 승인에 실패했습니다.')
+    return
+  }
   removeItemById(selectedItem.value.id)
   selectedItem.value = null
   modalTab.value = 'detail'
@@ -314,7 +345,7 @@ const handleApprove = () => {
   alert('최종 승인되었습니다.')
 }
 
-const handleReject = () => {
+const handleReject = async () => {
   if (!selectedItem.value) return
   const reason = reviewComment.value.trim()
   if (!reason) {
@@ -322,12 +353,38 @@ const handleReject = () => {
     return
   }
   if (!confirm('반려 처리하시겠습니까?')) return
+  try {
+    await rejectPerformance(selectedItem.value.id, reason)
+  } catch (_error) {
+    alert('반려 처리에 실패했습니다.')
+    return
+  }
   removeItemById(selectedItem.value.id)
   selectedItem.value = null
   modalTab.value = 'detail'
   reviewComment.value = ''
   alert('반려 처리되었습니다.')
 }
+
+async function loadApprovalItems() {
+  try {
+    const response = await getPerformanceApprovalItems()
+    planItems.value = Array.isArray(response?.planItems) ? response.planItems.map((item) => ({ ...item })) : []
+    resultItems.value = Array.isArray(response?.resultItems) ? response.resultItems.map((item) => ({ ...item })) : []
+  } catch (_error) {}
+}
+
+onMounted(loadApprovalItems)
+
+watch([activeTab, searchText], () => {
+  currentPage.value = 1
+})
+
+watch(currentItems, () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+})
 </script>
 
 <style scoped>
@@ -722,6 +779,40 @@ const handleReject = () => {
   padding: 48px 20px;
   color: var(--gray400);
   font-size: 0.88rem;
+}
+
+.approval-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--gray100);
+  background: #fff;
+}
+
+.page-btn {
+  min-width: 64px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--gray200);
+  border-radius: var(--radius-xs);
+  background: var(--gray50);
+  color: var(--gray700);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.page-status {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--gray600);
 }
 
 /* ════════════════════════════════

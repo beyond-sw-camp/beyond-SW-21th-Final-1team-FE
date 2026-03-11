@@ -6,12 +6,17 @@
         <h3 class="peer-sidebar-title">평가 대상</h3>
         <span class="peer-sidebar-count">{{ colleagues.length }}명</span>
       </div>
-      <div class="peer-list">
+      <div v-if="peerReviewError" class="peer-error-banner">
+        <span>{{ peerReviewError }}</span>
+        <button type="button" class="page-btn" :disabled="isLoadingTargets" @click="loadPeerReviewTargets">다시 시도</button>
+      </div>
+      <div v-if="isLoadingTargets" class="peer-loading">평가 대상을 불러오는 중입니다.</div>
+      <div v-else class="peer-list">
         <button
-          v-for="c in colleagues"
-          :key="c.name"
+          v-for="c in paginatedColleagues"
+          :key="c.id"
           class="peer-item"
-          :class="{ active: selectedColleague?.name === c.name }"
+          :class="{ active: selectedColleague?.id === c.id }"
           @click="selectColleague(c)"
         >
           <img :src="DEFAULT_AVATAR" :alt="`${c.name} 프로필`" class="peer-avatar" />
@@ -22,13 +27,18 @@
           <span v-if="c.evaluated" class="peer-done-badge">완료</span>
         </button>
       </div>
+      <div v-if="colleagueTotalPages > 1" class="peer-pagination">
+        <button class="page-btn" :disabled="colleagueCurrentPage === 1" @click="colleagueCurrentPage--">이전</button>
+        <span class="page-status">{{ colleagueCurrentPage }} / {{ colleagueTotalPages }}</span>
+        <button class="page-btn" :disabled="colleagueCurrentPage === colleagueTotalPages" @click="colleagueCurrentPage++">다음</button>
+      </div>
       <div class="peer-sidebar-footer">
         <div class="peer-progress-label">
           <span>진행률</span>
           <span class="peer-progress-num">{{ evaluatedCount }}/{{ colleagues.length }}</span>
         </div>
         <div class="peer-progress-bar">
-          <div class="peer-progress-fill" :style="{ width: (evaluatedCount / colleagues.length * 100) + '%' }"></div>
+          <div class="peer-progress-fill" :style="{ width: `${progressPercent}%` }"></div>
         </div>
       </div>
     </div>
@@ -52,7 +62,7 @@
             <img :src="DEFAULT_AVATAR" :alt="`${selectedColleague.name} 프로필`" class="peer-form-avatar" />
             <div>
               <h2 class="peer-form-name">{{ selectedColleague.name }}<span>님에 대한 평가</span></h2>
-              <p class="peer-form-meta">{{ selectedColleague.team }} · 평가 기간: 2023년 상반기</p>
+              <p class="peer-form-meta">{{ selectedColleague.team }} · 평가 기간: {{ reviewPeriod }}</p>
             </div>
           </div>
           <div class="peer-anonymous-badge">
@@ -101,8 +111,8 @@
         <!-- 푸터 -->
         <div class="peer-form-footer">
           <button class="btn-cancel" @click="resetForm">초기화</button>
-          <button class="btn-submit" :disabled="!isFormValid" @click="showModal = true">
-            <Send :size="14" /> 평가 제출하기
+          <button class="btn-submit" :disabled="!isFormValid || isSubmitting || hasSubmittedForPeer" @click="submitReview">
+            <Send :size="14" /> {{ isSubmitting ? '제출 중...' : '평가 제출하기' }}
           </button>
         </div>
       </template>
@@ -135,20 +145,35 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { Users, Shield, MessageSquare, Send, CheckCircle2 } from 'lucide-vue-next'
-import { PEER_REVIEW_COLLEAGUES } from '@/mocks/performance'
+import { getPeerReviewTargets, submitPeerReview } from '@/api/performance'
 
 const DEFAULT_AVATAR =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23eef2f7'/><circle cx='40' cy='31' r='14' fill='%2394a3b8'/><path d='M16 68c4-12 14-18 24-18s20 6 24 18' fill='%2394a3b8'/></svg>"
 
-const colleagues = ref(PEER_REVIEW_COLLEAGUES.map((item) => ({ ...item })))
+const colleagues = ref([])
+const colleagueCurrentPage = ref(1)
+const colleaguePageSize = 10
 
 const evaluatedCount = computed(() => colleagues.value.filter((c) => c.evaluated).length)
+const progressPercent = computed(() => {
+  if (!colleagues.value.length) return 0
+  const percent = (evaluatedCount.value / colleagues.value.length) * 100
+  return Math.min(100, Math.max(0, percent))
+})
+const colleagueTotalPages = computed(() => Math.max(1, Math.ceil(colleagues.value.length / colleaguePageSize)))
+const paginatedColleagues = computed(() => {
+  const start = (colleagueCurrentPage.value - 1) * colleaguePageSize
+  return colleagues.value.slice(start, start + colleaguePageSize)
+})
 
 const selectedColleague = ref(null)
 const showModal = ref(false)
 const comment = ref('')
+const isSubmitting = ref(false)
+const peerReviewError = ref('')
+const isLoadingTargets = ref(false)
 
 const scores = reactive({})
 const scoreLabels = { 1: '미흡', 2: '부족', 3: '보통', 4: '우수', 5: '탁월' }
@@ -162,9 +187,34 @@ const criteria = [
 ]
 
 const isFormValid = computed(() => criteria.every(c => scores[c.id]))
+const hasSubmittedForPeer = computed(() => Boolean(selectedColleague.value?.evaluated))
+const reviewPeriod = computed(() =>
+  selectedColleague.value?.reviewPeriod ||
+  selectedColleague.value?.evaluationPeriod ||
+  '미정')
+
+function syncColleaguePage(colleague) {
+  if (!colleague) {
+    colleagueCurrentPage.value = 1
+    return
+  }
+  const index = colleagues.value.findIndex((item) => item.id === colleague.id)
+  colleagueCurrentPage.value = index >= 0 ? Math.floor(index / colleaguePageSize) + 1 : 1
+}
+
+function markSelectedColleagueEvaluated(appraiseeId = selectedColleague.value?.id) {
+  if (!appraiseeId) return
+  if (selectedColleague.value?.id === appraiseeId) {
+    selectedColleague.value.evaluated = true
+  }
+  const target = colleagues.value.find((colleague) => colleague.id === appraiseeId)
+  if (target) target.evaluated = true
+}
 
 function selectColleague(c) {
+  if (isSubmitting.value) return
   selectedColleague.value = c
+  syncColleaguePage(c)
   resetForm()
 }
 
@@ -177,13 +227,61 @@ function closeModal() {
   showModal.value = false
 }
 
+async function submitReview() {
+  if (isSubmitting.value) return
+  if (hasSubmittedForPeer.value) return
+  if (!selectedColleague.value || !isFormValid.value) return
+  const appraiseeId = selectedColleague.value.id
+
+  try {
+    isSubmitting.value = true
+    await submitPeerReview({
+      appraiseeId,
+      communicationScore: scores[1],
+      solvingScore: scores[2],
+      responsibilityScore: scores[3],
+      teamContributionScore: scores[4],
+      cultureContributionScore: scores[5],
+      comment: comment.value,
+    })
+    markSelectedColleagueEvaluated(appraiseeId)
+    showModal.value = true
+  } catch (_error) {
+    alert('동료 평가 제출에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
 function closeAndNext() {
-  if (selectedColleague.value) selectedColleague.value.evaluated = true
   showModal.value = false
   const next = colleagues.value.find((c) => !c.evaluated)
   if (next) selectColleague(next)
   else selectedColleague.value = null
 }
+
+async function loadPeerReviewTargets() {
+  if (isLoadingTargets.value) return
+  try {
+    isLoadingTargets.value = true
+    peerReviewError.value = ''
+    const response = await getPeerReviewTargets()
+    colleagues.value = Array.isArray(response) ? response.map((item) => ({ ...item })) : []
+    const refreshedSelected = colleagues.value.find((item) => item.id === selectedColleague.value?.id)
+    selectedColleague.value = refreshedSelected || null
+    syncColleaguePage(selectedColleague.value)
+  } catch (error) {
+    console.error('Failed to load peer review targets.', error)
+    peerReviewError.value = '평가 대상을 불러오지 못했습니다.'
+    colleagues.value = []
+    colleagueCurrentPage.value = 1
+    selectedColleague.value = null
+  } finally {
+    isLoadingTargets.value = false
+  }
+}
+
+onMounted(loadPeerReviewTargets)
 </script>
 
 <style scoped>
@@ -210,6 +308,27 @@ function closeAndNext() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.peer-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: var(--gray500);
+  font-size: 0.82rem;
+}
+
+.peer-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-bottom: 1px solid #fecaca;
+  font-size: 0.78rem;
 }
 
 .peer-sidebar-header {
@@ -239,6 +358,38 @@ function closeAndNext() {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+}
+
+.peer-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px 0;
+}
+
+.page-btn {
+  min-width: 64px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--gray200);
+  border-radius: var(--radius-xs);
+  background: var(--gray50);
+  color: var(--gray700);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.page-status {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--gray600);
 }
 
 .peer-item {
