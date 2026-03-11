@@ -8,7 +8,7 @@
       </div>
       <div v-if="peerReviewError" class="peer-error-banner">
         <span>{{ peerReviewError }}</span>
-        <button type="button" class="page-btn" @click="loadPeerReviewTargets">다시 시도</button>
+        <button type="button" class="page-btn" :disabled="isLoadingTargets" @click="loadPeerReviewTargets">다시 시도</button>
       </div>
       <div v-if="isLoadingTargets" class="peer-loading">평가 대상을 불러오는 중입니다.</div>
       <div v-else class="peer-list">
@@ -202,14 +202,17 @@ function syncColleaguePage(colleague) {
   colleagueCurrentPage.value = index >= 0 ? Math.floor(index / colleaguePageSize) + 1 : 1
 }
 
-function markSelectedColleagueEvaluated() {
-  if (!selectedColleague.value) return
-  selectedColleague.value.evaluated = true
-  const target = colleagues.value.find((colleague) => colleague.id === selectedColleague.value.id)
+function markSelectedColleagueEvaluated(appraiseeId = selectedColleague.value?.id) {
+  if (!appraiseeId) return
+  if (selectedColleague.value?.id === appraiseeId) {
+    selectedColleague.value.evaluated = true
+  }
+  const target = colleagues.value.find((colleague) => colleague.id === appraiseeId)
   if (target) target.evaluated = true
 }
 
 function selectColleague(c) {
+  if (isSubmitting.value) return
   selectedColleague.value = c
   syncColleaguePage(c)
   resetForm()
@@ -228,11 +231,12 @@ async function submitReview() {
   if (isSubmitting.value) return
   if (hasSubmittedForPeer.value) return
   if (!selectedColleague.value || !isFormValid.value) return
+  const appraiseeId = selectedColleague.value.id
 
   try {
     isSubmitting.value = true
     await submitPeerReview({
-      appraiseeId: selectedColleague.value.id,
+      appraiseeId,
       communicationScore: scores[1],
       solvingScore: scores[2],
       responsibilityScore: scores[3],
@@ -240,7 +244,7 @@ async function submitReview() {
       cultureContributionScore: scores[5],
       comment: comment.value,
     })
-    markSelectedColleagueEvaluated()
+    markSelectedColleagueEvaluated(appraiseeId)
     showModal.value = true
   } catch (_error) {
     alert('동료 평가 제출에 실패했습니다.')
@@ -257,6 +261,7 @@ function closeAndNext() {
 }
 
 async function loadPeerReviewTargets() {
+  if (isLoadingTargets.value) return
   try {
     isLoadingTargets.value = true
     peerReviewError.value = ''
