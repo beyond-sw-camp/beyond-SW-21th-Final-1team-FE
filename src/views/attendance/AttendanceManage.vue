@@ -245,7 +245,7 @@
       <div class="modal-content sm">
         <div class="modal-header">
           <h3>반려 사유 입력</h3>
-          <button class="close-btn" @click="closeRejectModal">×</button>
+          <button class="close-btn" :disabled="rejectLoading" @click="closeRejectModal">×</button>
         </div>
         <div class="modal-body">
            <div class="info-text mb-4">
@@ -253,12 +253,14 @@
            </div>
            <div class="form-group">
             <label class="required">반려 사유</label>
-            <textarea v-model="rejectReason" rows="3" placeholder="반려 사유를 입력하세요."></textarea>
+            <textarea v-model="rejectReason" :disabled="rejectLoading" rows="3" placeholder="반려 사유를 입력하세요."></textarea>
            </div>
         </div>
         <div class="modal-footer">
-           <button class="btn-cancel" @click="closeRejectModal">취소</button>
-           <button class="btn-save red-btn" @click="submitReject">반려하기</button>
+           <button class="btn-cancel" :disabled="rejectLoading" @click="closeRejectModal">취소</button>
+           <button class="btn-save red-btn" :disabled="rejectLoading" @click="submitReject">
+             {{ rejectLoading ? '처리 중...' : '반려하기' }}
+           </button>
         </div>
       </div>
     </div>
@@ -312,6 +314,7 @@ const showRejectModal = ref(false)
 const showApproveModal = ref(false)
 const rejectReason = ref('')
 const approveLoading = ref(false)
+const rejectLoading = ref(false)
 
 // --- Computed (Daily) ---
 const filteredList = computed(() => {
@@ -464,15 +467,18 @@ const handleBulkLeaveReject = () => {
 }
 
 const closeRejectModal = () => {
+  if (rejectLoading.value) return
   showRejectModal.value = false
 }
 
 const submitReject = async () => {
+  if (rejectLoading.value) return
   if (!rejectReason.value.trim()) {
     alert('반려 사유를 입력해주세요.')
     return
   }
 
+  rejectLoading.value = true
   try {
     await store.processLeaveRequests(selectedLeaveIds.value, false, rejectReason.value)
     selectedLeaveIds.value = []
@@ -481,6 +487,8 @@ const submitReject = async () => {
   } catch (error) {
     const message = error?.response?.data?.message || '반려 처리에 실패했습니다. 다시 시도해 주세요.'
     alert(message)
+  } finally {
+    rejectLoading.value = false
   }
 }
 

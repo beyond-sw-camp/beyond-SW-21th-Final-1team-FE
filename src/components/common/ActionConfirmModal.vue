@@ -1,5 +1,10 @@
 <template>
-  <BaseModal :model-value="modelValue" @update:modelValue="emit('update:modelValue', $event)" :width="width">
+  <BaseModal
+    :model-value="modelValue"
+    :width="width"
+    :closable="!loading"
+    @update:modelValue="emit('update:modelValue', $event)"
+  >
     <div class="modal-header">
       <h3 class="modal-title">{{ title }}</h3>
     </div>
