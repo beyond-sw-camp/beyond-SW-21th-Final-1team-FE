@@ -29,8 +29,8 @@
         <div class="control-actions">
           <button class="btn-secondary" :disabled="ledgerLoading" @click="reloadMonthlyData">조회</button>
           <button class="btn-primary" :disabled="actionLoading" @click="runCalculation">일괄 급여 계산</button>
-          <button class="btn-warning" :disabled="actionLoading || monthStatus === 'initial'" @click="finalizeSalary">급여 마감</button>
-          <button class="btn-outline" :disabled="actionLoading || monthStatus !== 'closed'" @click="sendPayStubs">명세서 발송 처리</button>
+          <button class="btn-warning" :disabled="actionLoading || monthStatus === 'initial' || ledgerSummary.pendingFinalizeCount === 0" @click="finalizeSalary">급여 마감</button>
+          <button class="btn-outline" :disabled="actionLoading || monthStatus !== 'closed' || ledgerSummary.pendingSendCount === 0" @click="sendPayStubs">명세서 발송 처리</button>
           <button class="btn-secondary" :disabled="exportLoading" @click="downloadLedgerCsv(false)">대장 CSV</button>
           <button class="btn-secondary" :disabled="exportLoading" @click="downloadLedgerCsv(true)">이체 CSV</button>
         </div>
@@ -39,7 +39,7 @@
       <div class="card result-summary">
         <div class="summary-box">
           <span class="label">대상 건수</span>
-          <strong>{{ ledgerPage.totalElements }}</strong>
+          <strong>{{ ledgerSummary.totalCount }}</strong>
         </div>
         <div class="summary-box">
           <span class="label">계산 결과</span>
@@ -58,7 +58,7 @@
       <div class="card ledger-card">
         <div class="card-header">
           <h3>{{ targetMonth }} 급여 대장</h3>
-          <span class="count">총 {{ ledgerPage.totalElements }}건</span>
+          <span class="count">총 {{ ledgerSummary.totalCount }}건</span>
         </div>
 
         <div v-if="ledgerLoading" class="empty-state">급여 대장을 불러오는 중입니다.</div>
@@ -309,7 +309,7 @@
         </div>
         <div class="form-actions">
           <button class="btn-secondary" @click="resetRateForm">초기화</button>
-          <button class="btn-save" :disabled="savingRate" @click="saveRate">
+          <button class="btn-save" :disabled="savingRate || !canSaveRate" @click="saveRate">
             {{ savingRate ? '저장 중...' : '요율 저장' }}
           </button>
         </div>
@@ -423,7 +423,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { usePayrollStore } from '@/store/payroll'
 
 const payrollStore = usePayrollStore()
@@ -475,9 +475,17 @@ const rateForm = reactive({
 
 const ledgerPage = computed(() => payrollStore.adminLedgerPage)
 const ledgerRows = computed(() => payrollStore.adminLedgerPage.content || [])
+const ledgerSummary = computed(() => payrollStore.adminLedgerSummary)
 const insuranceRates = computed(() => payrollStore.insuranceRates)
 const salarySettings = computed(() => payrollStore.salarySettingHistory)
-const severancePreview = computed(() => payrollStore.severancePreview)
+const severancePreview = computed(() => {
+  const preview = payrollStore.severancePreview
+  if (!preview) return null
+  if (!selectedSeveranceEmployee.value?.employeeId || !retirementDate.value) return null
+  if (Number(preview.employeeId) !== Number(selectedSeveranceEmployee.value.employeeId)) return null
+  if (preview.retirementDate !== retirementDate.value) return null
+  return preview
+})
 const canSaveSalarySetting = computed(() =>
   Boolean(
     salaryForm.employeeId &&
@@ -486,10 +494,19 @@ const canSaveSalarySetting = computed(() =>
       salaryForm.applyStartDate,
   ),
 )
+const canSaveRate = computed(() =>
+  rateForm.applyYear !== '' &&
+  [
+    rateForm.nationalPensionRate,
+    rateForm.healthInsuranceRate,
+    rateForm.longTermCareRate,
+    rateForm.empInsuranceRate,
+  ].every((value) => value !== '' && Number(value) >= 0 && Number(value) <= 1),
+)
 
 const monthStatus = computed(() => {
-  if (!ledgerRows.value.length) return 'initial'
-  return ledgerRows.value.every((item) => item.isFinalized === 'Y') ? 'closed' : 'calculated'
+  if (!ledgerSummary.value.totalCount) return 'initial'
+  return ledgerSummary.value.pendingFinalizeCount === 0 ? 'closed' : 'calculated'
 })
 
 const monthStatusLabel = computed(() => {
@@ -543,7 +560,10 @@ const reloadMonthlyData = async () => {
 
   try {
     const { year, month } = getYearMonth()
-    await payrollStore.fetchAdminLedgers({ year, month, page: 1, size: 100 })
+    await Promise.all([
+      payrollStore.fetchAdminLedgers({ year, month, page: 1, size: 100 }),
+      payrollStore.fetchAdminLedgerSummary({ year, month }),
+    ])
   } catch (error) {
     pageError.value = getErrorMessage(error, '급여 대장을 불러오지 못했습니다.')
   } finally {
@@ -756,6 +776,12 @@ const editRate = (item) => {
 }
 
 const saveRate = async () => {
+  if (!canSaveRate.value) {
+    pageError.value = '보험 요율 값을 모두 입력해주세요.'
+    pageNotice.value = ''
+    return
+  }
+
   savingRate.value = true
   pageError.value = ''
   pageNotice.value = ''
@@ -782,6 +808,8 @@ const searchSeveranceEmployees = async () => {
   severanceLoading.value = true
   pageError.value = ''
   pageNotice.value = ''
+  payrollStore.clearSeverancePreview()
+  selectedSeveranceEmployee.value = null
 
   try {
     const page = await payrollStore.searchEmployees({
@@ -799,6 +827,7 @@ const searchSeveranceEmployees = async () => {
 
 const selectSeveranceEmployee = (item) => {
   selectedSeveranceEmployee.value = item
+  payrollStore.clearSeverancePreview()
 }
 
 const calculateSeverance = async () => {
@@ -820,6 +849,10 @@ const calculateSeverance = async () => {
     severanceLoading.value = false
   }
 }
+
+watch(retirementDate, () => {
+  payrollStore.clearSeverancePreview()
+})
 
 onMounted(async () => {
   await reloadMonthlyData()
