@@ -59,6 +59,9 @@ export const downloadPayslip = (ledgerId) =>
 export const getAdminPayrollLedgers = (params) =>
   payrollApi.get('/admin/ledgers', { params })
 
+export const getAdminPayrollLedgerSummary = (params) =>
+  payrollApi.get('/admin/ledgers/summary', { params })
+
 export const calculateMonthlyPayrolls = (year, month) =>
   payrollApi.post('/admin/calculate', null, { params: { year, month } })
 

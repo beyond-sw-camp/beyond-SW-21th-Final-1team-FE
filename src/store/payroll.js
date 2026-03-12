@@ -6,6 +6,7 @@ import {
   createSalarySetting,
   downloadPayslip,
   exportAdminPayrollLedgers,
+  getAdminPayrollLedgerSummary,
   finalizeMonthlyPayrolls,
   getSeverancePreview,
   getAdminPayrollLedgers,
@@ -113,6 +114,14 @@ export const usePayrollStore = defineStore('payroll', () => {
     totalPages: 0,
     last: true,
   })
+  const adminLedgerSummary = ref({
+    targetMonth: '',
+    totalCount: 0,
+    finalizedCount: 0,
+    pendingFinalizeCount: 0,
+    sentCount: 0,
+    pendingSendCount: 0,
+  })
   const lastBatchResult = ref(null)
   const lastFinalizeResult = ref(null)
   const lastSendResult = ref(null)
@@ -184,6 +193,19 @@ export const usePayrollStore = defineStore('payroll', () => {
     return adminLedgerPage.value
   }
 
+  const fetchAdminLedgerSummary = async (params) => {
+    const { data } = await getAdminPayrollLedgerSummary(params)
+    adminLedgerSummary.value = {
+      targetMonth: data?.targetMonth || '',
+      totalCount: Number(data?.totalCount || 0),
+      finalizedCount: Number(data?.finalizedCount || 0),
+      pendingFinalizeCount: Number(data?.pendingFinalizeCount || 0),
+      sentCount: Number(data?.sentCount || 0),
+      pendingSendCount: Number(data?.pendingSendCount || 0),
+    }
+    return adminLedgerSummary.value
+  }
+
   const runMonthlyCalculation = async (year, month) => {
     const { data } = await calculateMonthlyPayrolls(year, month)
     lastBatchResult.value = data
@@ -253,6 +275,10 @@ export const usePayrollStore = defineStore('payroll', () => {
     return severancePreview.value
   }
 
+  const clearSeverancePreview = () => {
+    severancePreview.value = null
+  }
+
   const saveSalarySetting = async ({ employeeId, settingId, ...payload }) => {
     if (!employeeId && !settingId) {
       throw new Error('사원 ID가 필요합니다.')
@@ -271,13 +297,16 @@ export const usePayrollStore = defineStore('payroll', () => {
 
   return {
     adminLedgerPage,
+    adminLedgerSummary,
     employeeSearchPage,
     fetchAdminLedgers,
+    fetchAdminLedgerSummary,
     fetchInsuranceRateList,
     fetchPayrollDetail,
     fetchPayrollsByYear,
     fetchRecentPayrolls,
     fetchSeverancePreview,
+    clearSeverancePreview,
     fetchSalarySettings,
     insuranceRates,
     isSalaryVerified,
