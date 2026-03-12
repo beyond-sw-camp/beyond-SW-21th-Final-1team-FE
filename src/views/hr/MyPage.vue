@@ -7,14 +7,19 @@
     <div class="profile-header">
       <div class="profile-left">
         <div class="profile-avatar">
-          <img v-if="user.profileImage" :src="user.profileImage" alt="프로필 이미지" class="avatar-image" />
+          <img
+            v-if="user.profileImage"
+            :src="user.profileImage"
+            alt="프로필 이미지"
+            class="avatar-image"
+          />
           <span v-else class="avatar-text">{{ user.name.slice(-2) }}</span>
           <span class="status-dot online"></span>
         </div>
         <div class="profile-info">
           <div class="profile-name-row">
             <span class="profile-name">{{ user.name }}</span>
-            <span class="status-badge">정상 근무</span>
+            <span class="status-badge">{{ user.status || '-' }}</span>
           </div>
           <div class="profile-dept">{{ user.team }} · {{ user.jobTitle }} · {{ user.position }}</div>
           <div class="profile-contacts">
@@ -41,39 +46,131 @@
     </div>
 
     <!-- 탭 컨텐츠 -->
-    <TabInfo v-if="activeTab === 'info'" :user="user" @update:user="user = $event"/>
-    <TabSalary v-else-if="activeTab === 'salary'" />
-    <TabHistory v-else-if="activeTab === 'history'" :employee-id="user.empNo" />
-    <TabCertificate v-else-if="activeTab === 'certificate'" :user="user" />
+    <TabInfo v-if="activeTab === 'info'" :user="user" @refresh="loadMyPageData" />
+    <TabHistory v-else-if="activeTab === 'history'" />
+    <TabCertificate v-else-if="activeTab === 'certificate'" />
     <!-- 추후 탭 추가 -->
     <div v-else class="tab-placeholder">{{ activeTabLabel }} 탭은 준비 중입니다.</div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import TabInfo from './tabs/TabInfo.vue'
-import TabSalary from './tabs/TabSalary.vue'
 import TabHistory from './tabs/TabHistory.vue'
 import TabCertificate from './tabs/TabCertificate.vue'
-import { createHrMyPageUserMock } from '@/mocks/hr/myPageUser'
+import { getMyPage, getMyPageHeader } from '@/api/hr'
 import { AUTH_KEYS } from '@/utils/auth'
 
 const activeTab = ref('info')
 const tabs = [
   { key: 'info', label: '정보' },
-  { key: 'salary', label: '급여' },
   { key: 'history', label: '인사 히스토리' },
   { key: 'certificate', label: '증명서' },
 ]
 
 const activeTabLabel = computed(() => tabs.find(t => t.key === activeTab.value)?.label)
 
-const user = ref(createHrMyPageUserMock())
-const sessionLastLogin = sessionStorage.getItem(AUTH_KEYS.lastLoginAt)
-if (sessionLastLogin) {
-  user.value.lastLogin = sessionLastLogin
+const toSkillTypeLabel = (category) => {
+  const map = {
+    CERTIFICATE: '자격',
+    LANGUAGE: '어학',
+    LICENSE: '면허',
+    ETC: '기타',
+  }
+  return map[category] || category || '-'
 }
+
+const toCareerPeriod = (startDate, endDate) => `${startDate || '-'} ~ ${endDate || '재직중'}`
+
+const user = ref({
+  profileImage: '',
+  name: '',
+  team: '',
+  jobTitle: '',
+  position: '',
+  email: '',
+  phone: '',
+  extension: '',
+  workLocation: '',
+  lastLogin: '',
+  empNo: '',
+  birthDate: '',
+  address: '',
+  ssn: '',
+  bankAccount: '',
+  orgPosition: '',
+  jobRole: '',
+  rank: '',
+  status: '',
+  hireDate: '',
+  tenure: '',
+  workType: '',
+  workRegion: '',
+  hireType: '',
+  skills: [],
+  careers: [],
+})
+
+const loadMyPageData = async () => {
+  try {
+    const [header, page] = await Promise.all([getMyPageHeader(), getMyPage()])
+    const basicInfo = page?.basicInfo || {}
+    const hrInfo = page?.hrInfo || {}
+    const sessionLastLogin = sessionStorage.getItem(AUTH_KEYS.lastLoginAt) || ''
+
+    user.value = {
+      profileImage: basicInfo.profileFileUrl || header?.profileFileUrl || '',
+      name: basicInfo.employeeName || header?.employeeName || '',
+      team: hrInfo.orgName || header?.orgName || '',
+      jobTitle: hrInfo.jobName || header?.jobName || '',
+      position: hrInfo.positionName || header?.positionName || '',
+      email: basicInfo.email || header?.email || '',
+      phone: basicInfo.phone || header?.phone || '',
+      extension: basicInfo.extensionNum || header?.extensionNum || '',
+      workLocation: hrInfo.areaName || header?.areaName || '',
+      lastLogin: sessionLastLogin,
+      empNo: basicInfo.employeeNum || '',
+      birthDate: basicInfo.birthDate || '',
+      address: basicInfo.address || '',
+      ssn: basicInfo.residentNumberMasked || '',
+      bankAccount: `${basicInfo.bankName || ''} ${basicInfo.accountNumberMasked || ''}`.trim(),
+      orgPosition: `${hrInfo.orgName || '-'} · ${hrInfo.positionName || '-'}`,
+      jobRole: hrInfo.jobName || '-',
+      rank: hrInfo.rankName || '-',
+      status: hrInfo.employeeStateDescription || header?.employeeStateDescription || '',
+      hireDate: hrInfo.hireDate || '',
+      tenure: hrInfo.tenureText || '',
+      workType: hrInfo.employTypeDescription || '',
+      workRegion: hrInfo.areaName || '',
+      hireType: hrInfo.recruitTypeDescription || '',
+      skills: (page?.skills || []).map((skill) => ({
+        skillId: skill.skillId,
+        type: toSkillTypeLabel(skill.category),
+        category: skill.category,
+        name: skill.skillName,
+        date: skill.acquisitionDate,
+        licenseNumber: skill.licenseNumber,
+        hrFileId: skill.hrFileId,
+      })),
+      careers: (page?.careers || []).map((career) => ({
+        careerId: career.careerId,
+        company: career.companyName,
+        role: career.orgName,
+        period: toCareerPeriod(career.startDate, career.endDate),
+        startDate: career.startDate,
+        endDate: career.endDate,
+        hrFileId: career.hrFileId,
+      })),
+    }
+  } catch (error) {
+    console.error('마이페이지 데이터 조회 실패:', error)
+  }
+}
+
+onMounted(() => {
+  loadMyPageData()
+})
 </script>
 
 <style scoped>

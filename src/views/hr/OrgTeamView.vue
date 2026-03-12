@@ -13,36 +13,56 @@
     </section>
 
     <section class="info-bar">
-      <strong>{{ currentUser.teamName }}</strong>
-      <span>팀원 {{ sortedTeamMembers.length }}명</span>
+      <strong>전체 인원 {{ memberTotal }}명</strong>
       <span v-if="canViewMemberDetail" class="permission-text"></span>
     </section>
 
-    <section class="member-grid">
-      <article
-        v-for="member in sortedTeamMembers"
-        :key="member.employeeId"
-        class="member-card"
-        :class="{ clickable: canViewMemberDetail }"
-        @click="openMemberDetail(member)"
-      >
-        <div class="profile-top">
-          <div class="profile-avatar">
-            <span>{{ member.profileInitial }}</span>
-          </div>
-          <div class="profile-head">
-            <strong>{{ member.name }}</strong>
-            <span class="status" :class="statusClass(member.status)">{{ member.status }}</span>
-          </div>
-        </div>
+    <section class="team-filter-bar">
+      <label for="teamFilter">팀 필터</label>
+      <select id="teamFilter" v-model="selectedTeam">
+        <option value="">전체</option>
+        <option v-for="team in teamOptions" :key="team" :value="team">{{ team }}</option>
+      </select>
+    </section>
 
-        <div class="member-rows">
-          <div class="row"><span>내선</span><strong>{{ member.extension }}</strong></div>
-          <div class="row"><span>연락처</span><strong>{{ member.phone }}</strong></div>
-          <div class="row"><span>이메일</span><strong>{{ member.email }}</strong></div>
-          <div class="row"><span>직책/직무/직위</span><strong>{{ member.duty }} · {{ member.job }} · {{ member.position }}</strong></div>
-        </div>
-      </article>
+    <section v-for="group in groupedMembers" :key="group.teamName" class="team-section">
+      <div class="team-section-head">
+        <strong>{{ group.teamName }}</strong>
+        <span>{{ group.members.length }}명</span>
+      </div>
+      <div class="member-grid">
+        <article
+          v-for="member in group.members"
+          :key="member.employeeId"
+          class="member-card"
+          :class="{ clickable: canViewMemberDetail }"
+          @click="openMemberDetail(member)"
+        >
+          <div class="profile-top">
+            <div class="profile-avatar">
+              <img
+                v-if="member.profileFileUrl"
+                :src="member.profileFileUrl"
+                alt="프로필 이미지"
+                class="profile-avatar-image"
+              />
+              <span v-else>{{ member.profileInitial }}</span>
+            </div>
+            <div class="profile-head">
+              <strong>{{ member.name }}</strong>
+              <span class="status" :class="statusClass(member.status)">{{ member.status }}</span>
+            </div>
+          </div>
+
+          <div class="member-rows">
+            <div class="row"><span>내선</span><strong>{{ member.extension }}</strong></div>
+            <div class="row"><span>연락처</span><strong>{{ member.phone }}</strong></div>
+            <div class="row"><span>이메일</span><strong>{{ member.email }}</strong></div>
+            <div class="row"><span>소속팀</span><strong>{{ member.orgName }}</strong></div>
+            <div class="row"><span>직책/직무/직위</span><strong>{{ member.duty }} · {{ member.job }} · {{ member.position }}</strong></div>
+          </div>
+        </article>
+      </div>
     </section>
 
     <BaseModal v-model="showDetailModal" width="760px">
@@ -75,10 +95,10 @@
 
           <section class="detail-card">
             <h3>역량 정보</h3>
-            <div v-if="selectedMember.skills?.length" class="skill-list">
+            <div v-if="selectedMember.skills?.length" class="list-scroll">
               <div v-for="(skill, idx) in selectedMember.skills" :key="`${selectedMember.employeeId}-${idx}`" class="skill-item">
                 <strong>{{ skill.name }}</strong>
-                <span>{{ skill.type }} · {{ skill.issuer }} · {{ skill.date }}</span>
+                <span>{{ skill.type }} · {{ skill.date }}</span>
                 <div class="item-actions">
                   <button type="button" class="link-btn" @click="openSkillEvidence(skill)">증빙 조회</button>
                 </div>
@@ -89,7 +109,7 @@
 
           <section class="detail-card">
             <h3>경력사항</h3>
-            <div v-if="selectedMember.careers?.length" class="career-list">
+            <div v-if="selectedMember.careers?.length" class="list-scroll">
               <div
                 v-for="(career, idx) in selectedMember.careers"
                 :key="`${selectedMember.employeeId}-career-${idx}`"
@@ -106,23 +126,36 @@
             <p v-else class="empty-text">등록된 경력사항이 없습니다.</p>
           </section>
 
-          <section class="detail-card history-card">
+          <section class="detail-card detail-card-full">
             <h3>인사 히스토리</h3>
-            <div v-if="selectedMemberHistories.length" class="history-list">
+            <div v-if="selectedMember.hrHistories?.length" class="history-list">
               <div
-                v-for="history in selectedMemberHistories"
-                :key="history.hr_event_id"
+                v-for="(history, idx) in selectedMember.hrHistories"
+                :key="`${selectedMember.employeeId}-history-${idx}`"
                 class="history-item"
               >
                 <div class="history-top">
-                  <span class="history-type">{{ history.event_type }}</span>
-                  <strong>{{ history.event_title }}</strong>
+                  <span class="history-type">{{ history.eventTypeDescription || history.eventType || '-' }}</span>
+                  <strong>{{ history.eventTitle || '-' }}</strong>
                 </div>
                 <div class="history-meta">
-                  <span>적용일: {{ history.effective_from }}</span>
-                  <span>상태: {{ historyStatusText(history.event_status) }}</span>
+                  <span>적용일: {{ history.effectiveFrom || '-' }}</span>
+                  <span>종료일: {{ history.effectiveTo || '-' }}</span>
                 </div>
-                <p class="history-change">{{ history.before_value }} → {{ history.after_value }}</p>
+                <template v-if="history.changeItems?.length">
+                  <p
+                    v-for="(change, changeIdx) in history.changeItems"
+                    :key="`${history.hrEventId}-change-${changeIdx}`"
+                    class="history-change"
+                  >
+                    {{ change.label }}: {{ change.before || '-' }} → {{ change.after || '-' }}
+                  </p>
+                </template>
+                <template v-else>
+                  <p class="history-change">변경 전: {{ history.beforeChange || '-' }}</p>
+                  <p class="history-change">변경 후: {{ history.afterChange || '-' }}</p>
+                </template>
+                <p class="history-change">사유: {{ history.reason || '-' }}</p>
               </div>
             </div>
             <p v-else class="empty-text">등록된 인사 히스토리가 없습니다.</p>
@@ -138,45 +171,169 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/common/BaseModal.vue'
-import { AUTH_KEYS } from '@/utils/auth'
+import { getSessionRoleCodes } from '@/utils/auth'
 import { usePerformanceStore } from '@/store/performance'
 import {
-  createHrCurrentUserMock,
-  createHrTeamMembersMock,
-  sortMembersByRule
-} from '@/mocks/hr/organization'
-import { createHrEventsMock } from '@/mocks/hr/hrEvents'
+  getMyOrganizationMembers,
+  getOrganizationMemberCareerEvidence,
+  getOrganizationMemberDetail,
+  getOrganizationMemberSkillEvidence,
+} from '@/api/hr'
 
 const router = useRouter()
 const performanceStore = usePerformanceStore()
 
-const currentUser = ref(createHrCurrentUserMock())
-const teamMembers = ref(createHrTeamMembersMock())
-const hrEvents = ref(createHrEventsMock())
+const teamMembers = ref([])
+const memberTotal = ref(0)
+const selectedTeam = ref('')
 
 const showDetailModal = ref(false)
 const selectedMember = ref(null)
 
-const canViewMemberDetail = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) === 'admin1234')
-const sortedTeamMembers = computed(() => sortMembersByRule(teamMembers.value))
-const selectedMemberHistories = computed(() => {
-  if (!selectedMember.value?.employeeId) return []
-  return hrEvents.value
-    .filter((item) => item.employee_id === selectedMember.value.employeeId)
-    .sort(
-      (a, b) =>
-        Number(String(b.effective_from).replaceAll('.', '')) -
-        Number(String(a.effective_from).replaceAll('.', ''))
-    )
+const canViewMemberDetail = computed(() => {
+  const roleCodes = getSessionRoleCodes()
+  return roleCodes.includes('EVALUATOR') || roleCodes.includes('ROLE_EVALUATOR')
+})
+const sortedTeamMembers = computed(() => [...teamMembers.value])
+const teamOptions = computed(() => {
+  const names = [...new Set(sortedTeamMembers.value.map((item) => item.orgName).filter(Boolean))]
+  return names.sort((a, b) => a.localeCompare(b, 'ko'))
+})
+const filteredMembers = computed(() => {
+  if (!selectedTeam.value) return sortedTeamMembers.value
+  return sortedTeamMembers.value.filter((item) => item.orgName === selectedTeam.value)
+})
+const groupedMembers = computed(() => {
+  const grouped = new Map()
+  for (const member of filteredMembers.value) {
+    const teamName = member.orgName || '미분류'
+    if (!grouped.has(teamName)) {
+      grouped.set(teamName, [])
+    }
+    grouped.get(teamName).push(member)
+  }
+  return [...grouped.entries()].map(([teamName, members]) => ({ teamName, members }))
 })
 
-const openMemberDetail = (member) => {
+const parseChangeMap = (raw) => {
+  if (!raw || typeof raw !== 'string') return {}
+  return raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((acc, part) => {
+      const separatorIdx = part.indexOf(':')
+      if (separatorIdx < 0) return acc
+      const key = part.slice(0, separatorIdx).trim()
+      const value = part.slice(separatorIdx + 1).trim()
+      if (key) acc[key] = value
+      return acc
+    }, {})
+}
+
+const buildChangedItems = (beforeRaw, afterRaw) => {
+  const beforeMap = parseChangeMap(beforeRaw)
+  const afterMap = parseChangeMap(afterRaw)
+  const keys = [...new Set([...Object.keys(beforeMap), ...Object.keys(afterMap)])]
+  return keys
+    .filter((key) => (beforeMap[key] || '') !== (afterMap[key] || ''))
+    .map((key) => ({
+      label: key,
+      before: beforeMap[key] || '',
+      after: afterMap[key] || '',
+    }))
+}
+
+const toSkillCategoryLabel = (category) => {
+  const map = {
+    CERTIFICATE: '자격',
+    LANGUAGE: '어학',
+  }
+  return map[category] || category || '-'
+}
+
+const mapMember = (row) => ({
+  employeeId: row.employeeId,
+  name: row.employeeName,
+  profileInitial: String(row.employeeName || '').slice(-2) || '직원',
+  profileFileUrl: row.profileFileUrl || '',
+  orgId: row.orgId,
+  orgName: row.orgName || '-',
+  extension: row.extensionNum || '-',
+  phone: row.phone || '-',
+  email: row.email || '-',
+  duty: row.positionName || '-',
+  job: row.jobName || '-',
+  position: row.rankName || '-',
+  status: row.employeeStateDescription || '-',
+})
+
+const loadMembers = async () => {
+  try {
+    const pageData = await getMyOrganizationMembers(1)
+    const content = Array.isArray(pageData?.content) ? pageData.content : []
+    teamMembers.value = content.map(mapMember)
+    memberTotal.value = Number(pageData?.totalElements || content.length || 0)
+  } catch (error) {
+    teamMembers.value = []
+    memberTotal.value = 0
+    alert(error?.response?.data?.error?.message || '내 조직 구성원 조회에 실패했습니다.')
+  }
+}
+
+const openMemberDetail = async (member) => {
   if (!canViewMemberDetail.value) return
-  selectedMember.value = member
-  showDetailModal.value = true
+  try {
+    const detail = await getOrganizationMemberDetail(member.employeeId)
+    selectedMember.value = {
+      employeeId: member.employeeId,
+      name: detail?.personalInfo?.employeeName || member.name,
+      email: detail?.personalInfo?.email || member.email,
+      phone: detail?.personalInfo?.phone || member.phone,
+      extension: detail?.personalInfo?.extensionNum || member.extension,
+      personalInfo: {
+        birthDate: detail?.personalInfo?.birthDate || '-',
+      },
+      hrInfo: {
+        organization: detail?.hrInfo?.orgName || '-',
+        dutyJobPosition: `${detail?.hrInfo?.positionName || '-'} · ${detail?.hrInfo?.jobName || '-'} · ${detail?.hrInfo?.rankName || '-'}`,
+        employmentStatus: detail?.hrInfo?.employeeStateDescription || '-',
+        hireDate: detail?.hrInfo?.hireDate || '-',
+        workType: detail?.hrInfo?.employTypeDescription || '-',
+        workRegion: detail?.hrInfo?.areaName || '-',
+      },
+      skills: (detail?.skills || []).map((skill) => ({
+        skillId: skill.skillId,
+        name: skill.skillName,
+        type: toSkillCategoryLabel(skill.category),
+        date: skill.acquisitionDate || '-',
+      })),
+      careers: (detail?.careers || []).map((career) => ({
+        careerId: career.careerId,
+        company: career.companyName,
+        role: career.orgName,
+        period: `${career.startDate || '-'} ~ ${career.endDate || '재직중'}`,
+      })),
+      hrHistories: (detail?.hrHistories || []).map((history) => ({
+        hrEventId: history.hrEventId,
+        eventType: history.eventType,
+        eventTypeDescription: history.eventTypeDescription,
+        eventTitle: history.eventTitle,
+        effectiveFrom: history.effectiveFrom,
+        effectiveTo: history.effectiveTo,
+        reason: history.reason,
+        beforeChange: history.beforeChange,
+        afterChange: history.afterChange,
+        changeItems: buildChangedItems(history.beforeChange, history.afterChange),
+      })),
+    }
+    showDetailModal.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '구성원 상세 조회에 실패했습니다.')
+  }
 }
 
 const goToTeamAttendance = () => {
@@ -189,39 +346,38 @@ const goToPerformanceInquiry = () => {
 }
 
 const statusClass = (status) => {
-  if (status === '정상') return 'ok'
-  if (status === '재택') return 'remote'
+  if (status === '재직') return 'ok'
+  if (status === '휴직') return 'remote'
   return 'leave'
 }
 
-const historyStatusText = (status) => {
-  if (status === 'APPROVED') return '완료'
-  if (status === 'REJECTED') return '반려'
-  return '진행중'
+const openSkillEvidence = async (skill) => {
+  if (!selectedMember.value?.employeeId || !skill?.skillId) return
+  try {
+    const response = await getOrganizationMemberSkillEvidence(selectedMember.value.employeeId, skill.skillId)
+    if (response?.fileUrl) {
+      window.open(response.fileUrl, '_blank', 'noopener,noreferrer')
+    }
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '역량 증빙 조회에 실패했습니다.')
+  }
 }
 
-const openDataUrl = (url) => {
-  if (!url) return
-  window.open(url, '_blank', 'noopener,noreferrer')
+const openCareerEvidence = async (career) => {
+  if (!selectedMember.value?.employeeId || !career?.careerId) return
+  try {
+    const response = await getOrganizationMemberCareerEvidence(selectedMember.value.employeeId, career.careerId)
+    if (response?.fileUrl) {
+      window.open(response.fileUrl, '_blank', 'noopener,noreferrer')
+    }
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '경력 증빙 조회에 실패했습니다.')
+  }
 }
 
-const buildSkillEvidenceFallback = (skill) => {
-  const text = `${skill?.name || '역량'} 증빙 더미 파일`
-  return `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`
-}
-
-const buildCareerEvidenceFallback = (career) => {
-  const text = `${career?.company || '경력'} 증빙 더미 파일`
-  return `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`
-}
-
-const openSkillEvidence = (skill) => {
-  openDataUrl(skill?.fileUrl || buildSkillEvidenceFallback(skill))
-}
-
-const openCareerEvidence = (career) => {
-  openDataUrl(career?.fileUrl || buildCareerEvidenceFallback(career))
-}
+onMounted(async () => {
+  await loadMembers()
+})
 </script>
 
 <style scoped>
@@ -230,12 +386,12 @@ const openCareerEvidence = (career) => {
 .breadcrumb { font-size: .78rem; color: var(--gray400); margin-bottom: 4px; }
 
 .page-head {
-  margin-top: 12px;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
+  margin-top: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  border: 1px solid #dbe3ef;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -249,7 +405,7 @@ const openCareerEvidence = (career) => {
 
 .title-wrap h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.24rem;
   color: var(--gray800);
 }
 
@@ -275,10 +431,10 @@ const openCareerEvidence = (career) => {
   border: 1px solid var(--primary);
   background: var(--accent);
   color: var(--primary);
-  height: 34px;
-  padding: 0 12px;
+  height: 32px;
+  padding: 0 10px;
   border-radius: 10px;
-  font-size: .84rem;
+  font-size: .8rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -300,16 +456,16 @@ const openCareerEvidence = (career) => {
 }
 
 .info-bar {
-  margin-top: 12px;
-  background: #fff;
-  border: 1px solid var(--gray200);
+  margin-top: 8px;
+  background: #f8fbff;
+  border: 1px solid #dbe6f3;
   border-radius: var(--radius);
-  padding: 12px 16px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  color: var(--gray600);
-  font-size: .86rem;
+  gap: 8px;
+  color: #52637a;
+  font-size: .82rem;
 }
 
 .permission-text {
@@ -317,19 +473,86 @@ const openCareerEvidence = (career) => {
   font-weight: 700;
 }
 
+.team-filter-bar {
+  margin-top: 8px;
+  background: #f8fbff;
+  border: 1px solid #dbe6f3;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  min-width: 320px;
+}
+
+.team-filter-bar label {
+  font-size: .82rem;
+  color: var(--gray500);
+  font-weight: 600;
+}
+
+.team-filter-bar select {
+  min-width: 220px;
+  height: 34px;
+  border: 1px solid #cfdae8;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #fff;
+  color: var(--gray700);
+  font-size: .84rem;
+}
+
+.team-filter-bar select:focus {
+  outline: none;
+  border-color: #0EA5E9;
+}
+
+.team-section {
+  margin-top: 10px;
+  background: #f9fbff;
+  border: 1px solid #dbe6f3;
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.team-section-head {
+  height: 38px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed #d6e0ee;
+  border-radius: 0;
+  padding: 0 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-section-head strong {
+  color: var(--gray800);
+  font-size: .95rem;
+}
+
+.team-section-head span {
+  color: #66778f;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
 .member-grid {
-  margin-top: 14px;
+  margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .member-card {
   background: #fff;
-  border: 1px solid var(--gray200);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 16px;
+  border: 1px solid #e1e8f3;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .04);
+  padding: 12px;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
 }
 
 .member-card.clickable {
@@ -337,31 +560,39 @@ const openCareerEvidence = (career) => {
 }
 
 .member-card.clickable:hover {
-  border-color: #7DD3FC;
+  border-color: #8fc7ff;
   box-shadow: 0 10px 24px rgba(2, 132, 199, .12);
+  transform: translateY(-1px);
 }
 
 .profile-top {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .profile-avatar {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: 14px;
   background: linear-gradient(135deg, #A5F3FC, #0891B2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .profile-avatar span {
   color: #fff;
   font-weight: 800;
-  font-size: .93rem;
+  font-size: .82rem;
+}
+
+.profile-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-head {
@@ -371,17 +602,17 @@ const openCareerEvidence = (career) => {
 }
 
 .profile-head strong {
-  font-size: 1.08rem;
+  font-size: .98rem;
   color: var(--gray800);
 }
 
 .status {
   display: inline-flex;
   align-items: center;
-  height: 22px;
+  height: 20px;
   padding: 0 8px;
   border-radius: 999px;
-  font-size: .72rem;
+  font-size: .68rem;
   font-weight: 700;
 }
 
@@ -402,14 +633,14 @@ const openCareerEvidence = (career) => {
 
 .member-rows {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .row {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 8px;
-  font-size: .84rem;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 6px;
+  font-size: .76rem;
 }
 
 .row span {
@@ -462,10 +693,17 @@ const openCareerEvidence = (career) => {
   border: 1px solid var(--gray200);
   border-radius: 12px;
   padding: 12px;
+  min-height: 190px;
+  max-height: 190px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.detail-card:last-child {
+.detail-card-full {
   grid-column: 1 / -1;
+  min-height: 240px;
+  max-height: 240px;
 }
 
 .detail-card h3 {
@@ -485,10 +723,10 @@ const openCareerEvidence = (career) => {
 .detail-row span { color: var(--gray500); }
 .detail-row strong { color: var(--gray800); word-break: break-word; }
 
-.skill-list {
+.list-scroll {
   display: grid;
   gap: 8px;
-  max-height: 220px;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -509,14 +747,6 @@ const openCareerEvidence = (career) => {
 .skill-item span {
   color: var(--gray500);
   font-size: .8rem;
-}
-
-.career-list {
-  display: grid;
-  gap: 8px;
-  max-height: 220px;
-  overflow-y: auto;
-  padding-right: 2px;
 }
 
 .career-item {
@@ -556,7 +786,7 @@ const openCareerEvidence = (career) => {
 }
 
 .history-list {
-  max-height: 240px;
+  min-height: 0;
   overflow-y: auto;
   display: grid;
   gap: 8px;
@@ -645,6 +875,36 @@ const openCareerEvidence = (career) => {
 
   .detail-sections {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detail-card,
+  .detail-card-full {
+    min-height: 220px;
+    max-height: 220px;
+  }
+
+  .team-filter-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .team-filter-bar select {
+    min-width: 100%;
+    width: 100%;
+  }
+}
+
+@media (max-width: 1500px) {
+  .member-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .member-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

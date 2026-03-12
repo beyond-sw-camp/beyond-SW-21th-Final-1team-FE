@@ -2,17 +2,18 @@
   <div class="card fade-up delay-1 profile-card">
     <div class="profile-content">
       <div class="avatar">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <img
+          v-if="profileImageUrl"
+          :src="profileImageUrl"
+          alt="프로필 이미지"
+          class="avatar-image"
+        />
+        <svg v-else width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
         </svg>
-        <div class="avatar-badge">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-          </svg>
-        </div>
       </div>
-      <div class="profile-name">{{ name }} {{ position }}</div>
-      <div class="profile-team">{{ team }}</div>
+      <div class="profile-name">{{ displayName }}</div>
+      <div class="profile-team">{{ displayOrgName }}</div>
       <div class="profile-btns">
         <div class="btn-group">
           <button class="btn-checkin" @click="handleCheckIn">출근</button>
@@ -28,19 +29,26 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import { storeToRefs } from 'pinia'
+import { getMyPageHeader } from '@/api/hr'
+import { AUTH_KEYS } from '@/utils/auth'
 
-defineProps({
-  name: { type: String, default: '김봉식' },
-  position: { type: String, default: '과장' },
-  team: { type: String, default: '모바일 1팀' },
-})
 const emit = defineEmits(['checkin', 'checkout'])
 
 const store = useAttendanceStore()
 const { checkInTime, checkOutTime } = storeToRefs(store)
+
+const profile = ref({
+  employeeName: sessionStorage.getItem(AUTH_KEYS.userName) || '',
+  orgName: sessionStorage.getItem(AUTH_KEYS.orgName) || '',
+  profileFileUrl: '',
+})
+
+const displayName = computed(() => profile.value.employeeName || '-')
+const displayOrgName = computed(() => profile.value.orgName || '-')
+const profileImageUrl = computed(() => profile.value.profileFileUrl || '')
 
 const handleCheckIn = () => {
   const now = new Date()
@@ -55,6 +63,23 @@ const handleCheckOut = () => {
   const m = String(now.getMinutes()).padStart(2, '0')
   store.setCheckOutTime(`${h}:${m}`)
 }
+
+const loadProfileHeader = async () => {
+  try {
+    const header = await getMyPageHeader()
+    profile.value = {
+      employeeName: header?.employeeName || profile.value.employeeName,
+      orgName: header?.orgName || profile.value.orgName,
+      profileFileUrl: header?.profileFileUrl || '',
+    }
+  } catch (_error) {
+    // 대시보드 카드 실패 시에는 세션 정보로만 렌더링
+  }
+}
+
+onMounted(() => {
+  loadProfileHeader()
+})
 </script>
 
 <style scoped>
@@ -65,12 +90,9 @@ const handleCheckOut = () => {
   background:linear-gradient(135deg,#94A3B8,#64748B);
   margin:0 auto 4px;display:flex;align-items:center;justify-content:center;
   position:relative;
+  overflow:hidden;
 }
-.avatar-badge{
-  position:absolute;bottom:0;right:0;width:20px;height:20px;
-  background:var(--primary);border-radius:50%;border:2px solid #fff;
-  display:flex;align-items:center;justify-content:center;
-}
+.avatar-image{width:100%;height:100%;object-fit:cover;display:block}
 .profile-name{font-size:1.05rem;font-weight:700;color:var(--gray800);margin-top:10px}
 .profile-team{font-size:0.8rem;color:var(--gray500);margin-bottom:16px}
 .profile-btns{display:flex;gap:6px}

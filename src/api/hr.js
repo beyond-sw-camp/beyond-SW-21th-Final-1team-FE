@@ -14,6 +14,27 @@ const appendJsonRequest = (formData, payload) => {
 
 export const getMyPage = () => unwrap(api.get('/mypage'))
 export const getMyPageHeader = () => unwrap(api.get('/mypage/header'))
+export const getMyHrEvents = () => unwrap(api.get('/mypage/hr-events'))
+export const getMyHrEventDetail = (hrEventId) => unwrap(api.get(`/mypage/hr-events/${hrEventId}`))
+export const getOrganizationTree = () => unwrap(api.get('/org/tree'))
+export const getOrganizationMembers = (orgId) => unwrap(api.get(`/org/${orgId}/members`))
+export const getCertificateRequestHistories = () => unwrap(api.get('/mypage/certificates/requests'))
+export const createCertificateRequest = (payload) => unwrap(api.post('/mypage/certificates/requests', payload))
+export const getMyOrganizationMembers = (page = 1, orgId) =>
+  unwrap(
+    api.get('/org/my/members', {
+      params: {
+        page,
+        ...(orgId ? { orgId } : {}),
+      },
+    }),
+  )
+export const getOrganizationMemberDetail = (targetEmployeeId) =>
+  unwrap(api.get(`/org/members/${targetEmployeeId}/detail`))
+export const getOrganizationMemberSkillEvidence = (targetEmployeeId, skillId) =>
+  unwrap(api.get(`/org/members/${targetEmployeeId}/skills/${skillId}/evidence`))
+export const getOrganizationMemberCareerEvidence = (targetEmployeeId, careerId) =>
+  unwrap(api.get(`/org/members/${targetEmployeeId}/careers/${careerId}/evidence`))
 export const getSkillEvidence = (skillId) => unwrap(api.get(`/mypage/skills/${skillId}/evidence`))
 export const getCareerEvidence = (careerId) => unwrap(api.get(`/mypage/careers/${careerId}/evidence`))
 
@@ -63,4 +84,19 @@ export const createCareer = async ({ companyName, orgName, startDate, endDate, f
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   )
+}
+
+export const deleteSkill = async (skillId) => {
+  await api.delete(`/mypage/skills/${skillId}`)
+}
+
+export const deleteCareer = async (careerId) => {
+  await api.delete(`/mypage/careers/${careerId}`)
+}
+
+export const downloadCertificateByRequestId = async (requestId) => {
+  const response = await api.get(`/mypage/certificates/${requestId}/download`, {
+    responseType: 'blob',
+  })
+  return response.data
 }

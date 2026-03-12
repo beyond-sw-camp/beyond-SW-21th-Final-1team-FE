@@ -53,17 +53,16 @@
         <div class="skill-table-wrap">
           <table class="skill-table">
             <thead>
-            <tr><th>종류</th><th>자격증명</th><th>취득일</th><th>상태</th><th>증빙 파일</th><th>삭제</th></tr>
+            <tr><th>종류</th><th>자격증명</th><th>취득일</th><th>증빙 파일</th><th>삭제</th></tr>
             </thead>
             <tbody>
-            <tr v-for="(s, i) in user.skills" :key="i">
+            <tr v-for="(s, i) in user.skills" :key="s.skillId || i">
               <td>{{ s.type }}</td>
               <td class="bold">{{ s.name }}</td>
               <td class="font-num">{{ s.date }}</td>
-              <td><span class="status-tag" :class="s.status === '유효' ? 'valid' : 'expired'">{{ s.status }}</span></td>
               <td>
                 <button
-                  v-if="s.fileUrl"
+                  v-if="s.hrFileId"
                   type="button"
                   class="link-btn"
                   @click="viewSkillFile(s)"
@@ -99,12 +98,12 @@
             </tr>
             </thead>
             <tbody>
-            <tr v-for="(c, i) in user.careers" :key="i">
+            <tr v-for="(c, i) in user.careers" :key="c.careerId || i">
               <td class="bold">{{ c.company }}</td>
               <td>{{ c.role }}</td>
               <td class="font-num">{{ c.period }}</td>
               <td>
-                <button v-if="c.fileUrl" type="button" class="link-btn" @click="viewCareerFile(c)">조회</button>
+                <button v-if="c.hrFileId" type="button" class="link-btn" @click="viewCareerFile(c)">조회</button>
                 <span v-else class="muted">미등록</span>
               </td>
               <td>
@@ -128,7 +127,7 @@
           <label>프로필 이미지</label>
           <div class="profile-image-row">
             <div class="profile-image-preview">
-              <img v-if="editForm.profileImage" :src="editForm.profileImage" alt="프로필 이미지" />
+              <img v-if="editForm.profileImagePreview" :src="editForm.profileImagePreview" alt="프로필 이미지" />
               <span v-else>{{ user.name.slice(-2) }}</span>
             </div>
             <button class="btn-upload" type="button" @click="triggerProfileFileInput">이미지 변경</button>
@@ -168,37 +167,28 @@
       </div>
       <div class="modal-fields">
         <div class="modal-field">
-          <label>종류</label>
+          <label>종류 <span class="required-mark">(필수)</span></label>
           <select v-model="skillForm.type">
-            <option value="자격증">자격증</option>
-            <option value="어학">어학</option>
-            <option value="면허">면허</option>
+            <option value="CERTIFICATE">자격</option>
+            <option value="LANGUAGE">어학</option>
+            <option value="LICENSE">면허</option>
+            <option value="ETC">기타</option>
           </select>
         </div>
         <div class="modal-field">
-          <label>자격명</label>
+          <label>자격명 <span class="required-mark">(필수)</span></label>
           <input v-model="skillForm.name" placeholder="자격명을 입력하세요" />
         </div>
         <div class="modal-field">
-          <label>발급 기관</label>
-          <input v-model="skillForm.issuer" placeholder="발급 기관을 입력하세요" />
-        </div>
-        <div class="modal-field-row">
-          <div class="modal-field">
-            <label>취득일</label>
-            <input v-model="skillForm.date" type="date" />
-          </div>
-          <div class="modal-field">
-            <label>만료일 (선택)</label>
-            <input v-model="skillForm.expiry" type="date" />
-          </div>
+          <label>취득일 <span class="required-mark">(필수)</span></label>
+          <input v-model="skillForm.date" type="date" />
         </div>
         <div class="modal-field">
           <label>자격 번호 (선택)</label>
-          <input v-model="skillForm.certNo" placeholder="자격 번호를 입력하세요" />
+          <input v-model="skillForm.licenseNumber" placeholder="자격 번호를 입력하세요" />
         </div>
         <div class="modal-field">
-          <label>증빙 파일 (이미지 또는 PDF)</label>
+          <label>증빙 파일 (이미지 또는 PDF) <span class="required-mark">(필수)</span></label>
           <div class="file-upload" @click="triggerFileInput">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span v-if="!skillForm.file">파일 선택</span>
@@ -209,7 +199,7 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn-confirm" @click="addSkill">확인</button>
+        <button class="btn-confirm" :disabled="!canAddSkill" @click="addSkill">확인</button>
         <button class="btn-cancel" @click="showAddSkill = false">취소</button>
       </div>
     </BaseModal>
@@ -222,16 +212,16 @@
       </div>
       <div class="modal-fields">
         <div class="modal-field">
-          <label>회사명</label>
+          <label>회사명 <span class="required-mark">(필수)</span></label>
           <input v-model="careerForm.company" placeholder="회사명을 입력하세요" />
         </div>
         <div class="modal-field">
-          <label>직무/소속</label>
+          <label>직무/소속 <span class="required-mark">(필수)</span></label>
           <input v-model="careerForm.role" placeholder="예: 백엔드 개발자 · 플랫폼개발팀" />
         </div>
         <div class="modal-field-row">
           <div class="modal-field">
-            <label>시작일</label>
+            <label>시작일 <span class="required-mark">(필수)</span></label>
             <input v-model="careerForm.startDate" type="date" />
           </div>
           <div class="modal-field">
@@ -240,7 +230,7 @@
           </div>
         </div>
         <div class="modal-field">
-          <label>증빙 파일 (이미지 또는 PDF)</label>
+          <label>증빙 파일 (이미지 또는 PDF) <span class="required-mark">(필수)</span></label>
           <div class="file-upload" @click="triggerCareerFileInput">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span v-if="!careerForm.file">파일 선택</span>
@@ -251,7 +241,7 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn-confirm" @click="addCareer">확인</button>
+        <button class="btn-confirm" :disabled="!canAddCareer" @click="addCareer">확인</button>
         <button class="btn-cancel" @click="showAddCareer = false">취소</button>
       </div>
     </BaseModal>
@@ -297,55 +287,92 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
-import { AUTH_KEYS } from '@/utils/auth'
+import {
+  changeMyPassword,
+  createCareer,
+  createSkill,
+  deleteCareer as deleteCareerApi,
+  deleteSkill as deleteSkillApi,
+  getCareerEvidence,
+  getSkillEvidence,
+  updateBasicInfo,
+} from '@/api/hr'
 
 const props = defineProps({ user: { type: Object, required: true } })
+const emit = defineEmits(['refresh'])
+
+const isSubmitting = ref(false)
+
+const refresh = () => emit('refresh')
 
 // ── 기본 정보 수정 ──
 const showEditBasic = ref(false)
-const editForm = reactive({ profileImage: '', email: '', phone: '', address: '' })
+const editForm = reactive({
+  profileImagePreview: '',
+  profileImageFile: null,
+  email: '',
+  phone: '',
+  address: '',
+})
 const profileFileInputRef = ref(null)
-const emit = defineEmits(['update:user'])
 
 watch(showEditBasic, (val) => {
   if (val) {
-    editForm.profileImage = props.user.profileImage || ''
+    editForm.profileImagePreview = props.user.profileImage || ''
+    editForm.profileImageFile = null
     editForm.email = props.user.email || ''
-    editForm.phone = props.user.phone
-    editForm.address = props.user.address
+    editForm.phone = props.user.phone || ''
+    editForm.address = props.user.address || ''
   }
 })
 
 const triggerProfileFileInput = () => profileFileInputRef.value?.click()
+
 const handleProfileImageSelect = (e) => {
   const file = e.target.files?.[0]
   if (!file || !String(file.type).startsWith('image/')) return
 
+  editForm.profileImageFile = file
   const reader = new FileReader()
   reader.onload = () => {
-    editForm.profileImage = String(reader.result || '')
+    editForm.profileImagePreview = String(reader.result || '')
   }
   reader.readAsDataURL(file)
   e.target.value = ''
 }
 
-const saveBasicInfo = () => {
-  emit('update:user', {
-    ...props.user,
-    profileImage: editForm.profileImage,
-    email: editForm.email,
-    phone: editForm.phone,
-    address: editForm.address
-  })
-  showEditBasic.value = false
-  // 추후 API: await api.put('/users/me/basic', editForm)
+const saveBasicInfo = async () => {
+  try {
+    isSubmitting.value = true
+    await updateBasicInfo({
+      email: editForm.email,
+      phone: editForm.phone,
+      address: editForm.address,
+      profileImage: editForm.profileImageFile,
+    })
+    showEditBasic.value = false
+    refresh()
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '기본 정보 수정에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 // ── 역량 정보 추가 ──
 const showAddSkill = ref(false)
 const fileInputRef = ref(null)
-const skillForm = reactive({ type: '자격증', name: '', issuer: '', date: '', expiry: '', certNo: '', file: null })
+const skillForm = reactive({
+  type: 'CERTIFICATE',
+  name: '',
+  date: '',
+  licenseNumber: '',
+  file: null,
+})
 const skillFileError = ref('')
+const canAddSkill = computed(() =>
+  Boolean(skillForm.type && skillForm.name && skillForm.date && skillForm.file),
+)
 
 watch(showAddSkill, (val) => {
   if (!val) {
@@ -354,6 +381,7 @@ watch(showAddSkill, (val) => {
 })
 
 const triggerFileInput = () => fileInputRef.value?.click()
+
 const handleFileSelect = (e) => {
   const file = e.target.files?.[0] || null
   if (!file) {
@@ -372,62 +400,67 @@ const handleFileSelect = (e) => {
   skillFileError.value = ''
 }
 
-const toDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('file-read-failed'))
-    reader.readAsDataURL(file)
-  })
-
 const addSkill = async () => {
-  if (!skillForm.name || !skillForm.issuer) return
+  if (!skillForm.name || !skillForm.date) return
   if (!skillForm.file) {
     skillFileError.value = '증빙 파일을 첨부해야 등록할 수 있습니다.'
     return
   }
 
-  let fileUrl = ''
   try {
-    fileUrl = await toDataUrl(skillForm.file)
+    isSubmitting.value = true
+    await createSkill({
+      category: skillForm.type,
+      skillName: skillForm.name,
+      acquisitionDate: skillForm.date,
+      licenseNumber: skillForm.licenseNumber || null,
+      file: skillForm.file,
+    })
+
+    Object.assign(skillForm, {
+      type: 'CERTIFICATE',
+      name: '',
+      date: '',
+      licenseNumber: '',
+      file: null,
+    })
+    skillFileError.value = ''
+    showAddSkill.value = false
+    refresh()
   } catch (error) {
-    skillFileError.value = '증빙 파일을 읽는 중 오류가 발생했습니다.'
-    return
+    alert(error?.response?.data?.error?.message || '역량 정보 등록에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
   }
-
-  const newSkill = {
-    type: skillForm.type,
-    name: skillForm.name,
-    issuer: skillForm.issuer,
-    date: skillForm.date,
-    status: '유효',
-    fileName: skillForm.file.name,
-    fileType: skillForm.file.type,
-    fileUrl
-  }
-  emit('update:user',{
-    ...props.user,
-    skills: [...props.user.skills, newSkill]
-  })
-  Object.assign(skillForm, { type: '자격증', name: '', issuer: '', date: '', expiry: '', certNo: '', file: null })
-  skillFileError.value = ''
-  showAddSkill.value = false
-  // 추후 API: await api.post('/users/me/skills', formData)
 }
 
-const viewSkillFile = (skill) => {
-  if (!skill?.fileUrl) return
-  window.open(skill.fileUrl, '_blank', 'noopener,noreferrer')
+const viewSkillFile = async (skill) => {
+  if (!skill?.skillId) return
+  try {
+    const response = await getSkillEvidence(skill.skillId)
+    if (response?.fileUrl) {
+      window.open(response.fileUrl, '_blank', 'noopener,noreferrer')
+    }
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '증빙 파일 조회에 실패했습니다.')
+  }
 }
 
-const deleteSkill = (index) => {
+const deleteSkill = async (index) => {
   const current = Array.isArray(props.user.skills) ? props.user.skills : []
-  if (!current[index]) return
+  const target = current[index]
+  if (!target?.skillId) return
   if (!window.confirm('해당 역량 정보를 삭제하시겠습니까?')) return
-  emit('update:user', {
-    ...props.user,
-    skills: current.filter((_, idx) => idx !== index)
-  })
+
+  try {
+    isSubmitting.value = true
+    await deleteSkillApi(target.skillId)
+    refresh()
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '역량 정보 삭제에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 // ── 경력사항 추가 ──
@@ -438,9 +471,12 @@ const careerForm = reactive({
   role: '',
   startDate: '',
   endDate: '',
-  file: null
+  file: null,
 })
 const careerFileError = ref('')
+const canAddCareer = computed(() =>
+  Boolean(careerForm.company && careerForm.role && careerForm.startDate && careerForm.file),
+)
 
 watch(showAddCareer, (val) => {
   if (!val) {
@@ -449,6 +485,7 @@ watch(showAddCareer, (val) => {
 })
 
 const triggerCareerFileInput = () => careerFileInputRef.value?.click()
+
 const handleCareerFileSelect = (e) => {
   const file = e.target.files?.[0] || null
   if (!file) {
@@ -467,13 +504,6 @@ const handleCareerFileSelect = (e) => {
   careerFileError.value = ''
 }
 
-const toYearMonth = (dateText) => (dateText ? String(dateText).slice(0, 7).replace('-', '.') : '-')
-const toCareerPeriod = (startDate, endDate) => {
-  const start = toYearMonth(startDate)
-  const end = endDate ? toYearMonth(endDate) : '재직중'
-  return `${start} ~ ${end}`
-}
-
 const addCareer = async () => {
   if (!careerForm.company || !careerForm.role || !careerForm.startDate) return
   if (!careerForm.file) {
@@ -481,52 +511,60 @@ const addCareer = async () => {
     return
   }
 
-  let fileUrl = ''
   try {
-    fileUrl = await toDataUrl(careerForm.file)
+    isSubmitting.value = true
+    await createCareer({
+      companyName: careerForm.company,
+      orgName: careerForm.role,
+      startDate: careerForm.startDate,
+      endDate: careerForm.endDate || null,
+      file: careerForm.file,
+    })
+
+    Object.assign(careerForm, {
+      company: '',
+      role: '',
+      startDate: '',
+      endDate: '',
+      file: null,
+    })
+    careerFileError.value = ''
+    showAddCareer.value = false
+    refresh()
   } catch (error) {
-    careerFileError.value = '증빙 파일을 읽는 중 오류가 발생했습니다.'
-    return
+    alert(error?.response?.data?.error?.message || '경력사항 등록에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
   }
-
-  const newCareer = {
-    company: careerForm.company,
-    role: careerForm.role,
-    period: toCareerPeriod(careerForm.startDate, careerForm.endDate),
-    fileName: careerForm.file.name,
-    fileType: careerForm.file.type,
-    fileUrl
-  }
-
-  emit('update:user', {
-    ...props.user,
-    careers: [...(props.user.careers || []), newCareer]
-  })
-
-  Object.assign(careerForm, {
-    company: '',
-    role: '',
-    startDate: '',
-    endDate: '',
-    file: null
-  })
-  careerFileError.value = ''
-  showAddCareer.value = false
 }
 
-const viewCareerFile = (career) => {
-  if (!career?.fileUrl) return
-  window.open(career.fileUrl, '_blank', 'noopener,noreferrer')
+const viewCareerFile = async (career) => {
+  if (!career?.careerId) return
+  try {
+    const response = await getCareerEvidence(career.careerId)
+    if (response?.fileUrl) {
+      window.open(response.fileUrl, '_blank', 'noopener,noreferrer')
+    }
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '증빙 파일 조회에 실패했습니다.')
+  }
 }
 
-const deleteCareer = (index) => {
+const deleteCareer = async (index) => {
   const current = Array.isArray(props.user.careers) ? props.user.careers : []
-  if (!current[index]) return
+  const target = current[index]
+  if (!target?.careerId) return
   if (!window.confirm('해당 경력사항을 삭제하시겠습니까?')) return
-  emit('update:user', {
-    ...props.user,
-    careers: current.filter((_, idx) => idx !== index)
-  })
+
+  try {
+    isSubmitting.value = true
+    await deleteCareerApi(target.careerId)
+    refresh()
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '경력사항 삭제에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 // ── 비밀번호 변경 ──
@@ -534,8 +572,6 @@ const showChangePw = ref(false)
 const pwSuccess = ref(false)
 const pwForm = reactive({ current: '', newPw: '', confirm: '' })
 const pwErrors = reactive({ current: '', confirm: '' })
-const getPasswordStorageKey = (userId) => `accountPassword:${userId}`
-const getDefaultPassword = (userId) => (userId ? `${userId}!` : '')
 
 watch(showChangePw, (val) => {
   if (val) {
@@ -545,22 +581,18 @@ watch(showChangePw, (val) => {
   }
 })
 
-const getCurrentPassword = () => {
-  const userId = sessionStorage.getItem(AUTH_KEYS.userId) || ''
-  return localStorage.getItem(getPasswordStorageKey(userId)) || getDefaultPassword(userId)
-}
-
 const pwRules = computed(() => {
-  const pw = pwForm.newPw
+  const pw = pwForm.newPw || ''
   return [
-    { label: '8자 이상', pass: pw.length >= 8 },
-    { label: '영문', pass: /[a-zA-Z]/.test(pw) },
+    { label: '8~20자', pass: pw.length >= 8 && pw.length <= 20 },
+    { label: '영문 대문자', pass: /[A-Z]/.test(pw) },
+    { label: '영문 소문자', pass: /[a-z]/.test(pw) },
     { label: '숫자', pass: /[0-9]/.test(pw) },
-    { label: '특수문자', pass: /[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/`~]/.test(pw) },
+    { label: '특수문자', pass: /[!@#$%^&*()\-_=+\[\]{}?]/.test(pw) },
   ]
 })
 
-const allPwRulesPass = computed(() => pwRules.value.every(r => r.pass))
+const allPwRulesPass = computed(() => pwRules.value.every((r) => r.pass))
 const canChangePw = computed(() => allPwRulesPass.value && pwForm.newPw && pwForm.newPw === pwForm.confirm)
 
 const validateNewPw = () => { pwErrors.confirm = '' }
@@ -568,18 +600,31 @@ const validateConfirmPw = () => {
   pwErrors.confirm = pwForm.confirm && pwForm.newPw !== pwForm.confirm ? '새 비밀번호가 일치하지 않습니다.' : ''
 }
 
-const changePassword = () => {
+const changePassword = async () => {
   pwErrors.current = ''
   if (!canChangePw.value) return
-  if (pwForm.current !== getCurrentPassword()) {
-    pwErrors.current = '현재 비밀번호가 일치하지 않습니다.'
-    return
-  }
 
-  const userId = sessionStorage.getItem(AUTH_KEYS.userId) || ''
-  localStorage.setItem(getPasswordStorageKey(userId), pwForm.newPw)
-  pwSuccess.value = true
-  setTimeout(() => { showChangePw.value = false }, 1500)
+  try {
+    isSubmitting.value = true
+    await changeMyPassword({
+      currentPassword: pwForm.current,
+      newPassword: pwForm.newPw,
+      confirmPassword: pwForm.confirm,
+    })
+    pwSuccess.value = true
+    setTimeout(() => { showChangePw.value = false }, 1200)
+  } catch (error) {
+    const message = error?.response?.data?.error?.message || '비밀번호 변경에 실패했습니다.'
+    if (message.includes('현재 비밀번호')) {
+      pwErrors.current = message
+    } else if (message.includes('일치')) {
+      pwErrors.confirm = message
+    } else {
+      alert(message)
+    }
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const closePwModal = () => { showChangePw.value = false }
@@ -590,7 +635,7 @@ const closePwModal = () => { showChangePw.value = false }
 .info-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
 
 /* Info Card */
-.info-card{background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.info-card{background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;min-height:0}
 .info-card-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--gray100)}
 .info-card-header h3{font-size:.95rem;font-weight:700;color:var(--gray800)}
 
@@ -616,7 +661,7 @@ const closePwModal = () => { showChangePw.value = false }
 .skill-table th{text-align:left;padding:10px 20px;font-weight:600;color:var(--gray500);border-bottom:1px solid var(--gray200);font-size:.78rem}
 .skill-table td{padding:10px 20px;border-bottom:1px solid var(--gray100);color:var(--gray700)}
 .skill-table tr:last-child td{border-bottom:none}
-.skill-table-wrap{max-height:280px;overflow-y:auto}
+.skill-table-wrap{height:320px;overflow:auto;min-height:0}
 .skill-table thead th{position:sticky;top:0;background:#fff;z-index:1}
 .status-tag{padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600}
 .status-tag.valid{background:#ECFDF5;color:#059669}
@@ -639,7 +684,7 @@ const closePwModal = () => { showChangePw.value = false }
 .career-table th{text-align:left;padding:10px 20px;font-weight:600;color:var(--gray500);border-bottom:1px solid var(--gray200);font-size:.78rem}
 .career-table td{padding:10px 20px;border-bottom:1px solid var(--gray100);color:var(--gray700)}
 .career-table tr:last-child td{border-bottom:none}
-.career-table-wrap{max-height:280px;overflow-y:auto}
+.career-table-wrap{height:320px;overflow:auto;min-height:0}
 .career-table thead th{position:sticky;top:0;background:#fff;z-index:1}
 .empty-row{text-align:center;color:var(--gray400)}
 
@@ -652,6 +697,7 @@ const closePwModal = () => { showChangePw.value = false }
 .modal-fields{display:flex;flex-direction:column;gap:16px}
 .modal-field{display:flex;flex-direction:column;gap:5px}
 .modal-field label{font-size:.82rem;font-weight:600;color:var(--gray600)}
+.required-mark{color:#0EA5E9;font-size:.78rem;font-weight:700}
 .modal-field input,.modal-field select{padding:10px 14px;border:1px solid var(--gray200);border-radius:var(--radius-xs);font-size:.85rem;font-family:var(--font);color:var(--gray700);outline:none;transition:all .2s}
 .modal-field input:focus,.modal-field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--accent)}
 .modal-field input:disabled{background:var(--gray50);color:var(--gray400)}

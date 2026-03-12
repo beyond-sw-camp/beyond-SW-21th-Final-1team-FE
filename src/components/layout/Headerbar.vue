@@ -105,6 +105,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import OrgSearchModal from '@/components/org/OrgSearchModal.vue'
 import { clearLoginSession, isAdminRole } from '@/utils/auth'
+import { logout } from '@/api/auth'
 
 defineProps({
   activeNav: { type: String, default: '메인' }
@@ -127,9 +128,15 @@ const goNotices = () => {
   router.push('/notices')
 }
 
-const handleLogout = () => {
-  clearLoginSession()
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await logout()
+  } catch (_error) {
+    // 토큰 만료/블랙리스트 등 실패여도 클라이언트 세션은 종료한다.
+  } finally {
+    clearLoginSession()
+    router.push('/login')
+  }
 }
 </script>
 
