@@ -292,7 +292,10 @@ export const useAttendanceStore = defineStore('attendance', () => {
         statusDescription: record.statusDescription,
         memo: record.statusDescription || '-',
       }))
-      syncTodayRecord()
+      const now = new Date()
+      if (year === now.getFullYear() && month === now.getMonth() + 1 && (!status || status === 'all')) {
+        syncTodayRecord()
+      }
     } finally {
       isLoading.value = false
     }

@@ -246,6 +246,13 @@ const currentDate = ref({
   day: today.getDate()
 })
 
+const toDateKey = (value) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Generate Dynamic Calendar
 const generateCalendar = (year, month) => {
   const firstDay = new Date(year, month - 1, 1)
@@ -275,7 +282,7 @@ const generateCalendar = (year, month) => {
   }
   
   // Add current month days
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toDateKey(new Date())
   for (let i = 1; i <= daysInMonth; i++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`
     days.push({
@@ -321,7 +328,7 @@ const miniCalendarGrid = computed(() => {
 
 const currentWeekGrid = computed(() => {
   // Find the week containing today, or the first week of the month
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toDateKey(new Date())
   for (const week of calendarGrid.value) {
     if (week.find(d => d.fullDate === todayStr)) {
       return week
