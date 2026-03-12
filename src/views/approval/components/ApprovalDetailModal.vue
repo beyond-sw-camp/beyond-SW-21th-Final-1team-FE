@@ -72,6 +72,7 @@ const statusClass = computed(() => {
     case '진행중': return 'status-ing';
     case '반려': return 'status-rejected';
     case '보류': return 'status-hold';
+    case '취소': return 'status-cancelled';
     case '임시저장': return 'status-temp';
     default: return '';
   }
@@ -131,6 +132,7 @@ const handleAction = (type) => {
 .status-ing { background: #eff6ff; color: #2563eb; }
 .status-rejected { background: #fef2f2; color: #dc2626; }
 .status-hold { background: #fffbeb; color: #d97706; }
+.status-cancelled { background: #f8fafc; color: #475569; }
 .status-temp { background: #f8fafc; color: #475569; }
 
 .modal-title {

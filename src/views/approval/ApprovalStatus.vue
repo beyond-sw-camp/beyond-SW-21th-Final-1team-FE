@@ -22,6 +22,7 @@ const isDrafting = (status) => status === '기안중';
 const isPending = (status) => status === '진행중';
 const isRejected = (status) => status === '반려';
 const isCompleted = (status) => status === '완료';
+const isCancelled = (status) => status === '취소';
 
 const tabs = computed(() => [
   { id: 'all', label: '전체', count: statusCounts.value.allCount },
@@ -42,6 +43,7 @@ const getStatusClass = (status) => {
   if (isPending(status)) return 'status-pending';
   if (isRejected(status)) return 'status-rejected';
   if (isCompleted(status)) return 'status-completed';
+  if (isCancelled(status)) return 'status-cancelled';
   return '';
 };
 
@@ -77,8 +79,11 @@ async function loadStatusSearch() {
 const openModal = async (item) => {
   try {
     if (!item.isRead) {
-      await markApprovalAsRead(item.approvalId)
-      item.isRead = true
+      try {
+        await markApprovalAsRead(item.approvalId)
+        item.isRead = true
+      } catch (_error) {
+      }
     }
     const detail = await getApprovalDetail(item.approvalId)
     selectedItem.value = mapApprovalDetailToItem(detail)
@@ -94,12 +99,12 @@ const closeModal = () => {
 
 const handleModalAction = (action) => {
   if (action.type === 'redraft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } })
   } else if (action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } })
   }
-  isModalOpen.value = false;
-};
+  isModalOpen.value = false
+}
 
 const handleRedraft = (item) => {
   router.push({ name: 'approval-draft', query: { from: item.approvalId, source: 'status' } })
@@ -381,6 +386,7 @@ watch([activeTab, searchQuery], loadStatusSearch)
 .status-pending { background: #fff4e6; color: #f08c00; border-color: #ffe8cc; }
 .status-rejected { background: #fff5f5; color: #fa5252; border-color: #ffe3e3; }
 .status-completed { background: #f2fcf5; color: #40c057; border-color: #d3f9d8; }
+.status-cancelled { background: #f1f3f5; color: #495057; border-color: #e9ecef; }
 
 .progress-container {
   display: flex;

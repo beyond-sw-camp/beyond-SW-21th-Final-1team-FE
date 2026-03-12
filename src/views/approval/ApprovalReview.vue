@@ -19,14 +19,14 @@
             </tr>
           </thead>
           <tbody>
-            <tr 
-              v-for="item in reviewList" 
-              :key="item.id" 
+            <tr
+              v-for="item in reviewList"
+              :key="item.id"
               class="clickable-row"
               @click="openModal(item)"
             >
               <td class="text-center">
-                <span class="status-dot" :class="{ 'unread': !item.isRead }"></span>
+                <span class="status-dot" :class="{ unread: !item.isRead }"></span>
               </td>
               <td>
                 <span class="category-tag">{{ item.category }}</span>
@@ -56,10 +56,9 @@
       </div>
     </div>
 
-    <!-- Review Modal -->
-    <ReviewModal 
-      :is-open="isModalOpen" 
-      :item="selectedItem" 
+    <ReviewModal
+      :is-open="isModalOpen"
+      :item="selectedItem"
       @close="isModalOpen = false"
       @action="handleReviewAction"
     />
@@ -93,8 +92,11 @@ async function loadReviewList() {
 const openModal = async (item) => {
   try {
     if (!item.isRead) {
-      await markApprovalAsRead(item.approvalId)
-      item.isRead = true
+      try {
+        await markApprovalAsRead(item.approvalId)
+        item.isRead = true
+      } catch (_error) {
+      }
     }
     const detail = await getApprovalDetail(item.approvalId)
     selectedItem.value = mapApprovalDetailToItem(detail)
@@ -105,13 +107,10 @@ const openModal = async (item) => {
 }
 
 const handleReviewAction = async (data) => {
-  if (data.type !== 'approve' && data.type !== 'reject') {
-    alert('현재는 승인/반려만 지원합니다.')
-    return
-  }
+  const isApprove = data.type === 'approve'
   try {
     await processApproval(data.id, {
-      approve: data.type === 'approve',
+      approve: isApprove,
       reason: data.reason || null,
     })
     isModalOpen.value = false

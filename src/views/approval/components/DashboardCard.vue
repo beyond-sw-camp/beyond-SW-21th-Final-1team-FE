@@ -194,6 +194,7 @@ const goToList = () => {
 .status-진행중 { background: #f0f7ff; color: #339af0; border: 1px solid #d0e7ff; }
 .status-반려 { background: #fff5f5; color: #fa5252; border: 1px solid #ffe3e3; }
 .status-보류 { background: #fff9db; color: #f08c00; border: 1px solid #ffec99; }
+.status-취소 { background: #f1f3f5; color: #495057; border: 1px solid #e9ecef; }
 
 .temp-actions {
   display: flex;
