@@ -112,6 +112,7 @@ const verifyPassword = async () => {
       passwordInput.value = ''
       return
     }
+    passwordInput.value = ''
     if (!payrollStore.recentPayrolls.length) {
       await payrollStore.fetchRecentPayrolls(6)
     }
