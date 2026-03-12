@@ -22,6 +22,27 @@ import {
   verifySalaryPassword,
 } from '@/api/payroll'
 
+const SALARY_AUTH_VERIFIED_AT_KEY = 'salaryAuthVerifiedAt'
+const SALARY_AUTH_TTL_MS = 5 * 60 * 1000
+
+const readSalaryVerifiedAt = () => {
+  if (typeof window === 'undefined') return 0
+  return Number(sessionStorage.getItem(SALARY_AUTH_VERIFIED_AT_KEY) || 0)
+}
+
+const isSalaryVerificationAlive = (verifiedAt = readSalaryVerifiedAt()) =>
+  Boolean(verifiedAt) && Date.now() - verifiedAt < SALARY_AUTH_TTL_MS
+
+const markSalaryVerified = () => {
+  if (typeof window === 'undefined') return
+  sessionStorage.setItem(SALARY_AUTH_VERIFIED_AT_KEY, String(Date.now()))
+}
+
+const clearSalaryVerified = () => {
+  if (typeof window === 'undefined') return
+  sessionStorage.removeItem(SALARY_AUTH_VERIFIED_AT_KEY)
+}
+
 const formatPaymentDateFromMonth = (targetMonth) => {
   if (!targetMonth) return '-'
   return `${targetMonth}.25`.replaceAll('-', '.')
@@ -79,7 +100,7 @@ const normalizeError = (error, fallback) =>
   error?.response?.data?.message || error?.message || fallback
 
 export const usePayrollStore = defineStore('payroll', () => {
-  const isSalaryVerified = ref(false)
+  const isSalaryVerified = ref(isSalaryVerificationAlive())
   const recentPayrolls = ref([])
   const payrollsByYear = ref({})
   const selectedPayrollDetail = ref(null)
@@ -109,9 +130,27 @@ export const usePayrollStore = defineStore('payroll', () => {
 
   const latestPayroll = computed(() => recentPayrolls.value[0] || null)
 
+  const syncSalaryVerificationState = () => {
+    const nextVerified = isSalaryVerificationAlive()
+    isSalaryVerified.value = nextVerified
+    if (!nextVerified) {
+      selectedPayrollDetail.value = null
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('session-storage-changed', syncSalaryVerificationState)
+    window.addEventListener('session-storage-changed', syncSalaryVerificationState)
+  }
+
   const verifyPassword = async (password) => {
     const { data } = await verifySalaryPassword(password)
-    isSalaryVerified.value = data === true
+    if (data === true) {
+      markSalaryVerified()
+    } else {
+      clearSalaryVerified()
+    }
+    syncSalaryVerificationState()
     return data === true
   }
 
