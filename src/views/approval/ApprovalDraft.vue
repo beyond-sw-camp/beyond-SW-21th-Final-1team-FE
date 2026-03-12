@@ -698,21 +698,6 @@ const vacationDurationLabel = computed(() => {
           </div>
         </div>
 
-        <!-- Receivers Section -->
-         <div class="referrer-section" v-if="receivers.length > 0">
-            <span class="section-label">수신:</span>
-            <div class="referrer-list">
-                <span v-for="receiver in receivers" :key="receiver.id" class="referrer-tag">
-                    {{ receiver.name }} ({{ receiver.position }})
-                </span>
-            </div>
-             <button class="btn-xs" @click="openModal('receiver')">수정</button>
-         </div>
-         <div class="referrer-section" v-else>
-            <span class="section-label">수신:</span>
-            <button class="btn-xs" @click="openModal('receiver')"> + 수신자 추가</button>
-         </div>
-
         <!-- Referrers Section -->
          <div class="referrer-section" v-if="referrers.length > 0">
             <span class="section-label">참조:</span>
@@ -726,6 +711,21 @@ const vacationDurationLabel = computed(() => {
          <div class="referrer-section" v-else>
             <span class="section-label">참조:</span>
             <button class="btn-xs" @click="openModal('referrer')"> + 참조자 추가</button>
+         </div>
+
+        <!-- Receivers Section -->
+         <div class="referrer-section" v-if="receivers.length > 0">
+            <span class="section-label">수신:</span>
+            <div class="referrer-list">
+                <span v-for="receiver in receivers" :key="receiver.id" class="referrer-tag">
+                    {{ receiver.name }} ({{ receiver.position }})
+                </span>
+            </div>
+             <button class="btn-xs" @click="openModal('receiver')">수정</button>
+         </div>
+         <div class="referrer-section" v-else>
+            <span class="section-label">수신:</span>
+            <button class="btn-xs" @click="openModal('receiver')"> + 수신자 추가</button>
          </div>
 
         <!-- Document Body Form -->
