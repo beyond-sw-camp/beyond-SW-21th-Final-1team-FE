@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getAccessToken } from '@/utils/auth'
+import { clearLoginSession, getAccessToken } from '@/utils/auth'
 
 const buildPayrollBaseUrl = () => {
   const fallback =
@@ -7,8 +7,9 @@ const buildPayrollBaseUrl = () => {
       ? `${window.location.origin}/api/v1`
       : 'http://localhost:8080/api/v1'
   const rawBase = (import.meta.env.VITE_API_URL || fallback).replace(/\/$/, '')
+  const payrollSuffixPattern = /\/payroll$/i
 
-  if (rawBase.endsWith('/api/payroll')) return rawBase
+  if (payrollSuffixPattern.test(rawBase)) return rawBase
   if (rawBase.endsWith('/api/v1')) return rawBase.replace(/\/api\/v1$/, '/api/payroll')
   if (rawBase.endsWith('/api')) return `${rawBase}/payroll`
 
@@ -29,6 +30,16 @@ payrollApi.interceptors.request.use((config) => {
   }
   return config
 })
+
+payrollApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      clearLoginSession()
+    }
+    return Promise.reject(error)
+  },
+)
 
 export const verifySalaryPassword = (password) =>
   payrollApi.post('/verify-password', { password })

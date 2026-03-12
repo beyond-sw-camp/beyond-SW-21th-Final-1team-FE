@@ -237,7 +237,7 @@
           </div>
           <div class="form-actions">
             <button class="btn-secondary" @click="resetSalaryForm">초기화</button>
-            <button class="btn-save" :disabled="savingEmployeeSetting" @click="saveEmployeeSalary">
+            <button class="btn-save" :disabled="savingEmployeeSetting || !canSaveSalarySetting" @click="saveEmployeeSalary">
               {{ savingEmployeeSetting ? '저장 중...' : '저장' }}
             </button>
           </div>
@@ -346,10 +346,10 @@
         <div class="card">
           <div class="card-header">
             <h3>퇴직금 대상 사원</h3>
-            <span class="count">총 {{ employeeSearchResults.length }}건</span>
+            <span class="count">총 {{ severanceSearchResults.length }}건</span>
           </div>
           <div v-if="severanceLoading && !severancePreview" class="empty-state">사원을 조회하는 중입니다.</div>
-          <div v-else-if="!employeeSearchResults.length" class="empty-state">검색된 사원이 없습니다.</div>
+          <div v-else-if="!severanceSearchResults.length" class="empty-state">검색된 사원이 없습니다.</div>
           <div v-else class="table-responsive">
             <table class="data-table">
               <thead>
@@ -363,7 +363,7 @@
               </thead>
               <tbody>
                 <tr
-                  v-for="item in employeeSearchResults"
+                  v-for="item in severanceSearchResults"
                   :key="`severance-${item.employeeId}`"
                   :class="{ selected: selectedSeveranceEmployee?.employeeId === item.employeeId }"
                 >
@@ -452,6 +452,8 @@ const severanceLoading = ref(false)
 const retirementDate = ref('')
 const selectedEmployee = ref(null)
 const selectedSeveranceEmployee = ref(null)
+const employeeSearchResults = ref([])
+const severanceSearchResults = ref([])
 
 const salaryForm = reactive({
   settingId: null,
@@ -475,8 +477,15 @@ const ledgerPage = computed(() => payrollStore.adminLedgerPage)
 const ledgerRows = computed(() => payrollStore.adminLedgerPage.content || [])
 const insuranceRates = computed(() => payrollStore.insuranceRates)
 const salarySettings = computed(() => payrollStore.salarySettingHistory)
-const employeeSearchResults = computed(() => payrollStore.employeeSearchPage.content || [])
 const severancePreview = computed(() => payrollStore.severancePreview)
+const canSaveSalarySetting = computed(() =>
+  Boolean(
+    salaryForm.employeeId &&
+      salaryForm.baseSalary !== '' &&
+      salaryForm.mealAllowance !== '' &&
+      salaryForm.applyStartDate,
+  ),
+)
 
 const monthStatus = computed(() => {
   if (!ledgerRows.value.length) return 'initial'
@@ -642,11 +651,12 @@ const searchEmployees = async () => {
   pageNotice.value = ''
 
   try {
-    await payrollStore.searchEmployees({
+    const page = await payrollStore.searchEmployees({
       keyword: employeeKeyword.value.trim() || null,
       page: 1,
       size: 20,
     })
+    employeeSearchResults.value = page?.content || []
   } catch (error) {
     pageError.value = getErrorMessage(error, '사원 검색에 실패했습니다.')
   } finally {
@@ -774,11 +784,12 @@ const searchSeveranceEmployees = async () => {
   pageNotice.value = ''
 
   try {
-    await payrollStore.searchEmployees({
+    const page = await payrollStore.searchEmployees({
       keyword: severanceKeyword.value.trim() || null,
       page: 1,
       size: 20,
     })
+    severanceSearchResults.value = page?.content || []
   } catch (error) {
     pageError.value = getErrorMessage(error, '퇴직금 대상 사원 검색에 실패했습니다.')
   } finally {
