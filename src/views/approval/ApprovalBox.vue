@@ -123,8 +123,11 @@ async function loadBoxes() {
 const openDetail = async (item) => {
   try {
     if (!item.isRead) {
-      await markApprovalAsRead(item.approvalId)
-      item.isRead = true
+      try {
+        await markApprovalAsRead(item.approvalId)
+        item.isRead = true
+      } catch (_error) {
+      }
     }
     const detail = await getApprovalDetail(item.approvalId)
     selectedItem.value = mapApprovalDetailToItem(detail)

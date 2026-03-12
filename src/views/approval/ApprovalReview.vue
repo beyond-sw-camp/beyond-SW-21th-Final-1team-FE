@@ -92,8 +92,11 @@ async function loadReviewList() {
 const openModal = async (item) => {
   try {
     if (!item.isRead) {
-      await markApprovalAsRead(item.approvalId)
-      item.isRead = true
+      try {
+        await markApprovalAsRead(item.approvalId)
+        item.isRead = true
+      } catch (_error) {
+      }
     }
     const detail = await getApprovalDetail(item.approvalId)
     selectedItem.value = mapApprovalDetailToItem(detail)
@@ -104,13 +107,10 @@ const openModal = async (item) => {
 }
 
 const handleReviewAction = async (data) => {
-  if (data.type !== 'approve' && data.type !== 'reject') {
-    alert('현재는 승인/반려만 지원합니다.')
-    return
-  }
+  const isApprove = data.type === 'approve'
   try {
     await processApproval(data.id, {
-      approve: data.type === 'approve',
+      approve: isApprove,
       reason: data.reason || null,
     })
     isModalOpen.value = false

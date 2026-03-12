@@ -146,6 +146,7 @@ const getStatusClass = (status) => {
     case '진행중': return 'status-ing';
     case '반려': return 'status-rejected';
     case '보류': return 'status-hold';
+    case '취소': return 'status-cancelled';
     case '임시저장': return 'status-temp';
     default: return '';
   }
@@ -185,8 +186,11 @@ const filteredList = computed(() => {
 const openDetail = async (item) => {
   try {
     if (!item.isRead) {
-      await markApprovalAsRead(item.approvalId)
-      item.isRead = true
+      try {
+        await markApprovalAsRead(item.approvalId)
+        item.isRead = true
+      } catch (_error) {
+      }
     }
     const detail = await getApprovalDetail(item.approvalId)
     selectedItem.value = mapApprovalDetailToItem(detail)
@@ -393,6 +397,7 @@ onMounted(loadBoxList)
 .status-ing { background: #f0f7ff; color: #339af0; border: 1px solid #d0e7ff; }
 .status-rejected { background: #fff5f5; color: #fa5252; border: 1px solid #ffe3e3; }
 .status-hold { background: #fff9db; color: #f08c00; border: 1px solid #ffec99; }
+.status-cancelled { background: #f1f3f5; color: #495057; border: 1px solid #e9ecef; }
 .status-temp { background: #f1f3f5; color: #495057; border: 1px solid #e9ecef; }
 
 .category-text {
