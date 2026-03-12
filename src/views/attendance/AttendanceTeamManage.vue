@@ -27,6 +27,14 @@
       </button>
     </div>
 
+    <div v-if="pageError" class="inline-alert error">
+      {{ pageError }}
+    </div>
+
+    <div v-else-if="isPageLoading" class="inline-alert info">
+      팀 근태 데이터를 불러오는 중입니다.
+    </div>
+
     <!-- Tab 1: Daily Attendance Status -->
     <div v-if="currentTab === 'daily'" class="tab-content">
       <div class="filter-card">
@@ -41,12 +49,15 @@
             <select class="form-select" v-model="filterStatus">
               <option value="all">전체</option>
               <option value="normal">정상</option>
-              <option value="late">지각</option>
+              <option value="tardy">지각</option>
+              <option value="early_leave">조퇴</option>
               <option value="absent">결근</option>
-              <option value="leave">휴가</option>
+              <option value="vacation">휴가</option>
             </select>
           </div>
-          <button class="btn-search">조회</button>
+          <button class="btn-search" :disabled="dailyLoading" @click="fetchDailyRecords">
+            {{ dailyLoading ? '조회 중...' : '조회' }}
+          </button>
         </div>
       </div>
 
@@ -68,7 +79,10 @@
             <tr 
               v-for="record in filteredDailyRecords" 
               :key="record.id"
-              :class="{ 'row-warning': record.status === 'late', 'row-danger': record.status === 'absent' }"
+              :class="{
+                'row-warning': record.status === 'tardy' || record.status === 'early_leave',
+                'row-danger': record.status === 'absent',
+              }"
               @click="openEditModal(record)"
             >
               <td>
@@ -80,9 +94,9 @@
               </td>
               <td>{{ record.dept }}</td>
               <td>{{ record.date }}</td>
-              <td>{{ record.startTime || '-' }}</td>
-              <td>{{ record.endTime || '-' }}</td>
-              <td>{{ record.workTime || '-' }}</td>
+              <td>{{ record.checkIn || '-' }}</td>
+              <td>{{ record.checkOut || '-' }}</td>
+              <td>{{ record.workHours || '-' }}</td>
               <td>
                 <span class="status-badge" :class="record.status">
                   {{ getStatusLabel(record.status) }}
@@ -103,8 +117,8 @@
       <div class="alert-box warning" v-if="hasStaffShortage">
         <div class="alert-icon">⚠️</div>
         <div class="alert-text">
-          <strong>코어타임 인원 부족 경고 (2월 18일 수요일)</strong>
-          <p>14:00 - 16:00 구간에 근무 인원이 부족합니다. 승인 시 주의바랍니다.</p>
+          <strong>코어타임 인원 부족 경고 ({{ days[selectedDayIndex]?.label }})</strong>
+          <p>{{ days[selectedDayIndex]?.date }} 14:00 - 16:00 구간에 근무 인원이 부족합니다. 승인 시 주의바랍니다.</p>
         </div>
       </div>
 
@@ -129,6 +143,7 @@
             <tr>
               <th width="40"><input type="checkbox" @change="toggleAllFlex" :checked="isAllFlexSelected" /></th>
               <th>이름</th>
+              <th>부서</th>
               <th>신청 주간</th>
               <th>유형</th>
               <th>사유</th>
@@ -140,6 +155,7 @@
             <tr v-for="req in flexibleRequests" :key="req.id">
               <td><input type="checkbox" :value="req.id" v-model="selectedFlexIds" :disabled="req.status !== 'pending'" /></td>
               <td>{{ req.name }} {{ req.position }}</td>
+              <td>{{ req.dept }}</td>
               <td>{{ req.period }}</td>
               <td>{{ req.type }}</td>
               <td>{{ req.reason }}</td>
@@ -160,12 +176,12 @@
                 v-for="(day, idx) in days" 
                 :key="idx"
                 class="day-tab"
-                :class="{ active: selectedDayIndex === idx, 'has-issue': idx === 2 }"
+                :class="{ active: selectedDayIndex === idx, 'has-issue': day.hasIssue }"
                 @click="selectedDayIndex = idx"
              >
                <span class="day-label">{{ day.label }}</span>
                <span class="day-date">{{ day.date }}</span>
-               <span class="dot-indicator" v-if="idx === 2"></span>
+               <span class="dot-indicator" v-if="day.hasIssue"></span>
              </button>
            </div>
         </div>
@@ -196,7 +212,8 @@
                    </div>
                  </div>
                  <div class="tl-track-cell">
-                    <div 
+                    <div
+                      v-if="user.weekPlan[selectedDayIndex]"
                       class="time-bar-pill"
                       :class="getTimeClass(user.weekPlan[selectedDayIndex])"
                       :style="getBarStyle(user.weekPlan[selectedDayIndex])"
@@ -204,8 +221,10 @@
                       <span class="bar-time">{{ user.weekPlan[selectedDayIndex].start }} - {{ user.weekPlan[selectedDayIndex].end }}</span>
                       <span class="bar-type">{{ getTypeLabel(user.weekPlan[selectedDayIndex].type) }}</span>
                     </div>
+                    <div v-else class="empty-bar">신청 없음</div>
                  </div>
               </div>
+              <div v-if="timelineData.length === 0" class="timeline-empty">해당 주차의 유연근무 신청이 없습니다.</div>
            </div>
         </div>
       </div>
@@ -231,11 +250,11 @@
           <div class="form-group-row">
              <div class="form-col">
                <label>출근 시각</label>
-               <input type="time" v-model="editForm.startTime" />
+               <input type="time" v-model="editForm.checkIn" />
              </div>
              <div class="form-col">
                <label>퇴근 시각</label>
-               <input type="time" v-model="editForm.endTime" />
+               <input type="time" v-model="editForm.checkOut" />
              </div>
           </div>
           
@@ -252,151 +271,309 @@
     </div>
 
   </div>
+  <ActionConfirmModal
+    v-model="showFlexActionModal"
+    :title="flexActionRequiresReason ? '반려 처리' : '승인 처리'"
+    :message="`${selectedFlexIds.length}건을 ${flexActionRequiresReason ? '반려' : '승인'}하시겠습니까?`"
+    :confirm-text="flexActionRequiresReason ? '반려하기' : '승인하기'"
+    :require-reason="flexActionRequiresReason"
+    :loading="flexActionLoading"
+    v-model:reason="flexActionReason"
+    @confirm="submitFlexAction"
+  />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useAttendanceStore } from '@/store/attendance'
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
+
+const store = useAttendanceStore()
+
+function toDateKey(value) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 const currentTab = ref('daily')
 const flexViewMode = ref('list')
-const filterDate = ref('2026-02-17')
+const filterDate = ref(toDateKey(new Date()))
 const filterStatus = ref('all')
-const hasStaffShortage = ref(true)
+const showFlexActionModal = ref(false)
+const flexActionReason = ref('')
+const flexActionMode = ref('approve')
+const flexActionLoading = ref(false)
+const isPageLoading = ref(false)
+const dailyLoading = ref(false)
+const pageError = ref('')
 
-// --- Daily Attendance Data ---
-const dailyRecords = ref([
-  { id: 1, name: '김철수', position: '대리', dept: '개발팀', date: '2026-02-17', startTime: '08:55', endTime: '18:05', workTime: '8h 10m', status: 'normal' },
-  { id: 2, name: '이영희', position: '사원', dept: '개발팀', date: '2026-02-17', startTime: '09:02', endTime: '', workTime: '', status: 'late' },
-  { id: 3, name: '박민수', position: '과장', dept: '개발팀', date: '2026-02-17', startTime: '', endTime: '', workTime: '', status: 'absent' },
-  { id: 4, name: '최자바', position: '팀장', dept: '개발팀', date: '2026-02-17', startTime: '08:50', endTime: '18:00', workTime: '8h 10m', status: 'normal' },
-])
+const statusMap = {
+  normal: '정상',
+  tardy: '지각',
+  absent: '결근',
+  vacation: '휴가',
+  early_leave: '조퇴',
+}
+
+const getStatusLabel = (status) => statusMap[status] || status
+const getFlexStatusLabel = (status) =>
+  ({ pending: '승인 대기', approved: '승인', rejected: '반려' }[status] || status)
 
 const filteredDailyRecords = computed(() => {
-  return dailyRecords.value.filter(r => {
-    if (filterStatus.value !== 'all' && r.status !== filterStatus.value) return false
-    return true
-  })
+  if (filterStatus.value === 'all') {
+    return store.dailyAttendance
+  }
+  return store.dailyAttendance.filter((record) => record.status === filterStatus.value)
 })
 
-const getStatusLabel = (s) => ({ normal: '정상', late: '지각', absent: '결근', leave: '휴가' }[s])
-
-// --- Edit Modal ---
 const showEditModal = ref(false)
 const editingRecord = ref(null)
-const editForm = ref({ startTime: '', endTime: '', reason: '' })
+const editForm = ref({ checkIn: '', checkOut: '', reason: '' })
 
 const openEditModal = (record) => {
   editingRecord.value = record
-  editForm.value = { startTime: record.startTime, endTime: record.endTime, reason: '' }
+  editForm.value = {
+    checkIn: record.checkIn || '',
+    checkOut: record.checkOut || '',
+    reason: '',
+  }
   showEditModal.value = true
 }
+
 const closeEditModal = () => {
   showEditModal.value = false
   editingRecord.value = null
 }
-const saveRecord = () => {
-  if (!editForm.value.reason) {
+
+const saveRecord = async () => {
+  if (!editForm.value.reason.trim()) {
     alert('수정 사유를 입력해주세요.')
     return
   }
-  // Update logic mock
-  editingRecord.value.startTime = editForm.value.startTime
-  editingRecord.value.endTime = editForm.value.endTime
-  editingRecord.value.status = 'normal' // Assume correction fixes status
-  alert('수정되었습니다.')
-  closeEditModal()
+
+  try {
+    await store.updateDailyAttendance({
+      targetEmployeeId: editingRecord.value.userId,
+      workDate: editingRecord.value.date,
+      newCheckInTime: editForm.value.checkIn || null,
+      newCheckOutTime: editForm.value.checkOut || null,
+      newStatus: editingRecord.value.status.toUpperCase(),
+      modifyReason: editForm.value.reason,
+    })
+    await fetchDailyRecords({ propagate: true })
+    alert('수정되었습니다.')
+    closeEditModal()
+  } catch (error) {
+    alert(error?.response?.data?.message || '수정에 실패했습니다.')
+  }
 }
 
+const fetchDailyRecords = async ({ propagate = false } = {}) => {
+  dailyLoading.value = true
+  pageError.value = ''
+  try {
+    await store.fetchAdminDailyAttendanceList({
+      startDate: filterDate.value,
+      endDate: filterDate.value,
+      status: filterStatus.value === 'all' ? null : filterStatus.value,
+    })
+  } catch (error) {
+    pageError.value = error?.response?.data?.message || '일일 근태 현황을 불러오지 못했습니다.'
+    if (propagate) {
+      throw error
+    }
+  } finally {
+    dailyLoading.value = false
+  }
+}
 
-// --- Flexible Work Data ---
-const flexibleRequests = ref([
-  { id: 101, name: '이영희', position: '사원', period: '2026-02-23 ~ 02-27', type: '시차출퇴근', reason: '병원 진료', status: 'pending' },
-  { id: 102, name: '박민수', position: '과장', period: '2026-02-23 ~ 02-27', type: '선택적 근로', reason: '육아', status: 'pending' },
-])
 const selectedFlexIds = ref([])
-const pendingFlexCount = computed(() => flexibleRequests.value.filter(r => r.status === 'pending').length)
-const isAllFlexSelected = computed(() => selectedFlexIds.value.length > 0 && selectedFlexIds.value.length === flexibleRequests.value.filter(r => r.status === 'pending').length)
+const flexibleRequests = computed(() => store.flexibleWorkPlans)
+const overviewDays = computed(() => store.teamWeeklyOverview?.days || [])
+const pendingFlexCount = computed(
+  () => flexibleRequests.value.filter((record) => record.status === 'pending').length,
+)
+const isAllFlexSelected = computed(() => {
+  const pendingIds = flexibleRequests.value
+    .filter((record) => record.status === 'pending')
+    .map((record) => record.id)
+  return pendingIds.length > 0 && pendingIds.every((id) => selectedFlexIds.value.includes(id))
+})
 
-const toggleAllFlex = (e) => {
-  if (e.target.checked) selectedFlexIds.value = flexibleRequests.value.filter(r => r.status === 'pending').map(r => r.id)
-  else selectedFlexIds.value = []
-}
-const getFlexStatusLabel = (s) => ({ pending: '승인 대기', approved: '승인', rejected: '반려' }[s])
-
-const bulkApprove = () => {
-  alert(`${selectedFlexIds.value.length}건을 승인했습니다.`)
-  flexibleRequests.value.forEach(r => { if(selectedFlexIds.value.includes(r.id)) r.status = 'approved' })
+const toggleAllFlex = (event) => {
+  if (event.target.checked) {
+    selectedFlexIds.value = flexibleRequests.value
+      .filter((record) => record.status === 'pending')
+      .map((record) => record.id)
+    return
+  }
   selectedFlexIds.value = []
 }
-const bulkReject = () => {
-  const reason = prompt('반려 사유를 입력하세요 (필수)')
-  if (!reason) return
-  flexibleRequests.value.forEach(r => { if(selectedFlexIds.value.includes(r.id)) r.status = 'rejected' })
-  selectedFlexIds.value = []
+
+const bulkApprove = async () => {
+  if (!selectedFlexIds.value.length) {
+    return
+  }
+  flexActionMode.value = 'approve'
+  flexActionReason.value = ''
+  showFlexActionModal.value = true
 }
 
-// --- Timeline Data (Mock) ---
-const days = [
-  { label: '월', date: '02.23' },
-  { label: '화', date: '02.24' },
-  { label: '수', date: '02.25' },
-  { label: '목', date: '02.26' },
-  { label: '금', date: '02.27' },
-]
-const hours = Array.from({length: 13}, (_, i) => i + 8)
+const bulkReject = async () => {
+  if (!selectedFlexIds.value.length) {
+    return
+  }
+  flexActionMode.value = 'reject'
+  flexActionReason.value = ''
+  showFlexActionModal.value = true
+}
+
+const flexActionRequiresReason = computed(() => flexActionMode.value === 'reject')
+
+const submitFlexAction = async () => {
+  if (flexActionLoading.value) return
+  if (flexActionRequiresReason.value && !flexActionReason.value.trim()) {
+    alert('반려 사유를 입력해주세요.')
+    return
+  }
+  flexActionLoading.value = true
+  try {
+    await store.processFlexiblePlans(
+      selectedFlexIds.value,
+      flexActionMode.value === 'approve',
+      flexActionRequiresReason.value ? flexActionReason.value.trim() : '',
+    )
+    selectedFlexIds.value = []
+    showFlexActionModal.value = false
+    alert(`선택한 신청이 ${flexActionMode.value === 'approve' ? '승인' : '반려'}되었습니다.`)
+  } catch (error) {
+    alert(error?.response?.data?.message || `일괄 ${flexActionMode.value === 'approve' ? '승인' : '반려'}에 실패했습니다.`)
+  } finally {
+    flexActionLoading.value = false
+  }
+}
+
+const hours = Array.from({ length: 13 }, (_, i) => i + 8)
 const selectedDayIndex = ref(0)
-const timelineData = ref([
-  { 
-    id: 1, name: '김철수', position: '대리',
-    weekPlan: Array(5).fill({ start: '09:00', end: '18:00', type: 'normal' })
-  },
-  { 
-    id: 2, name: '이영희', position: '사원',
-    weekPlan: [
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-    ]
-  },
-  { 
-    id: 3, name: '박민수', position: '과장',
-    weekPlan: [
-       { start: '09:00', end: '18:00', type: 'normal' },
-       { start: '09:00', end: '18:00', type: 'normal' },
-       { start: '09:00', end: '16:00', type: 'short' }, // Deficiency
-       { start: '09:00', end: '18:00', type: 'normal' },
-       { start: '09:00', end: '18:00', type: 'normal' },
-    ]
-  },
-])
 
-// Timeline Helpers
+const parseIsoDate = (value) => {
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+const formatDateNumber = (value) =>
+  `${String(value.getMonth() + 1).padStart(2, '0')}.${String(value.getDate()).padStart(2, '0')}`
+
+const getMonday = (value) => {
+  const date = new Date(value)
+  const day = date.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  date.setDate(date.getDate() + diff)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+const parseTime = (timeText) => {
+  const [hour, minute] = timeText.split(':').map(Number)
+  return hour + minute / 60
+}
+
+const mapPlanType = (plan) => {
+  const workForm = String(plan.type || '').toUpperCase()
+  if (workForm.includes('OFFICE')) return 'normal'
+  if (workForm.includes('SHORT')) return 'short'
+  return 'flex'
+}
+
+const days = computed(() =>
+  Array.from({ length: 5 }, (_, idx) => {
+    const planDate = overviewDays.value[idx]?.planDate
+    const date = planDate ? parseIsoDate(planDate) : new Date()
+    return {
+      label: ['월', '화', '수', '목', '금'][idx],
+      date: formatDateNumber(date),
+      fullDate: planDate || toDateKey(date),
+      hasIssue: Boolean(overviewDays.value[idx]?.coreTimeShortageRisk),
+    }
+  }),
+)
+
+const timelineData = computed(() => {
+  const grouped = new Map()
+
+  overviewDays.value.forEach((day, dayIndex) => {
+    ;(day.entries || []).forEach((item) => {
+      if (!grouped.has(item.userId)) {
+        grouped.set(item.userId, {
+          id: item.userId,
+          name: item.name,
+          position: item.position,
+          weekPlan: Array.from({ length: 5 }, () => null),
+        })
+      }
+
+      grouped.get(item.userId).weekPlan[dayIndex] = {
+        start: String(item.startDate).slice(11, 16),
+        end: String(item.endDate).slice(11, 16),
+        type: mapPlanType(item),
+      }
+    })
+  })
+
+  return Array.from(grouped.values())
+})
+
+const hasStaffShortage = computed(() => Boolean(overviewDays.value[selectedDayIndex.value]?.coreTimeShortageRisk))
+
 const getTimeClass = (day) => {
+  if (!day) return 'pill-gray'
   if (day.type === 'normal') return 'pill-blue'
   if (day.type === 'flex') return 'pill-green'
   return 'pill-gray'
 }
+
 const getTypeLabel = (type) => ({ normal: '기본', flex: '유연', short: '단축' }[type] || type)
-const parseTime = (t) => {
-  const [h, m] = t.split(':').map(Number)
-  return h + m / 60
-}
+
 const getBarStyle = (day) => {
+  if (!day) return { left: '0%', width: '0%' }
   const start = parseTime(day.start)
   const end = parseTime(day.end)
   const duration = end - start
   const startOffset = start - 8
-  const leftPercent = (startOffset / 12) * 100
-  const widthPercent = (duration / 12) * 100
-  return { left: `${leftPercent}%`, width: `${widthPercent}%` }
+  return {
+    left: `${(startOffset / 12) * 100}%`,
+    width: `${(duration / 12) * 100}%`,
+  }
 }
 
+onMounted(async () => {
+  const today = toDateKey(new Date())
+  isPageLoading.value = true
+  pageError.value = ''
+  const results = await Promise.allSettled([
+    fetchDailyRecords({ propagate: true }),
+    store.fetchTeamFlexibleWorkPlans(),
+    store.fetchTeamWeeklyOverview(today),
+  ])
+
+  const failedCount = results.filter((result) => result.status === 'rejected').length
+  if (failedCount > 0) {
+    pageError.value =
+      failedCount === results.length
+        ? '팀 근태 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+        : '일부 팀 근태 데이터를 불러오지 못했습니다. 다시 조회해 주세요.'
+  }
+  isPageLoading.value = false
+})
 </script>
 
 <style scoped>
 .team-manage-page { padding: 32px; background: var(--background-gray); min-height: 100vh; display: flex; flex-direction: column; gap: 24px; }
+.inline-alert { border-radius: 12px; padding: 14px 16px; font-size: 0.95rem; font-weight: 600; }
+.inline-alert.info { background: #EFF6FF; color: #1D4ED8; }
+.inline-alert.error { background: #FEF2F2; color: #B91C1C; }
 .page-header { margin-bottom: 8px; }
 .page-title { font-size: 1.5rem; font-weight: 700; color: var(--gray900); }
 .page-description { color: var(--gray600); font-size: 0.95rem; margin-top: 4px; }
@@ -428,9 +605,10 @@ const getBarStyle = (day) => {
 /* Status Badges */
 .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
 .status-badge.normal { background: #ECFDF5; color: #059669; }
-.status-badge.late { background: #FFFBEB; color: #B45309; }
+.status-badge.tardy { background: #FFFBEB; color: #B45309; }
+.status-badge.early_leave { background: #FFF7ED; color: #C2410C; }
 .status-badge.absent { background: #FEF2F2; color: #B91C1C; }
-.status-badge.leave { background: #EFF6FF; color: #1D4ED8; }
+.status-badge.vacation { background: #EFF6FF; color: #1D4ED8; }
 .status-badge.pending { background: #FFF7ED; color: #C2410C; }
 .status-badge.approved { background: #ECFDF5; color: #047857; }
 .status-badge.rejected { background: #FEF2F2; color: #B91C1C; }
@@ -463,6 +641,8 @@ const getBarStyle = (day) => {
 .timeline-row { display: flex; align-items: center; height: 48px; position: relative; z-index: 2; }
 .tl-name-cell { width: 200px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
 .tl-track-cell { flex: 1; position: relative; height: 100%; }
+.empty-bar { height: 100%; display: flex; align-items: center; color: var(--gray400); padding-left: 12px; font-size: 0.85rem; }
+.timeline-empty { padding: 24px 0; text-align: center; color: var(--gray500); }
 
 .time-bar-pill { position: absolute; top: 8px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: #fff; font-size: 0.8rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .pill-blue { background: #3B82F6; }

@@ -43,9 +43,9 @@
             <div v-for="item in member.chartData" :key="item.subject" class="c-score-row">
               <span class="c-score-label">{{ item.subject }}</span>
               <div class="c-score-bar-bg">
-                <div class="c-score-bar-fill" :style="{ width: (item.A / 5) * 100 + '%' }" />
+              <div class="c-score-bar-fill" :style="{ width: (item.value / 5) * 100 + '%' }" />
               </div>
-              <span class="c-score-num">{{ item.A }}</span>
+              <span class="c-score-num">{{ item.value }}</span>
             </div>
           </div>
 
@@ -67,8 +67,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { Radar } from 'vue-chartjs'
+import { getPerformanceTeamStats } from '@/api/performance'
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -77,8 +78,6 @@ import {
   Filler,
   Tooltip,
 } from 'chart.js'
-import { PERFORMANCE_MEMBERS } from '@/mocks/performance'
-import { createHrOrgTreeMock } from '@/mocks/hr/organization'
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip)
 
@@ -86,54 +85,30 @@ const DEFAULT_AVATAR =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23eef2f7'/><circle cx='40' cy='31' r='14' fill='%2394a3b8'/><path d='M16 68c4-12 14-18 24-18s20 6 24 18' fill='%2394a3b8'/></svg>"
 
 const selectedTeam = ref('')
+const statsData = ref({
+  teamOptions: [],
+  members: [],
+})
 const currentYear = new Date().getFullYear()
 const periodOptions = [
   `${currentYear}년 2분기`,
   `${currentYear}년 1분기`,
   `${currentYear - 1}년 4분기`,
 ]
-const orgRoot = createHrOrgTreeMock()
-
-function collectTeamNodes(node, acc = []) {
-  if (!node) return acc
-  if (node.type === '팀') acc.push(node)
-  ;(node.children || []).forEach((child) => collectTeamNodes(child, acc))
-  return acc
-}
-
-const teamNodes = collectTeamNodes(orgRoot)
-const teamOptions = computed(() => teamNodes.map((team) => team.name))
+const teamOptions = computed(() => statsData.value.teamOptions || [])
 
 const filteredMembers = computed(() => {
-  const targetTeams = selectedTeam.value
-    ? teamNodes.filter((team) => team.name === selectedTeam.value)
-    : teamNodes
-
-  const rawMembers = targetTeams.flatMap((team) =>
-    (team.members || []).map((member) => ({ ...member, teamName: team.name })),
-  )
-
-  return rawMembers.map((member, index) => {
-    const template = PERFORMANCE_MEMBERS[index % PERFORMANCE_MEMBERS.length]
-    return {
-      id: member.employeeId || `${member.teamName}-${member.name}-${index}`,
-      name: member.name,
-      role: member.job,
-      department: member.teamName,
-      avgScore: template?.avgScore ?? 4.5,
-      chartData: template?.chartData ?? [],
-      tasks: template?.tasks ?? [],
-      image: DEFAULT_AVATAR,
-      systemScore: Math.round((template?.avgScore ?? 4.5) * 20),
-    }
-  })
+  return (statsData.value.members || []).map((member) => ({
+    ...member,
+    image: DEFAULT_AVATAR,
+  }))
 })
 
 const getChartData = (member) => ({
   labels: member.chartData.map((d) => d.subject),
   datasets: [{
     label: member.name,
-    data: member.chartData.map((d) => d.A),
+    data: member.chartData.map((d) => d.value),
     backgroundColor: 'rgba(8, 145, 178, 0.08)',
     borderColor: '#06B6D4',
     borderWidth: 2,
@@ -166,6 +141,19 @@ const radarOptionsC = {
     },
   },
 }
+
+async function loadTeamStats() {
+  try {
+    const response = await getPerformanceTeamStats(selectedTeam.value ? { team: selectedTeam.value } : {})
+    if (response) {
+      statsData.value = response
+      return
+    }
+  } catch (_error) {}
+}
+
+onMounted(loadTeamStats)
+watch(selectedTeam, loadTeamStats)
 </script>
 
 <style scoped>
