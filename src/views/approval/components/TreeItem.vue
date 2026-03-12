@@ -22,7 +22,6 @@
       >
         <span class="user-avatar">👤</span>
         <span class="user-text">{{ user.name }} {{ user.position }}</span>
-        <span v-if="user.canFinalize && mode === 'approval'" class="finalize-badge">전결</span>
       </div>
       <!-- Sub-departments -->
       <div v-if="node.children && node.children.length">
@@ -41,7 +40,6 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { mockUsers } from '@/utils/approvalData';
 
 const props = defineProps({
   node: Object,
@@ -55,8 +53,7 @@ const isOpen = ref(true);
 const toggle = () => (isOpen.value = !isOpen.value);
 
 const departmentUsers = computed(() => {
-  if (!props.node.users) return [];
-  return props.node.users.map(id => mockUsers.find(u => u.id === id)).filter(Boolean);
+  return Array.isArray(props.node.users) ? props.node.users : [];
 });
 
 const isSelected = (userId) => props.selectedUsers.some(u => u.id === userId);
@@ -117,14 +114,5 @@ const isSelected = (userId) => props.selectedUsers.some(u => u.id === userId);
 }
 .user-text {
   font-size: 0.85rem;
-}
-.finalize-badge {
-  background: #fff1f0;
-  color: #cf1322;
-  border: 1px solid #ffa39e;
-  font-size: 0.7rem;
-  padding: 0 4px;
-  border-radius: 2px;
-  margin-left: auto;
 }
 </style>

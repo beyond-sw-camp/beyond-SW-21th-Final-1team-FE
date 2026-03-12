@@ -19,14 +19,14 @@
             </tr>
           </thead>
           <tbody>
-            <tr 
-              v-for="item in reviewList" 
-              :key="item.id" 
+            <tr
+              v-for="item in reviewList"
+              :key="item.id"
               class="clickable-row"
               @click="openModal(item)"
             >
               <td class="text-center">
-                <span class="status-dot" :class="{ 'unread': !item.isRead }"></span>
+                <span class="status-dot" :class="{ unread: !item.isRead }"></span>
               </td>
               <td>
                 <span class="category-tag">{{ item.category }}</span>
@@ -56,10 +56,9 @@
       </div>
     </div>
 
-    <!-- Review Modal -->
-    <ReviewModal 
-      :is-open="isModalOpen" 
-      :item="selectedItem" 
+    <ReviewModal
+      :is-open="isModalOpen"
+      :item="selectedItem"
       @close="isModalOpen = false"
       @action="handleReviewAction"
     />

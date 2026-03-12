@@ -62,9 +62,9 @@
       />
     </div>
 
-    <ApprovalDetailModal 
-      :is-open="isDetailOpen" 
-      :item="selectedItem" 
+    <ApprovalDetailModal
+      :is-open="isDetailOpen"
+      :item="selectedItem"
       @close="isDetailOpen = false"
       @action="handleModalAction"
     />

@@ -3,13 +3,13 @@ import { ref, computed, reactive, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   templates,
-  mockApprovalLine,
   findApprovalDocument
 } from '@/utils/approvalData';
 import OrgChartModal from './components/OrgChartModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import { useRoute } from 'vue-router';
 import { getLoginSession } from '@/utils/auth';
+import { draftApproval, getApprovalDetail, redraftApproval, tempApproval } from '@/api/approval';
 
 // State
 const router = useRouter();
@@ -50,6 +50,8 @@ const docInfo = reactive({
 const approvalLine = ref([]);
 const receivers = ref([]);
 const referrers = ref([]);
+const isSubmitting = ref(false);
+const sourceApprovalStatus = ref('');
 
 // Derived State
 const currentTemplateName = computed(() => {
@@ -99,14 +101,47 @@ const templateByCategory = {
   '기안서': 'businessTrip'
 };
 
+const templateByDocType = {
+  VACATION: 'vacation',
+  OVERTIME: 'overtime',
+  FLEXIBLE: 'flexible',
+  TRIP: 'businessTrip',
+  LEAVE: 'leave',
+  RTW: 'reinstatement',
+};
+
+const vacationTypeLabels = {
+  ANNUAL: '연차',
+  HALF: '반차',
+  SICK: '병가',
+  ETC: '기타',
+};
+
+const leaveTypeLabels = {
+  PARENTAL_LEAVE: '육아휴직',
+  SICK_LEAVE: '질병휴직',
+  FAMILY_CARE_LEAVE: '가족돌봄휴직',
+};
+
+const tripTypeLabels = {
+  OUTSIDE: '외근',
+  BUSINESSTRIP: '출장',
+};
+
 // Methods
-const loadTestData = () => {
-    approvalLine.value = activeTemplate.value === 'vacation' ? [] : [...mockApprovalLine];
+const loadTestData = ({ preserveSourceStatus = false } = {}) => {
+    if (!preserveSourceStatus) {
+      sourceApprovalStatus.value = '';
+    }
+    approvalLine.value = [];
     receivers.value = [];
     referrers.value = [];
     docInfo.title = `${currentTemplateName.value} - ${currentUser.name}`;
     docInfo.content = '';
     docInfo.attachments = [];
+    docInfo.startTime = '09:00';
+    docInfo.endTime = '18:00';
+    docInfo.vacationType = '연차';
 
     docInfo.workDate = currentDate;
     docInfo.tripType = '외근';
@@ -123,7 +158,97 @@ const loadTestData = () => {
     }
 };
 
-const loadFromData = (id, source) => {
+const createSelectionUser = (id, name, position) => ({
+  id: id ?? Math.random().toString(36).slice(2, 11),
+  employeeId: id ?? '',
+  name: name || '',
+  position: position || '',
+  department: '',
+});
+
+const toDateOnly = (value) => String(value || '').split('T')[0];
+const toTimeOnly = (value, fallback = '') => String(value || '').slice(11, 16) || fallback;
+const toTimeOrDefault = (value, fallback) => {
+  const time = toTimeOnly(value, fallback);
+  return time === '00:00' ? fallback : time;
+};
+
+const applyBackendDetail = (detail) => {
+    const nextTemplate =
+      templateByDocType[detail?.docType] ||
+      templateByCategory[detail?.docType] ||
+      'businessTrip';
+
+    activeTemplate.value = nextTemplate;
+    loadTestData({ preserveSourceStatus: true });
+    sourceApprovalStatus.value = detail?.approvalStatus || '';
+
+    docInfo.title = sourceApprovalStatus.value === 'TEMP' ? detail.title || '' : `[재상신] ${detail.title || ''}`;
+    approvalLine.value = (detail?.approvalLines || []).map((line) =>
+      createSelectionUser(line.approverId, line.approverName, line.approverRank),
+    );
+    referrers.value = (detail?.referenceLines || []).map((line) =>
+      createSelectionUser(line.referencerId, line.referencerName, line.referenceRank),
+    );
+    receivers.value = (detail?.recipientLines || []).map((line) =>
+      createSelectionUser(line.receiverId, line.receiverName, line.receiverRank),
+    );
+
+    if (detail?.vacationDetail) {
+      docInfo.startDate = toDateOnly(detail.vacationDetail.startDate);
+      docInfo.endDate = toDateOnly(detail.vacationDetail.endDate);
+      docInfo.vacationType = vacationTypeLabels[detail.vacationDetail.vacationType] || '연차';
+      if (detail.vacationDetail.vacationType === 'HALF') {
+        docInfo.startTime = toTimeOrDefault(detail.vacationDetail.startDate, '09:00');
+        docInfo.endTime = toTimeOrDefault(detail.vacationDetail.endDate, '18:00');
+      }
+      docInfo.content = detail.vacationDetail.reason || '';
+      return;
+    }
+
+    if (detail?.flexibleWorkDetail) {
+      docInfo.startDate = toDateOnly(detail.flexibleWorkDetail.startDate);
+      docInfo.endDate = toDateOnly(detail.flexibleWorkDetail.endDate);
+      docInfo.startTime = toTimeOnly(detail.flexibleWorkDetail.startDate, '09:00');
+      docInfo.endTime = toTimeOnly(detail.flexibleWorkDetail.endDate, '18:00');
+      docInfo.content = detail.flexibleWorkDetail.reason || '';
+      return;
+    }
+
+    if (detail?.businessTripDetail) {
+      docInfo.startDate = toDateOnly(detail.businessTripDetail.startDate);
+      docInfo.endDate = toDateOnly(detail.businessTripDetail.endDate);
+      docInfo.startTime = toTimeOnly(detail.businessTripDetail.startDate, '09:00');
+      docInfo.endTime = toTimeOnly(detail.businessTripDetail.endDate, '18:00');
+      docInfo.tripType = tripTypeLabels[detail.businessTripDetail.tripType] || '외근';
+      docInfo.destination = detail.businessTripDetail.destination || '';
+      docInfo.content = detail.businessTripDetail.reason || '';
+      return;
+    }
+
+    if (detail?.overtimeDetail) {
+      docInfo.workDate = toDateOnly(detail.overtimeDetail.workDate);
+      docInfo.startTime = String(detail.overtimeDetail.startTime || '').slice(0, 5) || '09:00';
+      docInfo.endTime = String(detail.overtimeDetail.endTime || '').slice(0, 5) || '18:00';
+      docInfo.content = detail.overtimeDetail.reason || '';
+      return;
+    }
+
+    if (detail?.leaveDetail) {
+      docInfo.startDate = toDateOnly(detail.leaveDetail.startDate);
+      docInfo.endDate = toDateOnly(detail.leaveDetail.endDate);
+      docInfo.leaveType = leaveTypeLabels[detail.leaveDetail.leaveType] || '육아휴직';
+      docInfo.content = detail.leaveDetail.reason || '';
+      return;
+    }
+
+    if (detail?.rtwDetail) {
+      docInfo.rtwDate = toDateOnly(detail.rtwDetail.rtwDate);
+      docInfo.content = detail.rtwDetail.reason || '';
+    }
+};
+
+const loadFromMockData = (id, source) => {
     const doc = findApprovalDocument(id, source);
     if (!doc) {
       loadTestData();
@@ -132,6 +257,8 @@ const loadFromData = (id, source) => {
 
     const category = doc.category || doc.templateName;
     activeTemplate.value = templateByCategory[category] || 'businessTrip';
+    loadTestData({ preserveSourceStatus: true });
+    sourceApprovalStatus.value = doc.status === '임시저장' ? 'TEMP' : '';
     docInfo.title = `[재상신] ${doc.title}`;
     docInfo.content = doc.content || '';
     docInfo.startDate = doc.startDate || '';
@@ -144,17 +271,7 @@ const loadFromData = (id, source) => {
     docInfo.leaveType = doc.leaveType || '육아휴직';
     docInfo.rtwDate = doc.rtwDate || doc.date || currentDate;
 
-    if (doc.approvalLine) {
-      // Re-map approval line (original line minus current status)
-      approvalLine.value = doc.approvalLine
-      .filter((a) => a.status !== '기안')
-      .map(a => ({
-        id: '',
-        name: a.name,
-        position: a.position,
-        department: '소속팀'
-      }));
-    }
+    approvalLine.value = [];
 
     if (doc.referrers) {
       referrers.value = doc.referrers.map(r => ({
@@ -175,21 +292,45 @@ const loadFromData = (id, source) => {
     }
 };
 
+const loadFromData = async (id, source) => {
+    const approvalId = Number(id);
+    if (Number.isFinite(approvalId) && approvalId > 0) {
+      try {
+        const detail = await getApprovalDetail(approvalId);
+        applyBackendDetail(detail);
+        return;
+      } catch (error) {
+        const mockDoc = findApprovalDocument(id, source);
+        if (!mockDoc) {
+          loadTestData();
+          alert(error?.response?.data?.error?.message || '기존 기안 정보를 불러오지 못했습니다.');
+          return;
+        }
+      }
+    }
+
+    loadFromMockData(id, source);
+};
+
 const handleClickOutside = (event) => {
     if (templateSelectorRef.value && !templateSelectorRef.value.contains(event.target)) {
         showTemplateMenu.value = false;
     }
 };
 
-// Initialize with test data
-onMounted(() => {
+const syncDraftFromRoute = () => {
     const fromId = route.query.from;
     const source = route.query.source || 'box';
     if (fromId) {
       loadFromData(fromId, source);
-    } else {
-      loadTestData();
+      return;
     }
+    loadTestData();
+};
+
+// Initialize with test data
+onMounted(() => {
+    syncDraftFromRoute();
     window.addEventListener('click', handleClickOutside);
 });
 
@@ -197,11 +338,18 @@ onUnmounted(() => {
     window.removeEventListener('click', handleClickOutside);
 });
 
+watch(
+  () => [route.query.from, route.query.source],
+  () => {
+    syncDraftFromRoute();
+  }
+);
+
 const selectTemplate = (id) => {
   activeTemplate.value = id;
   showTemplateMenu.value = false;
   // Reset fields if needed
-  loadTestData(); // Re-load basic data for new template
+  loadTestData({ preserveSourceStatus: true }); // Re-load basic data for new template
 };
 
 const openModal = (mode) => {
@@ -246,21 +394,150 @@ const handleModalConfirm = (selectedUsers) => {
 };
 
 const tempSave = () => {
-  alert('임시 저장되었습니다.\n(임시 보관함으로 이동합니다)');
+  submitDraft('temp');
 };
 
 const submitApproval = () => {
   if (!docInfo.title) return alert('제목을 입력해주세요.');
   if (approvalLine.value.length === 0) {
-      if(!confirm('결재선이 지정되지 않았습니다. 계속 진행하시겠습니까?')) return;
+      alert('결재선은 최소 1명 이상 지정해야 합니다.');
+      return;
   }
   
   isConfirmModalOpen.value = true;
 };
 
-const finalizeSubmission = () => {
-  alert(`[${currentTemplateName.value}] 기안이 상신되었습니다.\n결재 현황 페이지로 이동합니다.`);
-  router.push('/approval/status');
+const toNullable = (value) => {
+  const text = String(value || '').trim();
+  return text ? text : null;
+};
+
+const toDateTime = (date, time = '00:00') => {
+  if (!date) return null;
+  return `${date}T${time.length === 5 ? `${time}:00` : time}`;
+};
+
+const vacationTypeMap = {
+  연차: 'ANNUAL',
+  반차: 'HALF',
+  병가: 'SICK',
+  기타: 'ETC',
+};
+
+const leaveTypeMap = {
+  육아휴직: 'PARENTAL_LEAVE',
+  질병휴직: 'SICK_LEAVE',
+  가족돌봄휴직: 'FAMILY_CARE_LEAVE',
+};
+
+const docTypeMap = {
+  vacation: 'VACATION',
+  overtime: 'OVERTIME',
+  flexible: 'FLEXIBLE',
+  businessTrip: 'TRIP',
+  leave: 'LEAVE',
+  reinstatement: 'RTW',
+};
+
+const buildDraftPayload = () => {
+  const payload = {
+    title: docInfo.title,
+    docType: docTypeMap[activeTemplate.value],
+    approvalLine: approvalLine.value.map((approver, index) => ({
+      approvalSeq: index + 1,
+      approverId: Number(approver.employeeId ?? approver.id),
+    })),
+    referenceLine: referrers.value.map((user) => ({
+      referencerId: Number(user.employeeId ?? user.id),
+    })),
+    receipientLine: receivers.value.map((user) => ({
+      receipientId: Number(user.employeeId ?? user.id),
+    })),
+  };
+
+  if (activeTemplate.value === 'vacation') {
+    payload.vacationRequest = {
+      vacationType: vacationTypeMap[docInfo.vacationType] || 'ANNUAL',
+      startDate: toDateTime(docInfo.startDate, docInfo.startTime),
+      endDate: toDateTime(docInfo.endDate, docInfo.endTime),
+      reason: docInfo.content,
+    };
+  } else if (activeTemplate.value === 'flexible') {
+    payload.flexibleWorkRequest = {
+      startDate: toDateTime(docInfo.startDate, docInfo.startTime),
+      endDate: toDateTime(docInfo.endDate, docInfo.endTime),
+      reason: docInfo.content,
+    };
+  } else if (activeTemplate.value === 'businessTrip') {
+    payload.businessTripRequest = {
+      tripType: docInfo.tripType === '출장' ? 'BUSINESSTRIP' : 'OUTSIDE',
+      destination: docInfo.destination,
+      startDate: toDateTime(docInfo.startDate, docInfo.startTime),
+      endDate: toDateTime(docInfo.endDate, docInfo.endTime),
+      reason: docInfo.content,
+    };
+  } else if (activeTemplate.value === 'overtime') {
+    payload.overtimeRequest = {
+      workDate: docInfo.workDate,
+      startTime: `${docInfo.startTime}:00`,
+      endTime: `${docInfo.endTime}:00`,
+      reason: docInfo.content,
+    };
+  } else if (activeTemplate.value === 'leave') {
+    payload.leaveRequest = {
+      startDate: toDateTime(docInfo.startDate, docInfo.startTime),
+      endDate: toDateTime(docInfo.endDate, docInfo.endTime),
+      leaveType: leaveTypeMap[docInfo.leaveType] || 'PARENTAL_LEAVE',
+      reason: docInfo.content,
+    };
+  } else if (activeTemplate.value === 'reinstatement') {
+    payload.rtwRequest = {
+      rtwDate: docInfo.rtwDate,
+      reason: docInfo.content,
+    };
+  }
+
+  return payload;
+};
+
+const submitDraft = async (mode = 'pending') => {
+  if (isSubmitting.value) return;
+  if (!docInfo.title) {
+    alert('제목을 입력해주세요.');
+    return;
+  }
+  if (approvalLine.value.length === 0) {
+    alert('결재선은 최소 1명 이상 지정해야 합니다.');
+    return;
+  }
+
+  try {
+    isSubmitting.value = true;
+    const payload = buildDraftPayload();
+    const files = Array.isArray(docInfo.attachments) ? docInfo.attachments : [];
+    const approvalId = Number(route.query.from);
+    const canRedraftTemp =
+      Number.isFinite(approvalId) && approvalId > 0 && sourceApprovalStatus.value === 'TEMP';
+
+    if (canRedraftTemp) {
+      await redraftApproval({ approvalId, payload, files });
+    } else if (mode === 'temp') {
+      await tempApproval({ payload, files });
+    } else {
+      await draftApproval({ payload, files });
+    }
+    alert(mode === 'temp' ? '임시 저장되었습니다.' : `[${currentTemplateName.value}] 기안이 상신되었습니다.`);
+    router.push(mode === 'temp' ? '/approval/box' : '/approval/status');
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '전자결재 저장에 실패했습니다.');
+  } finally {
+    isSubmitting.value = false;
+    isConfirmModalOpen.value = false;
+  }
+};
+
+const finalizeSubmission = async () => {
+  await submitDraft('pending');
 };
 
 const confirmMessage = computed(() => {
@@ -1326,6 +1603,3 @@ const vacationDurationLabel = computed(() => {
 }
 
 </style>
-
-
-

@@ -94,12 +94,12 @@ const closeModal = () => {
 
 const handleModalAction = (action) => {
   if (action.type === 'redraft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } })
   } else if (action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } });
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } })
   }
-  isModalOpen.value = false;
-};
+  isModalOpen.value = false
+}
 
 const handleRedraft = (item) => {
   router.push({ name: 'approval-draft', query: { from: item.approvalId, source: 'status' } })

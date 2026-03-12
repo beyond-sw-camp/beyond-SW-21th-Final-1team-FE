@@ -80,10 +80,9 @@
       </table>
     </div>
 
-    <!-- Modal -->
-    <ApprovalDetailModal 
-      :is-open="isDetailOpen" 
-      :item="selectedItem" 
+    <ApprovalDetailModal
+      :is-open="isDetailOpen"
+      :item="selectedItem"
       @close="isDetailOpen = false"
       @action="handleModalAction"
     />
@@ -105,7 +104,6 @@ const allDocuments = ref([])
 const searchQuery = ref('')
 const currentFilter = ref('전체')
 const sortBy = ref('date-desc')
-
 const isDetailOpen = ref(false)
 const selectedItem = ref({})
 
