@@ -137,15 +137,18 @@ const openDetail = async (item) => {
   }
 }
 
-const handleModalAction = (action) => {
+const handleModalAction = async (action) => {
   if (action.type === 'redraft' || action.type === 'draft') {
     router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
   } else if (action.type === 'delete' || action.type === 'cancel') {
-    deleteApproval(action.id)
-      .then(loadBoxes)
-      .catch((error) => {
-        alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
-      })
+    try {
+      await deleteApproval(action.id)
+      await loadBoxes()
+      isDetailOpen.value = false
+    } catch (error) {
+      alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
+    }
+    return
   } else if (action.type === 'review') {
     router.push({ name: 'approval-review' })
   }

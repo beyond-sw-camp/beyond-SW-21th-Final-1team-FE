@@ -226,15 +226,18 @@ const handleReviewAction = async (data) => {
   }
 }
 
-const handleDetailAction = (action) => {
+const handleDetailAction = async (action) => {
   if (action.type === 'redraft' || action.type === 'draft') {
     router.push({ name: 'approval-draft', query: { from: action.id, source: 'main' } })
   } else if (action.type === 'delete' || action.type === 'cancel') {
-    deleteApproval(action.id)
-      .then(loadDashboard)
-      .catch((error) => {
-        alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
-      })
+    try {
+      await deleteApproval(action.id)
+      await loadDashboard()
+      isDetailModalOpen.value = false
+    } catch (error) {
+      alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
+    }
+    return
   } else if (action.type === 'review') {
     router.push({ name: 'approval-review' })
   }
