@@ -317,6 +317,13 @@ const getWeekStart = (date) => {
 const formatMonthDate = (date) =>
   `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 
+const toDateKey = (value) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const weeklyPeriodLabel = computed(() => {
   if (!weeklySummary.value?.weekStartDate || !weeklySummary.value?.weekEndDate) return '-'
   const weekStart = new Date(`${weeklySummary.value.weekStartDate}T00:00:00`)
@@ -368,13 +375,13 @@ const calendarWeeks = computed(() => {
   const firstDay = new Date(year, month, 1)
   const start = new Date(firstDay)
   start.setDate(1 - firstDay.getDay())
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayKey = toDateKey(new Date())
 
   return Array.from({ length: 6 }, (_, weekIndex) =>
     Array.from({ length: 7 }, (_, dayIndex) => {
       const date = new Date(start)
       date.setDate(start.getDate() + weekIndex * 7 + dayIndex)
-      const key = date.toISOString().slice(0, 10)
+      const key = toDateKey(date)
       const labelInfo = eventLabelMap.value.get(key)
       return {
         date: key,
@@ -483,10 +490,11 @@ onMounted(async () => {
   updateTime()
   timer = setInterval(updateTime, 1000)
   const now = new Date()
+  const today = toDateKey(now)
   await Promise.all([
     store.fetchMonthlyRecords(now.getFullYear(), now.getMonth() + 1),
     store.fetchMonthlySummary(now.getFullYear(), now.getMonth() + 1),
-    store.fetchWeeklySummary(now.toISOString().slice(0, 10)),
+    store.fetchWeeklySummary(today),
     store.fetchAttendanceCalendar(now.getFullYear(), now.getMonth() + 1),
     store.refreshRequestHistory(),
   ])
