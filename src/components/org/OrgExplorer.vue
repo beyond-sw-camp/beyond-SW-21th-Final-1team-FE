@@ -128,6 +128,7 @@ const myOrgNodeId = ref(null)
 const normalize = (value) => String(value || '').trim().toLowerCase()
 const isOpen = (nodeId) => Boolean(expandedNodes.value[nodeId])
 
+const orgIdFromSession = ref(sessionStorage.getItem(AUTH_KEYS.orgId) || '')
 const orgNameFromSession = ref(sessionStorage.getItem(AUTH_KEYS.orgName) || '')
 
 const orgTypeLabel = (type) => {
@@ -187,7 +188,9 @@ const findPathByNodeId = (node, nodeId, path = []) => {
 const collectAllNodeIds = (node, acc = {}) => {
   if (!node) return acc
   acc[node.id] = true
-  ;(node.children || []).forEach((child) => collectAllNodeIds(child, acc))
+  ;(node.children || []).forEach((child) => {
+    collectAllNodeIds(child, acc)
+  })
   return acc
 }
 
@@ -443,7 +446,9 @@ const buildTree = (rows) => {
       if (sortDiff !== 0) return sortDiff
       return String(a.name || '').localeCompare(String(b.name || ''), 'ko')
     })
-    nodes.forEach((n) => sortNodes(n.children))
+    nodes.forEach((n) => {
+      sortNodes(n.children)
+    })
   }
 
   sortNodes(roots)
@@ -456,14 +461,19 @@ const loadOrganizationTree = async () => {
     orgRoot.value = buildTree(Array.isArray(rows) ? rows : [])
     if (!orgRoot.value) return
 
+    const all = []
+    const walk = (node) => {
+      all.push(node)
+      ;(node.children || []).forEach(walk)
+    }
+    walk(orgRoot.value)
+
     let initNode = null
-    if (orgNameFromSession.value) {
-      const all = []
-      const walk = (node) => {
-        all.push(node)
-        ;(node.children || []).forEach(walk)
-      }
-      walk(orgRoot.value)
+    const sessionOrgId = Number(orgIdFromSession.value)
+    if (Number.isFinite(sessionOrgId) && sessionOrgId > 0) {
+      initNode = all.find((node) => Number(node.id) === sessionOrgId) || null
+    }
+    if (!initNode && orgNameFromSession.value) {
       initNode = all.find((node) => node.name === orgNameFromSession.value) || null
     }
 

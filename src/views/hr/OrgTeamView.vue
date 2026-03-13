@@ -21,7 +21,9 @@
       <label for="teamFilter">팀 필터</label>
       <select id="teamFilter" v-model="selectedTeam">
         <option value="">전체</option>
-        <option v-for="team in teamOptions" :key="team" :value="team">{{ team }}</option>
+        <option v-for="team in teamOptions" :key="team.orgId" :value="String(team.orgId)">
+          {{ team.orgName }}
+        </option>
       </select>
     </section>
 
@@ -189,6 +191,7 @@ const performanceStore = usePerformanceStore()
 const teamMembers = ref([])
 const memberTotal = ref(0)
 const selectedTeam = ref('')
+const teamOptions = ref([])
 
 const showDetailModal = ref(false)
 const selectedMember = ref(null)
@@ -198,13 +201,9 @@ const canViewMemberDetail = computed(() => {
   return roleCodes.includes('EVALUATOR') || roleCodes.includes('ROLE_EVALUATOR')
 })
 const sortedTeamMembers = computed(() => [...teamMembers.value])
-const teamOptions = computed(() => {
-  const names = [...new Set(sortedTeamMembers.value.map((item) => item.orgName).filter(Boolean))]
-  return names.sort((a, b) => a.localeCompare(b, 'ko'))
-})
 const filteredMembers = computed(() => {
   if (!selectedTeam.value) return sortedTeamMembers.value
-  return sortedTeamMembers.value.filter((item) => item.orgName === selectedTeam.value)
+  return sortedTeamMembers.value.filter((item) => String(item.orgId) === String(selectedTeam.value))
 })
 const groupedMembers = computed(() => {
   const grouped = new Map()
@@ -251,6 +250,8 @@ const toSkillCategoryLabel = (category) => {
   const map = {
     CERTIFICATE: '자격',
     LANGUAGE: '어학',
+    LICENSE: '면허',
+    ETC: '기타'
   }
   return map[category] || category || '-'
 }
@@ -271,15 +272,45 @@ const mapMember = (row) => ({
   status: row.employeeStateDescription || '-',
 })
 
+const buildTeamOptions = (members) => {
+  const seen = new Set()
+  const options = []
+  for (const member of members) {
+    const orgId = Number(member.orgId || 0)
+    if (!orgId || seen.has(orgId)) continue
+    seen.add(orgId)
+    options.push({ orgId, orgName: member.orgName || '미분류' })
+  }
+  options.sort((a, b) => String(a.orgName).localeCompare(String(b.orgName), 'ko'))
+  return options
+}
+
 const loadMembers = async () => {
   try {
-    const pageData = await getMyOrganizationMembers(1)
-    const content = Array.isArray(pageData?.content) ? pageData.content : []
-    teamMembers.value = content.map(mapMember)
-    memberTotal.value = Number(pageData?.totalElements || content.length || 0)
+    let page = 1
+    let totalPages = 1
+    const all = []
+
+    while (page <= totalPages) {
+      const pageData = await getMyOrganizationMembers(page)
+      const content = Array.isArray(pageData?.content) ? pageData.content : []
+      all.push(...content)
+      totalPages = Math.max(1, Number(pageData?.totalPages || 1))
+      page += 1
+    }
+
+    const mapped = all.map(mapMember)
+    teamMembers.value = mapped
+    memberTotal.value = mapped.length
+    teamOptions.value = buildTeamOptions(mapped)
+
+    if (selectedTeam.value && !teamOptions.value.some((team) => String(team.orgId) === String(selectedTeam.value))) {
+      selectedTeam.value = ''
+    }
   } catch (error) {
     teamMembers.value = []
     memberTotal.value = 0
+    teamOptions.value = []
     alert(error?.response?.data?.error?.message || '내 조직 구성원 조회에 실패했습니다.')
   }
 }
@@ -544,6 +575,9 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .member-card {

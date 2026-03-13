@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { AUTH_KEYS, USER_ROLES } from '@/utils/auth'
+import { AUTH_KEYS, isAdminRole } from '@/utils/auth'
 
 const routes = [
   {
@@ -175,11 +175,10 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const isLoggedIn = sessionStorage.getItem(AUTH_KEYS.loggedIn) === 'true'
-  const userRole = sessionStorage.getItem(AUTH_KEYS.role) || USER_ROLES.user
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/login')
-  } else if (to.meta.requiresAdmin && userRole !== USER_ROLES.admin) {
+  } else if (to.meta.requiresAdmin && !isAdminRole()) {
     next('/')
   } else if (to.path === '/login' && isLoggedIn) {
     next('/')

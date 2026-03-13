@@ -102,6 +102,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { getActivePinia } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import OrgSearchModal from '@/components/org/OrgSearchModal.vue'
 import { clearLoginSession, isAdminRole } from '@/utils/auth'
@@ -135,6 +136,10 @@ const handleLogout = async () => {
     // 토큰 만료/블랙리스트 등 실패여도 클라이언트 세션은 종료한다.
   } finally {
     clearLoginSession()
+    const pinia = getActivePinia()
+    if (pinia) {
+      pinia.state.value = {}
+    }
     router.push('/login')
   }
 }

@@ -1,22 +1,15 @@
-export const HR_ADMIN_ROLE_CODES = [
-  'HR_ADMIN_MASTER',
-  'HR_ADMIN_BASIC',
-  'HR_ADMIN_PAYROLL',
-  'ROLE_HR_ADMIN_MASTER',
-  'ROLE_HR_ADMIN_BASIC',
-  'ROLE_HR_ADMIN_PAYROLL',
-]
+import { ADMIN_ROLE_CODES } from '@/utils/auth'
 
 export const VIEW_PERMISSION_MAP = {
-  'admin-main': HR_ADMIN_ROLE_CODES,
-  'admin-employees': HR_ADMIN_ROLE_CODES,
-  'admin-hr-change': HR_ADMIN_ROLE_CODES,
-  'admin-policies': HR_ADMIN_ROLE_CODES,
-  'admin-kms-permissions-history': HR_ADMIN_ROLE_CODES,
-  'admin-notices': HR_ADMIN_ROLE_CODES,
-  'admin-attendance': HR_ADMIN_ROLE_CODES,
-  'admin-salary': HR_ADMIN_ROLE_CODES,
-  'kms-permission-history': HR_ADMIN_ROLE_CODES,
+  'admin-main': ADMIN_ROLE_CODES,
+  'admin-employees': ADMIN_ROLE_CODES,
+  'admin-hr-change': ADMIN_ROLE_CODES,
+  'admin-policies': ADMIN_ROLE_CODES,
+  'admin-kms-permissions-history': ADMIN_ROLE_CODES,
+  'admin-notices': ADMIN_ROLE_CODES,
+  'admin-attendance': ADMIN_ROLE_CODES,
+  'admin-salary': ADMIN_ROLE_CODES,
+  'kms-permission-history': ADMIN_ROLE_CODES,
 }
 
 export const VIEW_CATALOG = [
@@ -75,4 +68,24 @@ export const VIEW_CATALOG = [
 export const getRequiredRoleCodesByRouteName = (routeName) => {
   if (!routeName) return []
   return VIEW_PERMISSION_MAP[String(routeName)] || []
+}
+
+const ROUTE_VIEW_CODE_MAP = VIEW_CATALOG.reduce((acc, item) => {
+  if (item?.routeName && item?.viewCode) {
+    acc[String(item.routeName)] = String(item.viewCode)
+  }
+  return acc
+}, {})
+
+export const getViewCodeByRouteName = (routeName) => {
+  if (!routeName) return ''
+  return ROUTE_VIEW_CODE_MAP[String(routeName)] || ''
+}
+
+export const getFirstAllowedRouteName = (allowedViewCodes = []) => {
+  const allowedSet = new Set(Array.isArray(allowedViewCodes) ? allowedViewCodes : [])
+  const first = VIEW_CATALOG.find(
+    (item) => item?.routeName && item.viewCode !== 'LOGIN' && allowedSet.has(item.viewCode)
+  )
+  return first?.routeName || ''
 }

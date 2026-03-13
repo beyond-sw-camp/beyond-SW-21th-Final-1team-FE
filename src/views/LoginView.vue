@@ -181,6 +181,7 @@ const completeBackendLogin = (loginData, fallbackUserId = '') => {
     userId: profile?.employeeNum || fallbackUserId,
     employeeId: profile?.employeeId ? String(profile.employeeId) : '',
     userName: profile?.employeeName || fallbackUserId,
+    orgId: profile?.orgId ? String(profile.orgId) : '',
     orgName: profile?.orgName || '',
     positionName: profile?.positionName || '',
     rankName: profile?.rankName || '',
