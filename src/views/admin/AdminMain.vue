@@ -256,6 +256,7 @@ const filters = reactive({
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalElements = ref(0)
+const upcomingHireCount = ref(0)
 const allEmployees = ref([])
 const showDetailModal = ref(false)
 const selectedEmployee = ref(null)
@@ -301,7 +302,7 @@ const pagedEmployees = computed(() =>
 
 const kpiCards = computed(() => [
   { label: '전체 인원', value: `${totalElements.value}명`, note: '전 사원 목록 기준' },
-  { label: '신규 입사 예정', value: '-', note: '백엔드 미제공' },
+  { label: '신규 입사 예정', value: `${upcomingHireCount.value}명`, note: '입사일 기준' },
   { label: '최근 인사 변경', value: '-', note: '백엔드 미제공' },
 ])
 
@@ -327,6 +328,17 @@ const normalizeEmployeeStateText = (value) => {
   if (!text) return '-'
   if (text === '퇴사') return '사직'
   return text
+}
+
+const isFutureHireDate = (value) => {
+  if (!value) return false
+  const dateText = String(value).slice(0, 10)
+  const today = new Date()
+  const y = today.getFullYear()
+  const m = String(today.getMonth() + 1).padStart(2, '0')
+  const d = String(today.getDate()).padStart(2, '0')
+  const todayText = `${y}-${m}-${d}`
+  return dateText > todayText
 }
 
 const loadOrgOptions = async () => {
@@ -369,6 +381,24 @@ const loadEmployees = async (page = 1) => {
     totalPages.value = 1
     totalElements.value = 0
     alert(error?.response?.data?.error?.message || '사원 목록 조회에 실패했습니다.')
+  }
+}
+
+const loadUpcomingHireCount = async () => {
+  try {
+    const firstPage = await getAdminEmployees({ page: 1 })
+    const totalPageCount = Math.max(1, Number(firstPage?.totalPages || 1))
+    const allRows = [...(Array.isArray(firstPage?.content) ? firstPage.content : [])]
+
+    for (let page = 2; page <= totalPageCount; page += 1) {
+      const pageData = await getAdminEmployees({ page })
+      const pageRows = Array.isArray(pageData?.content) ? pageData.content : []
+      allRows.push(...pageRows)
+    }
+
+    upcomingHireCount.value = allRows.filter((row) => isFutureHireDate(row?.hireDate)).length
+  } catch (_error) {
+    upcomingHireCount.value = 0
   }
 }
 
@@ -456,7 +486,7 @@ watch(currentPage, (nextPage, prevPage) => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadOrgOptions(), loadEmployees(1)])
+  await Promise.all([loadOrgOptions(), loadEmployees(1), loadUpcomingHireCount()])
 })
 </script>
 

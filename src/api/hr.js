@@ -31,6 +31,8 @@ export const getMyOrganizationMembers = (page = 1, orgId) =>
   )
 export const getAdminEmployees = (params) => unwrap(api.get('/admin/employees', { params }))
 export const getAdminEmployeeDetail = (employeeId) => unwrap(api.get(`/admin/employees/${employeeId}`))
+export const createAdminEmployee = (payload) => unwrap(api.post('/admin/employees', payload))
+export const getAdminHrChangeOptions = () => unwrap(api.get('/admin/hr-change/options'))
 export const getAdminEmployeeSkillEvidence = (employeeId, skillId) =>
   unwrap(api.get(`/admin/employees/${employeeId}/skills/${skillId}/evidence`))
 export const getAdminEmployeeCareerEvidence = (employeeId, careerId) =>
