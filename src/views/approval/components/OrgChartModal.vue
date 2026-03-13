@@ -34,7 +34,6 @@
                         <span class="user-name-pos">{{ user.name }} {{ user.position }}</span>
                         <span class="user-dept">{{ user.department }}</span>
                     </div>
-                    <span v-if="user.canFinalize && mode === 'approval'" class="finalize-badge">전결</span>
                 </div>
                 <div v-if="filteredUsers.length === 0" class="empty-search">
                     검색 결과가 없습니다.
@@ -83,7 +82,6 @@
                 <span class="name">{{ user.name }}</span>
                 <span class="position">{{ user.position }}</span>
                 <span class="dept">{{ user.department }}</span>
-                <span v-if="user.canFinalize && mode === 'approval'" class="finalize-badge-small">전결 가능</span>
               </div>
               <button class="remove-btn" @click="removeUser(index)">&times;</button>
             </div>
@@ -103,7 +101,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { orgChart as rawOrgChart, mockUsers } from '@/utils/approvalData';
+import { getOrganizationMembers, getOrganizationTree } from '@/api/hr';
 import TreeItem from './TreeItem.vue';
 import BaseModal from '@/components/common/BaseModal.vue';
 
@@ -122,14 +120,16 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'confirm']);
 
-const orgChart = ref(rawOrgChart);
+const orgChart = ref([]);
 const localSelection = ref([]);
 const searchQuery = ref('');
+const allUsers = ref([]);
+const isLoading = ref(false);
 
 const filteredUsers = computed(() => {
     if (!searchQuery.value) return [];
     const lowerQuery = searchQuery.value.toLowerCase();
-    return mockUsers.filter(user => 
+    return allUsers.value.filter(user => 
         user.name.toLowerCase().includes(lowerQuery) || 
         user.department.toLowerCase().includes(lowerQuery)
     );
@@ -140,6 +140,9 @@ watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     localSelection.value = [...props.initialSelection];
     searchQuery.value = '';
+    if (orgChart.value.length === 0) {
+      loadOrganizationData();
+    }
   }
 });
 
@@ -200,6 +203,65 @@ const handleBaseVisibility = (nextValue) => {
 const confirm = () => {
   emit('confirm', localSelection.value);
   close();
+};
+
+const mapMember = (member, departmentName) => ({
+  id: member.employeeId,
+  employeeId: member.employeeId,
+  name: member.employeeName,
+  position: member.positionName || member.rankName || '',
+  department: departmentName,
+  email: member.email || '',
+});
+
+const buildOrganizationTree = (nodes, memberMap) => {
+  const byId = new Map(
+    (nodes || []).map((node) => [
+      node.orgId,
+      {
+        id: node.orgId,
+        name: node.orgName,
+        parentOrgId: node.parentOrgId,
+        children: [],
+        users: memberMap.get(node.orgId) || [],
+      },
+    ]),
+  );
+
+  const roots = [];
+  byId.forEach((node) => {
+    const parent = byId.get(node.parentOrgId);
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  return roots;
+};
+
+const loadOrganizationData = async () => {
+  try {
+    isLoading.value = true;
+    const nodes = await getOrganizationTree();
+    const memberEntries = await Promise.all(
+      (nodes || []).map(async (node) => {
+        const members = await getOrganizationMembers(node.orgId);
+        return [
+          node.orgId,
+          (members || []).map((member) => mapMember(member, node.orgName)),
+        ];
+      }),
+    );
+    const memberMap = new Map(memberEntries);
+    orgChart.value = buildOrganizationTree(nodes || [], memberMap);
+    allUsers.value = memberEntries.flatMap(([, members]) => members);
+  } catch (_error) {
+    orgChart.value = [];
+    allUsers.value = [];
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 </script>
@@ -390,16 +452,6 @@ const confirm = () => {
     font-size: 0.9rem;
     color: #555;
 }
-:deep(.finalize-badge) {
-    background: #fff1f0;
-    color: #cf1322;
-    border: 1px solid #ffa39e;
-    font-size: 0.7rem;
-    padding: 0 4px;
-    border-radius: 2px;
-    margin-left: auto;
-}
-
 .search-results .tree-user {
     margin-left: 0;
     padding: 10px;
@@ -465,15 +517,6 @@ const confirm = () => {
 .user-info .dept {
   color: #999;
   font-size: 0.8rem;
-}
-
-.finalize-badge-small {
-    font-size: 0.7rem;
-    color: #cf1322;
-    background: #fff1f0;
-    padding: 0 4px;
-    border-radius: 2px;
-    border: 1px solid #ffa39e;
 }
 
 .remove-btn {

@@ -35,7 +35,7 @@
           </div>
           <div class="stat-text">
             <span class="num">{{ monthlyStats.remoteCount }}</span>
-            <span class="label">재택/외근</span>
+            <span class="label">결근</span>
           </div>
         </div>
         <!-- Leave -->
@@ -108,14 +108,13 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Mock Data Rows -->
             <tr v-for="(row, idx) in paginatedRecords" :key="idx">
-              <td>{{ row.date }} <span class="weekday">({{ row.day }})</span></td>
-              <td>{{ row.inTime }}</td>
-              <td>{{ row.outTime }}</td>
-              <td><span class="status-tag" :class="row.statusClass">{{ row.status }}</span></td>
+              <td>{{ row.date }} <span class="weekday">({{ getDayName(row.date) }})</span></td>
+              <td>{{ row.checkIn || '-' }}</td>
+              <td>{{ row.checkOut || '-' }}</td>
+              <td><span class="status-tag" :class="row.status">{{ row.statusDescription }}</span></td>
               <td class="memo">{{ row.memo }}</td>
-              <td class="text-right font-bold">{{ row.total }}</td>
+              <td class="text-right font-bold">{{ row.workHours }}</td>
             </tr>
           </tbody>
         </table>
@@ -141,37 +140,27 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useAttendanceStore } from '@/store/attendance'
 
 const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+const getDayName = (dateText) => dayNames[new Date(dateText).getDay()]
+
+const store = useAttendanceStore()
+const { dailyAttendance, monthlySummary } = storeToRefs(store)
 
 const tabs = [
   { value: 'all', label: '전체' },
   { value: 'normal', label: '정상' },
-  { value: 'late', label: '지각/조퇴' },
-  { value: 'leave', label: '휴가' }
+  { value: 'tardy', label: '지각' },
+  { value: 'early_leave', label: '조퇴' },
+  { value: 'vacation', label: '휴가' }
 ]
-
-const statusMap = {
-  normal: { status: '정상', statusClass: 'normal', inTime: '08:55', outTime: '18:10', memo: '-', total: '8h 15m', leaveDays: 0 },
-  late: { status: '지각/조퇴', statusClass: 'late', inTime: '09:10', outTime: '18:20', memo: '대중교통 지연', total: '8h 10m', leaveDays: 0 },
-  remote: { status: '재택/외근', statusClass: 'remote', inTime: '09:00', outTime: '18:00', memo: '재택근무', total: '8h 00m', leaveDays: 0 },
-  leave: { status: '휴가', statusClass: 'leave', inTime: '-', outTime: '-', memo: '연차 사용', total: '-', leaveDays: 1 }
-}
-
-const monthPatterns = [
-  ['normal', 'late', 'normal', 'normal', 'remote', 'normal', 'leave', 'normal'],
-  ['normal', 'normal', 'late', 'remote', 'normal', 'leave', 'normal', 'normal'],
-  ['late', 'normal', 'normal', 'normal', 'leave', 'normal', 'remote', 'normal'],
-  ['normal', 'leave', 'normal', 'late', 'normal', 'remote', 'normal', 'normal']
-]
-
-const selectedMonth = ref({ year: 2026, month: 2 })
+const selectedMonth = ref({ year: new Date().getFullYear(), month: new Date().getMonth() + 1 })
 const activeTab = ref('all')
 const searchQuery = ref('')
 const currentPage = ref(1)
-
-const monthOffset = computed(() => (selectedMonth.value.year - 2026) * 12 + (selectedMonth.value.month - 2))
 
 const selectorMonthLabel = computed(() => {
   const month = String(selectedMonth.value.month).padStart(2, '0')
@@ -180,59 +169,18 @@ const selectorMonthLabel = computed(() => {
 
 const headerMonthLabel = computed(() => `${selectedMonth.value.year}년 ${selectedMonth.value.month}월`)
 
-const monthlyRecords = computed(() => {
-  const { year, month } = selectedMonth.value
-  const pattern = monthPatterns[Math.abs(monthOffset.value) % monthPatterns.length]
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const today = new Date()
-  const startOfSelectedMonth = new Date(year, month - 1, 1)
-  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
-  const currentYear = today.getFullYear()
-  const currentMonth = today.getMonth() + 1
-
-  if (startOfSelectedMonth > endOfToday) return []
-
-  const maxDay = year === currentYear && month === currentMonth ? today.getDate() : daysInMonth
-
-  return Array.from({ length: maxDay }, (_, idx) => maxDay - idx)
-    .map((day) => {
-      const dateObj = new Date(year, month - 1, day)
-      const y = dateObj.getFullYear()
-      const m = String(dateObj.getMonth() + 1).padStart(2, '0')
-      const d = String(dateObj.getDate()).padStart(2, '0')
-      const dayType = pattern[(day - 1) % pattern.length]
-      const statusInfo = statusMap[dayType]
-
-      return {
-        ...statusInfo,
-        type: dayType,
-        date: `${y}.${m}.${d}`,
-        day: dayNames[dateObj.getDay()],
-        dateObj
-      }
-    })
-    .filter((record) => ![0, 6].includes(record.dateObj.getDay()))
-    .filter((record) => record.dateObj <= endOfToday)
-    .map(({ dateObj, ...record }) => record)
-})
-
 const monthlyStats = computed(() => {
-  const normalCount = monthlyRecords.value.filter((record) => record.type === 'normal').length
-  const lateCount = monthlyRecords.value.filter((record) => record.type === 'late').length
-  const remoteCount = monthlyRecords.value.filter((record) => record.type === 'remote').length
-  const leaveTotal = monthlyRecords.value.reduce((sum, record) => sum + (record.leaveDays || 0), 0)
-
   return {
-    normalCount,
-    lateCount,
-    remoteCount,
-    leaveDays: Number.isInteger(leaveTotal) ? String(leaveTotal) : leaveTotal.toFixed(1)
+    normalCount: monthlySummary.value.normalCount,
+    lateCount: monthlySummary.value.tardyCount + monthlySummary.value.earlyLeaveCount,
+    remoteCount: monthlySummary.value.absentCount,
+    leaveDays: monthlySummary.value.vacationCount,
   }
 })
 
 const displayedRecords = computed(() => {
-  if (activeTab.value === 'all') return monthlyRecords.value
-  return monthlyRecords.value.filter((record) => record.type === activeTab.value)
+  if (activeTab.value === 'all') return dailyAttendance.value
+  return dailyAttendance.value.filter((record) => record.status === activeTab.value)
 })
 
 const filteredRecords = computed(() => {
@@ -242,18 +190,17 @@ const filteredRecords = computed(() => {
   return displayedRecords.value.filter((record) => {
     const searchTargets = [
       record.date,
-      record.day,
-      record.inTime,
-      record.outTime,
-      record.status,
+      record.checkIn,
+      record.checkOut,
+      record.statusDescription,
       record.memo,
-      record.total
+      record.workHours
     ]
     return searchTargets.some((target) => String(target).toLowerCase().includes(keyword))
   })
 })
 
-const pageSize = computed(() => (activeTab.value === 'all' ? 10 : 3))
+const pageSize = computed(() => 10)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredRecords.value.length / pageSize.value)))
 
@@ -264,7 +211,7 @@ const paginatedRecords = computed(() => {
   return filteredRecords.value.slice(start, start + pageSize.value)
 })
 
-watch([activeTab, searchQuery, monthOffset], () => {
+watch([activeTab, searchQuery, () => selectedMonth.value.year, () => selectedMonth.value.month], () => {
   currentPage.value = 1
 })
 
@@ -302,6 +249,17 @@ const goNextMonth = () => {
   }
   selectedMonth.value.month += 1
 }
+
+const fetchDetails = async () => {
+  await Promise.all([
+    store.fetchMonthlyRecords(selectedMonth.value.year, selectedMonth.value.month),
+    store.fetchMonthlySummary(selectedMonth.value.year, selectedMonth.value.month),
+  ])
+}
+
+onMounted(fetchDetails)
+
+watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDetails)
 </script>
 
 <style scoped>
@@ -508,9 +466,10 @@ const goNextMonth = () => {
   border-radius: 6px; font-size: 0.75rem; font-weight: 600;
 }
 .status-tag.normal { background: #E3F2FD; color: #1E88E5; }
-.status-tag.late { background: #FFF3E0; color: #FB8C00; }
-.status-tag.remote { background: #F3E8FF; color: #7E22CE; }
-.status-tag.leave { background: #FEE2E2; color: #DC2626; }
+.status-tag.tardy { background: #FFF3E0; color: #FB8C00; }
+.status-tag.early_leave { background: #FFF3E0; color: #FB8C00; }
+.status-tag.absent { background: #F3F4F6; color: #4B5563; }
+.status-tag.vacation { background: #FEE2E2; color: #DC2626; }
 .memo {
   color: var(--gray500); font-size: 0.85rem;
 }

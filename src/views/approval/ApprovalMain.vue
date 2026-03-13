@@ -71,7 +71,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in pendingApprovals" :key="item.approvalId" @click="$router.push('/approval/review')">
+              <tr v-for="item in pendingApprovals" :key="item.approvalId" @click="openPendingReview(item)">
                 <td>
                   <div class="title-cell">
                     <span class="tag">{{ item.templateName }}</span>
@@ -104,7 +104,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in myDrafts" :key="item.approvalId" @click="$router.push('/approval/status')">
+              <tr v-for="item in myDrafts" :key="item.approvalId" @click="openDraftDetail(item)">
                 <td>
                   <span class="title-text">{{ item.title }}</span>
                 </td>
@@ -125,14 +125,42 @@
         </div>
       </section>
     </div>
+
+    <ReviewModal
+      :is-open="isReviewModalOpen"
+      :item="selectedReviewItem"
+      @close="isReviewModalOpen = false"
+      @action="handleReviewAction"
+    />
+
+    <ApprovalDetailModal
+      :is-open="isDetailModalOpen"
+      :item="selectedDetailItem"
+      @close="isDetailModalOpen = false"
+      @action="handleDetailAction"
+    />
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { getApprovalDashboard } from '@/api/approval'
-import { mapDashboardDraftItem, mapDashboardPendingItem } from '@/utils/approvalMapper'
+import { useRouter } from 'vue-router'
+import ReviewModal from './components/ReviewModal.vue'
+import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
+import {
+  deleteApproval,
+  getApprovalDashboard,
+  getApprovalDetail,
+  markApprovalAsRead,
+  processApproval,
+} from '@/api/approval'
+import {
+  mapApprovalDetailToItem,
+  mapDashboardDraftItem,
+  mapDashboardPendingItem,
+} from '@/utils/approvalMapper'
 
+const router = useRouter()
 const counts = ref({
   pendingReviewCount: 0,
   inProgressCount: 0,
@@ -140,6 +168,10 @@ const counts = ref({
 })
 const pendingApprovals = ref([])
 const myDrafts = ref([])
+const isReviewModalOpen = ref(false)
+const isDetailModalOpen = ref(false)
+const selectedReviewItem = ref({})
+const selectedDetailItem = ref({})
 
 async function loadDashboard() {
   try {
@@ -151,6 +183,65 @@ async function loadDashboard() {
     pendingApprovals.value = []
     myDrafts.value = []
   }
+}
+
+const openPendingReview = async (item) => {
+  try {
+    if (!item.isRead) {
+      try {
+        await markApprovalAsRead(item.approvalId)
+        item.isRead = true
+      } catch (_error) {
+      }
+    }
+    const detail = await getApprovalDetail(item.approvalId)
+    selectedReviewItem.value = mapApprovalDetailToItem(detail)
+    isReviewModalOpen.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
+  }
+}
+
+const openDraftDetail = async (item) => {
+  try {
+    const detail = await getApprovalDetail(item.approvalId)
+    selectedDetailItem.value = mapApprovalDetailToItem(detail)
+    isDetailModalOpen.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
+  }
+}
+
+const handleReviewAction = async (data) => {
+  const isApprove = data.type === 'approve'
+  try {
+    await processApproval(data.id, {
+      approve: isApprove,
+      reason: data.reason || null,
+    })
+    isReviewModalOpen.value = false
+    await loadDashboard()
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 처리에 실패했습니다.')
+  }
+}
+
+const handleDetailAction = async (action) => {
+  if (action.type === 'redraft' || action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'main' } })
+  } else if (action.type === 'delete' || action.type === 'cancel') {
+    try {
+      await deleteApproval(action.id)
+      await loadDashboard()
+      isDetailModalOpen.value = false
+    } catch (error) {
+      alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
+    }
+    return
+  } else if (action.type === 'review') {
+    router.push({ name: 'approval-review' })
+  }
+  isDetailModalOpen.value = false
 }
 
 onMounted(loadDashboard)

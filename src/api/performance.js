@@ -13,17 +13,18 @@ export const getPerformanceMonthlyReport = (params = {}) =>
 export const getPerformanceInquiryItems = (params = {}) =>
   unwrap(api.get('/performance/inquiry', { params }))
 
-export const updatePerformanceResult = async (performanceId, request, files = []) => {
-  const formData = new FormData()
-  formData.append(
-    'request',
-    new Blob([JSON.stringify(request)], { type: 'application/json' }),
-  )
-  files.forEach((file) => formData.append('files', file))
+export const getPerformanceInquiryTeamMembers = () =>
+  unwrap(api.get('/performance/team-evaluation/targets'))
 
-  await api.patch(`/performance/result/${performanceId}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+export const updatePerformanceResult = async (performanceId, request, files = []) => {
+  const form = new FormData()
+  Object.entries(request || {}).forEach(([key, value]) => {
+    form.append(key, value ?? '')
   })
+  files.forEach((file) => {
+    form.append('files', file)
+  })
+  return api.post(`/performance/result/${performanceId}`, form)
 }
 
 export const getPerformanceApprovalItems = () => unwrap(api.get('/performance/approvals'))

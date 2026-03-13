@@ -17,9 +17,9 @@
           <button class="toggle-btn" :class="{ active: currentView === 'week' }" @click="currentView = 'week'">주간</button>
           <button class="toggle-btn" :class="{ active: currentView === 'list' }" @click="currentView = 'list'">목록</button>
         </div>
-        <button class="btn-add" @click="showRegisterModal = true">
+        <button class="btn-add" disabled>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          일정 등록
+          일정 등록 준비중
         </button>
       </div>
     </div>
@@ -57,7 +57,7 @@
 
         <!-- 2. Team Filter -->
         <div class="sidebar-card filter-card">
-          <h3 class="card-subtitle">팀원 필터</h3>
+          <h3 class="card-subtitle">일정 필터</h3>
           <button class="filter-icon-btn">
              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           </button>
@@ -73,24 +73,24 @@
             </div>
             <div 
               class="filter-item" 
-              :class="{ active: selectedFilter === 'user1' }"
-              @click="selectedFilter = 'user1'"
+              :class="{ active: selectedFilter === 'ATTENDANCE' }"
+              @click="selectedFilter = 'ATTENDANCE'"
             >
               <span class="avatar-icon">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </span>
               <div class="filter-info">
-                <span class="filter-name bold">Steve 매니저</span>
-                <span class="filter-sub">내 일정만 보기</span>
+                <span class="filter-name bold">근태 기록</span>
+                <span class="filter-sub">출퇴근 중심 보기</span>
               </div>
             </div>
             <div 
               class="filter-item" 
-              :class="{ active: selectedFilter === 'user2' }"
-              @click="selectedFilter = 'user2'"
+              :class="{ active: selectedFilter === 'REQUEST' }"
+              @click="selectedFilter = 'REQUEST'"
             >
               <span class="avatar-circle pink">S</span>
-              <span class="filter-name">Sarah 사원</span>
+              <span class="filter-name">신청 일정</span>
             </div>
           </div>
         </div>
@@ -99,10 +99,10 @@
         <div class="sidebar-card legend-card">
           <h3 class="card-subtitle">범례</h3>
           <ul class="legend-list">
-            <li><span class="dot blue"></span>기본 근무</li>
-            <li><span class="dot pink"></span>휴가/연차</li>
-            <li><span class="dot purple"></span>재택 근무</li>
-            <li><span class="dot red"></span>휴무일</li>
+            <li><span class="dot blue"></span>근태 기록</li>
+            <li><span class="dot pink"></span>휴가</li>
+            <li><span class="dot purple"></span>유연근무</li>
+            <li><span class="dot red"></span>출장/외근</li>
           </ul>
         </div>
       </aside>
@@ -209,7 +209,7 @@
             </div>
             <div class="list-view-body">
               <div v-for="event in specialEvents" :key="event.id" class="list-row">
-                 <div class="list-col-date">{{ event.startDate.substring(5, 10).replace('-', '.') }}</div>
+                 <div class="list-col-date">{{ event.targetDate.substring(5, 10).replace('-', '.') }}</div>
                  <div class="list-col-type">
                    <span class="type-badge" :class="getEventColor(event.type)">{{ getTypeLabel(event.type) }}</span>
                  </div>
@@ -225,58 +225,18 @@
       </main>
     </div>
 
-    <!-- Schedule Registration Modal -->
-    <BaseModal v-model="showRegisterModal" width="500px">
-      <div class="modal-header">
-        <h3 class="modal-title">일정 등록</h3>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">일정 제목</label>
-          <input type="text" v-model="scheduleForm.title" class="form-input" placeholder="일정 제목을 입력하세요" />
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">시작 일시</label>
-            <input type="datetime-local" v-model="scheduleForm.startDate" class="form-input" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">종료 일시</label>
-            <input type="datetime-local" v-model="scheduleForm.endDate" class="form-input" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">일정 구분</label>
-          <select v-model="scheduleForm.type" class="form-select">
-            <option value="work">기본 근무</option>
-            <option value="meeting">회의/미팅</option>
-            <option value="trip">출장/외근</option>
-            <option value="vacation">휴가</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">메모</label>
-          <textarea v-model="scheduleForm.memo" class="form-textarea" placeholder="메모를 입력하세요" rows="3"></textarea>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" @click="showRegisterModal = false">취소</button>
-        <button class="btn-submit" @click="handleRegister">등록</button>
-      </div>
-    </BaseModal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import BaseModal from '@/components/common/BaseModal.vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useAttendanceStore } from '@/store/attendance'
 
 const currentView = ref('month')
-const showRegisterModal = ref(false)
-const selectedFilter = ref('user1') // Default to 'user1' (Steve) as per requirement? Or 'ALL'? User request says "If click ALL... if click Sarah". Let's default to 'user1' (My schedule) as usually initial view.
-// Actually, let's default to 'ALL' or 'user1' based on context. Typically 'My Schedule' is default. 
-// User request: "If I click ALL button... If I click Sarah..."
-// Let's set default to 'user1' (Steve - implied 'me').
+const selectedFilter = ref('ALL')
+const store = useAttendanceStore()
+const { calendarEvents } = storeToRefs(store)
 
 // Date logic
 const today = new Date()
@@ -286,10 +246,12 @@ const currentDate = ref({
   day: today.getDate()
 })
 
-// Mock Data: Initial events
-// Mock Data: Initial events with user IDs
-// user1: Steve (Manager), user2: Sarah (Employee)
-
+const toDateKey = (value) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 // Generate Dynamic Calendar
 const generateCalendar = (year, month) => {
@@ -320,7 +282,7 @@ const generateCalendar = (year, month) => {
   }
   
   // Add current month days
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toDateKey(new Date())
   for (let i = 1; i <= daysInMonth; i++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`
     days.push({
@@ -366,7 +328,7 @@ const miniCalendarGrid = computed(() => {
 
 const currentWeekGrid = computed(() => {
   // Find the week containing today, or the first week of the month
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = toDateKey(new Date())
   for (const week of calendarGrid.value) {
     if (week.find(d => d.fullDate === todayStr)) {
       return week
@@ -393,72 +355,28 @@ const nextMonth = () => {
   }
 }
 
-// Generate Mock Data Relative to TODAY
-const generateMockEvents = () => {
-  const events = []
-  const baseDate = new Date()
-  const year = baseDate.getFullYear()
-  const month = String(baseDate.getMonth() + 1).padStart(2, '0')
-  const daysInMonth = new Date(year, baseDate.getMonth() + 1, 0).getDate()
-
-  // Add some fixed events relative to current month
-  // Steve: Vacation on 11th
-  if (11 <= daysInMonth) events.push({ id: 8, userId: 'user1', title: '연차', type: 'vacation', startDate: `${year}-${month}-11T00:00`, endDate: `${year}-${month}-11T23:59` })
-  // Sarah: WFH on 20th
-  if (20 <= daysInMonth) events.push({ id: 15, userId: 'user2', title: '재택 근무', type: 'work_home', startDate: `${year}-${month}-20T09:00`, endDate: `${year}-${month}-20T18:00` })
-  // Steve: Trip on 25th
-  if (25 <= daysInMonth) events.push({ id: 18, userId: 'user1', title: '외근', type: 'trip', startDate: `${year}-${month}-25T09:00`, endDate: `${year}-${month}-25T18:00` })
-
-  return events
+const mapEventType = (event) => {
+  if (event.category === 'ATTENDANCE') return 'work'
+  if (event.category === 'LEAVE') return 'vacation'
+  if (event.category === 'WEEKLY_SCHEDULE') return 'work_home'
+  if (event.category === 'BUSINESS_TRIP') return 'trip'
+  return 'meeting'
 }
 
-const scheduleEvents = ref(generateMockEvents())
-
-const users = [
-  { id: 'user1', name: 'Steve' },
-  { id: 'user2', name: 'Sarah' }
-]
+const normalizedEvents = computed(() =>
+  calendarEvents.value.map((event) => ({
+    ...event,
+    type: mapEventType(event),
+  })),
+)
 
 const getEventsForDate = (date) => {
-  const dayOfWeek = new Date(date).getDay()
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-  
-  // 1. Existing events
-  const existingEvents = scheduleEvents.value.filter(e => e.startDate.startsWith(date))
-
-  // 2. Determine target users based on filter
-  let targetUserIds = []
-  if (selectedFilter.value === 'ALL') {
-    targetUserIds = users.map(u => u.id)
-  } else {
-    targetUserIds = [selectedFilter.value]
-  }
-
-  const finalEvents = []
-
-  targetUserIds.forEach(userId => {
-    // Check if user has explicit event
-    const userEvent = existingEvents.find(e => e.userId === userId)
-    
-    if (userEvent) {
-      finalEvents.push(userEvent)
-    } else {
-      // If no event and it's a weekday, add Basic Work
-      if (!isWeekend) {
-        finalEvents.push({
-          id: `auto-${userId}-${date}`,
-          userId: userId,
-          title: '기본 근무',
-          type: 'work',
-          startDate: `${date}T09:00`,
-          endDate: `${date}T18:00`
-        })
-      }
-    }
+  return normalizedEvents.value.filter((event) => {
+    if (event.targetDate !== date) return false
+    if (selectedFilter.value === 'ATTENDANCE') return event.category === 'ATTENDANCE'
+    if (selectedFilter.value === 'REQUEST') return event.category !== 'ATTENDANCE'
+    return true
   })
-
-  // Sort by user ID to keep order consistent in ALL view
-  return finalEvents.sort((a, b) => a.userId.localeCompare(b.userId))
 }
 
 const getEventColor = (type) => {
@@ -471,18 +389,10 @@ const getEventColor = (type) => {
 
 const getEventLabel = (event) => {
   let label = event.title
-  if (event.type === 'work') label = `🕒 09:00 - 18:00`
+  if (event.type === 'work') label = `🕒 ${event.title}`
   else if (event.type === 'vacation') label = `🏖️ ${event.title}`
   else if (event.type === 'work_home') label = `🏠 ${event.title}`
   else if (event.type === 'trip') label = `🚗 ${event.title}`
-  
-  // In ALL view, prepend name
-  if (selectedFilter.value === 'ALL' && event.userId) {
-    const user = users.find(u => u.id === event.userId)
-    const name = user ? user.name : ''
-    return `${name} ${label}`
-  }
-  
   return label
 }
 
@@ -493,34 +403,22 @@ const getTypeLabel = (type) => {
 
 // Special items for List View (exclude basic work)
 const specialEvents = computed(() => {
-  return scheduleEvents.value
+  return normalizedEvents.value
     .filter(e => e.type !== 'work')
-    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+    .filter((event) => {
+      if (selectedFilter.value === 'ATTENDANCE') return false
+      if (selectedFilter.value === 'REQUEST') return event.category !== 'ATTENDANCE'
+      return true
+    })
+    .sort((a, b) => String(a.targetDate).localeCompare(String(b.targetDate)))
 })
 
-const scheduleForm = ref({
-  title: '',
-  startDate: '',
-  endDate: '',
-  type: 'work',
-  memo: ''
-})
-
-const handleRegister = () => {
-  const newId = scheduleEvents.value.length + 1
-  scheduleEvents.value.push({
-    id: newId,
-    title: scheduleForm.value.title || '새 일정',
-    type: scheduleForm.value.type,
-    startDate: scheduleForm.value.startDate, // ISO string from input
-    endDate: scheduleForm.value.endDate,
-    memo: scheduleForm.value.memo
-  })
-  alert('일정이 등록되었습니다.')
-  showRegisterModal.value = false
-  // Reset form
-  scheduleForm.value = { title: '', startDate: '', endDate: '', type: 'work', memo: '' }
+const fetchCalendar = async () => {
+  await store.fetchAttendanceCalendar(currentDate.value.year, currentDate.value.month)
 }
+
+onMounted(fetchCalendar)
+watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
 </script>
 
 <style scoped>

@@ -61,7 +61,6 @@ const sortOrder = ref('desc')
 const sourceItems = ref([])
 const isDetailOpen = ref(false)
 const selectedItem = ref({})
-
 const pendingCount = computed(() => sourceItems.value.filter((item) => item.type === 'pending').length)
 const progressCount = computed(() => sourceItems.value.filter((item) => item.type === 'progress').length)
 const tabs = computed(() => ([

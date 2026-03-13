@@ -16,6 +16,8 @@ const STATUS_LABELS = {
   DELEGATED: '전결',
   COMPLETE: '완료',
   REJECTED: '반려',
+  CANCELLED: '취소',
+  cancelled: '취소',
   WITHDRAWN: '회수',
 }
 

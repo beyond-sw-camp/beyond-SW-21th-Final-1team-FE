@@ -34,12 +34,6 @@
             <button class="t-btn t-btn-danger-ghost" @click="showRejectReason = true">
               반려
             </button>
-            <button class="t-btn t-btn-purple-ghost" @click="handleAction('finalize')">
-              전결
-            </button>
-            <button class="t-btn t-btn-warning-ghost" @click="handleAction('hold')">
-              보류
-            </button>
           </div>
           <button class="t-btn t-btn-secondary" @click="close">창 닫기</button>
         </div>
@@ -109,16 +103,10 @@ const handleAction = (type) => {
     case 'reject':
       message = `반려 되었습니다. 사유 : ${rejectReason.value} (${reviewerName} ${reviewerPos})`;
       break;
-    case 'hold':
-      message = `보류 처리되었습니다. (${reviewerName} ${reviewerPos})`;
-      break;
-    case 'finalize':
-      message = `해당 결재건이 전결(최종 승인) 처리되었습니다. (${reviewerName} ${reviewerPos})`;
-      break;
   }
   
   alert(`[알림/이메일 전송]\n${message}`);
-  emit('action', { type, id: props.item.id, reason: rejectReason.value });
+  emit('action', { type, id: props.item.approvalId || props.item.id, reason: rejectReason.value });
   close();
 };
 </script>

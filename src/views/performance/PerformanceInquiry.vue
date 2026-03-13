@@ -8,7 +8,13 @@
             <User :size="14" class="filter-icon" />
             <select v-model="filterEmployee" class="filter-select">
               <option value="">전체 팀원</option>
-              <option v-for="employee in employeeOptions" :key="employee" :value="employee">{{ employee }}</option>
+              <option
+                v-for="employee in employeeOptions"
+                :key="employee.employeeId"
+                :value="String(employee.employeeId)"
+              >
+                {{ employee.employeeName }}
+              </option>
             </select>
           </div>
           <div class="filter-select-wrap">
@@ -51,7 +57,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in filteredItems" :key="item.id" @click="openDetail(item)">
+            <tr v-for="item in paginatedItems" :key="item.id" @click="openDetail(item)">
               <td>
                 <span class="badge" :class="item.type === 'Team' ? 'badge-blue' : 'badge-green'">
                   {{ item.type === 'Team' ? '팀 성과' : '개인 성과' }}
@@ -73,10 +79,16 @@
               <td class="td-core">{{ item.coreTask || '-' }}</td>
             </tr>
             <tr v-if="filteredItems.length === 0">
-              <td colspan="6" class="td-empty">검색 결과가 없습니다.</td>
+              <td colspan="6" class="td-empty">{{ loadError || '검색 결과가 없습니다.' }}</td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div v-if="totalPages > 1" class="pagination-bar">
+        <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
+        <span class="page-status">{{ currentPage }} / {{ totalPages }}</span>
+        <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
       </div>
     </div>
 
@@ -202,10 +214,35 @@
 
                 <div class="result-group">
                   <label class="result-label">증빙 자료 첨부</label>
-                  <div class="upload-zone">
+                  <input
+                    ref="fileInput"
+                    type="file"
+                    class="sr-only"
+                    multiple
+                    accept=".pdf,.xlsx,.xls,.doc,.docx"
+                    @change="handleFileChange"
+                  />
+                  <div
+                    class="upload-zone"
+                    role="button"
+                    tabindex="0"
+                    @click="openFilePicker"
+                    @keydown.enter.prevent="openFilePicker"
+                    @keydown.space.prevent="openFilePicker"
+                  >
                     <Upload :size="24" />
                     <span class="upload-main">클릭하여 파일 업로드</span>
-                    <span class="upload-sub">PDF, XLSX, DOCX (최대 10MB)</span>
+                    <span class="upload-sub">PDF, XLSX, DOCX (파일당 최대 50MB)</span>
+                  </div>
+                  <div v-if="selectedFiles.length > 0" class="upload-file-list">
+                    <div
+                      v-for="file in selectedFiles"
+                      :key="`${file.name}-${file.size}-${file.lastModified}`"
+                      class="upload-file-item"
+                    >
+                      <span class="upload-file-name">{{ file.name }}</span>
+                      <button type="button" class="upload-file-remove" @click="removeFile(file)">삭제</button>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -219,8 +256,8 @@
               </template>
               <template v-else>
                 <button class="btn-outline" @click="modalTab = 'detail'">이전</button>
-                <button class="btn-primary" @click="submitResult">
-                  <CheckCircle :size="14" /> 최종 결과 제출
+                <button class="btn-primary" :disabled="isSubmitting || isSubmissionLocked" @click="submitResult">
+                  <CheckCircle :size="14" /> {{ isSubmitting ? '제출 중...' : '최종 결과 제출' }}
                 </button>
               </template>
             </div>
@@ -232,51 +269,64 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Search, Filter, X, Upload, CheckCircle, AlertCircle, User } from 'lucide-vue-next'
-import { AUTH_KEYS, USER_ROLES } from '@/utils/auth'
-import { PERFORMANCE_INQUIRY_ITEMS } from '@/mocks/performance'
+import { getPerformanceInquiryItems, getPerformanceInquiryTeamMembers, updatePerformanceResult } from '@/api/performance'
+import { AUTH_KEYS, USER_ROLES, isAdminRole, isEvaluatorRole, sessionRoleCodesRef, sessionRoleRef } from '@/utils/auth'
 
 const selectedItem = ref(null)
 const modalTab = ref('detail')
+const fileInput = ref(null)
+const selectedFiles = ref([])
 const resultProgress = ref(85)
 const resultSummary = ref('')
 const resultNote = ref('')
 const growthPoint = ref('')
 const improvementPoint = ref('')
+const isSubmitting = ref(false)
 
 const filterStatus = ref('')
 const filterEmployee = ref('')
 const filterMonth = ref('')
 const searchText = ref('')
 const searchField = ref('title')
+const currentPage = ref(1)
+const pageSize = 12
 
-const items = ref(PERFORMANCE_INQUIRY_ITEMS.map((item) => ({ ...item })))
+const normalizeItem = (item) => ({
+  ...item,
+  type: item.type === 'TEAM' ? 'Team' : item.type === 'PERSONAL' ? 'Personal' : item.type,
+})
+
+const items = ref([])
+const teamMemberOptions = ref([])
+const loadError = ref('')
+let inquiryRequestSeq = 0
 const userId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
 const userName = computed(() => sessionStorage.getItem(AUTH_KEYS.userName) || '')
-const userRole = computed(() => sessionStorage.getItem(AUTH_KEYS.role) || USER_ROLES.user)
-const isPerformanceManager = computed(() => userRole.value === USER_ROLES.admin || userId.value === 'admin1234')
-
-const USER_TO_EMPLOYEE_ID = {
-  test1234: '2402040001',
-}
-const currentEmployeeId = computed(() => USER_TO_EMPLOYEE_ID[userId.value] || '')
+const userRole = computed(() => sessionRoleRef.value || USER_ROLES.user)
+const isPerformanceManager = computed(() =>
+  isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, userRole.value))
+const currentEmployeeId = computed(() => sessionStorage.getItem(AUTH_KEYS.employeeId) || '')
 
 const visibleItems = computed(() => {
   if (isPerformanceManager.value) return items.value
 
   return items.value.filter((item) => {
-    if (currentEmployeeId.value) return item.employeeId === currentEmployeeId.value
+    if (currentEmployeeId.value) return String(item.employeeId || '') === String(currentEmployeeId.value)
     return item.employeeName === userName.value
   })
 })
 
-const employeeOptions = computed(() => [...new Set(visibleItems.value.map((item) => item.employeeName).filter(Boolean))])
+const employeeOptions = computed(() => teamMemberOptions.value)
 
 const filteredItems = computed(() => {
   return visibleItems.value.filter((item) => {
-    if (filterEmployee.value && item.employeeName !== filterEmployee.value) return false
     if (filterStatus.value && item.status !== filterStatus.value) return false
+    if (filterMonth.value) {
+      const [year, month] = filterMonth.value.split('-')
+      if (!item.date?.includes(`${year}.${month}`) && !item.date?.includes(`${year}-${month}`)) return false
+    }
     if (searchText.value) {
       const keyword = searchText.value.trim()
       const targetText = searchField.value === 'coreTask' ? (item.coreTask || '') : (item.title || '')
@@ -286,7 +336,21 @@ const filteredItems = computed(() => {
   })
 })
 
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / pageSize)))
+
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredItems.value.slice(start, start + pageSize)
+})
+
 const isTeamResult = computed(() => selectedItem.value?.type === 'Team' || selectedItem.value?.type === '팀 성과')
+const isSubmissionLocked = computed(() => selectedItem.value?.status === '대기')
+
+const normalizeSelectedFiles = (files = []) => files.filter((file, index, array) =>
+  array.findIndex((item) =>
+    item.name === file.name &&
+    item.size === file.size &&
+    item.lastModified === file.lastModified) === index)
 
 function statusClass(status) {
   if (status === '완료') return 'badge-gray'
@@ -297,6 +361,7 @@ function statusClass(status) {
 function openDetail(item) {
   selectedItem.value = item
   modalTab.value = 'detail'
+  selectedFiles.value = []
   resultProgress.value = Number(item.progress) || 0
   resultSummary.value = ''
   resultNote.value = ''
@@ -304,24 +369,146 @@ function openDetail(item) {
   improvementPoint.value = ''
 }
 
+function openFilePicker() {
+  fileInput.value?.click()
+}
+
+function handleFileChange(event) {
+  const files = Array.from(event.target?.files || [])
+  if (!files.length) return
+
+  const oversizedFiles = files.filter((file) => file.size > 50 * 1024 * 1024)
+  const validFiles = files.filter((file) => file.size <= 50 * 1024 * 1024)
+
+  if (oversizedFiles.length > 0) {
+    alert(`50MB를 초과한 파일은 업로드할 수 없습니다: ${oversizedFiles.map((file) => file.name).join(', ')}`)
+  }
+
+  if (validFiles.length > 0) {
+    const mergedFiles = [...selectedFiles.value, ...validFiles]
+    selectedFiles.value = normalizeSelectedFiles(mergedFiles)
+  }
+  event.target.value = ''
+}
+
+function removeFile(targetFile) {
+  selectedFiles.value = selectedFiles.value.filter(
+    (file) => !(
+      file.name === targetFile.name &&
+      file.size === targetFile.size &&
+      file.lastModified === targetFile.lastModified
+    ),
+  )
+}
+
 function handleEdit() {
   alert('상세 항목을 확인한 뒤 결과 등록 탭에서 수정 내용을 제출할 수 있습니다.')
 }
 
-function submitResult() {
+async function submitResult() {
+  if (isSubmitting.value) return
   if (!selectedItem.value) return
+  if (isSubmissionLocked.value) return
+  const normalizedFiles = normalizeSelectedFiles(selectedFiles.value)
+  selectedFiles.value = normalizedFiles
+  if (!normalizedFiles.length) {
+    alert('증빙 자료를 한 개 이상 첨부해주세요.')
+    openFilePicker()
+    return
+  }
   if (!resultSummary.value.trim()) {
     alert('성과 요약을 입력해주세요.')
     return
   }
   const target = items.value.find((item) => item.id === selectedItem.value.id)
   if (!target) return
-  target.progress = Number(resultProgress.value) || 0
-  target.status = '완료'
-  selectedItem.value = target
-  modalTab.value = 'detail'
-  alert('결과가 등록되었습니다.')
+  isSubmitting.value = true
+  try {
+    await updatePerformanceResult(selectedItem.value.id, {
+      progress: Number(resultProgress.value) || 0,
+      resultSummary: resultSummary.value,
+      resultNote: resultNote.value,
+      growthPoint: growthPoint.value,
+      improvementPoint: improvementPoint.value,
+    }, normalizedFiles)
+    target.progress = Number(resultProgress.value) || 0
+    target.status = '대기'
+    target.achievement = resultSummary.value
+    selectedItem.value = target
+    modalTab.value = 'detail'
+    selectedFiles.value = []
+    alert('결과가 등록되었고 평가자 승인 대기 상태로 변경되었습니다.')
+  } catch (_error) {
+    alert('성과 결과 등록에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
+
+async function loadInquiryItems(sequence = ++inquiryRequestSeq) {
+  try {
+    loadError.value = ''
+    const params = {}
+    if (isPerformanceManager.value && filterEmployee.value) {
+      params.targetEmployeeId = filterEmployee.value
+    }
+    const response = await getPerformanceInquiryItems(params)
+    if (sequence !== inquiryRequestSeq) return
+    items.value = Array.isArray(response) ? response.map((item) => normalizeItem(item)) : []
+  } catch (error) {
+    if (sequence !== inquiryRequestSeq) return
+    items.value = []
+    selectedItem.value = null
+    loadError.value = error?.response?.data?.error?.message || '성과 조회 API 호출에 실패했습니다.'
+  }
+}
+
+async function loadTeamMembers() {
+  if (!isPerformanceManager.value) return
+  try {
+    const response = await getPerformanceInquiryTeamMembers()
+    teamMemberOptions.value = Array.isArray(response)
+      ? response.map((member) => ({
+          employeeId: member.employeeId ?? member.id,
+          employeeName: member.employeeName ?? member.name,
+          orgName: member.organizationName ?? member.orgName ?? member.department ?? '',
+        }))
+          .filter((member) => member.employeeId && member.employeeName)
+      : []
+  } catch (_error) {
+    console.error('Failed to load team members for performance inquiry.', _error)
+    teamMemberOptions.value = []
+    alert(_error?.response?.data?.error?.message || '팀원 목록을 불러오지 못했습니다.')
+  }
+}
+
+watch(filterEmployee, () => {
+  if (!isPerformanceManager.value) return
+  inquiryRequestSeq += 1
+  currentPage.value = 1
+  loadInquiryItems(inquiryRequestSeq)
+})
+
+watch(isPerformanceManager, (isManager) => {
+  if (!isManager) return
+  loadTeamMembers()
+  loadInquiryItems()
+})
+
+watch([filterStatus, filterMonth, searchText, searchField], () => {
+  currentPage.value = 1
+})
+
+watch(filteredItems, () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+})
+
+onMounted(async () => {
+  await loadTeamMembers()
+  await loadInquiryItems()
+})
 </script>
 
 <style scoped>
@@ -454,6 +641,40 @@ function submitResult() {
 .table-wrap {
   flex: 1;
   overflow-y: auto;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--gray100);
+  background: #fff;
+}
+
+.page-btn {
+  min-width: 64px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--gray200);
+  border-radius: var(--radius-xs);
+  background: var(--gray50);
+  color: var(--gray700);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.page-status {
+  min-width: 52px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--gray600);
 }
 
 .inq-table {
@@ -919,6 +1140,18 @@ function submitResult() {
 }
 
 /* 업로드 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .upload-zone {
   display: flex;
   flex-direction: column;
@@ -952,6 +1185,39 @@ function submitResult() {
 
 .upload-zone:hover .upload-sub {
   color: var(--gray400);
+}
+
+.upload-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.upload-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--gray200);
+  border-radius: var(--radius-xs);
+  background: var(--gray50);
+}
+
+.upload-file-name {
+  color: var(--gray700);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.upload-file-remove {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 /* 푸터 */

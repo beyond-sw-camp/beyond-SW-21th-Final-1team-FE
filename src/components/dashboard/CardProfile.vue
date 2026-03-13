@@ -57,11 +57,12 @@ const handleCheckIn = () => {
   store.setCheckInTime(`${h}:${m}`)
 }
 
-const handleCheckOut = () => {
-  const now = new Date()
-  const h = String(now.getHours()).padStart(2, '0')
-  const m = String(now.getMinutes()).padStart(2, '0')
-  store.setCheckOutTime(`${h}:${m}`)
+const handleCheckOut = async () => {
+  try {
+    await store.clockOut()
+  } catch (error) {
+    alert(error.response?.data?.message || '퇴근 처리에 실패했습니다.')
+  }
 }
 
 const loadProfileHeader = async () => {

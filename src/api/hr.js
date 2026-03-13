@@ -37,6 +37,9 @@ export const getOrganizationMemberCareerEvidence = (targetEmployeeId, careerId) 
   unwrap(api.get(`/org/members/${targetEmployeeId}/careers/${careerId}/evidence`))
 export const getSkillEvidence = (skillId) => unwrap(api.get(`/mypage/skills/${skillId}/evidence`))
 export const getCareerEvidence = (careerId) => unwrap(api.get(`/mypage/careers/${careerId}/evidence`))
+export const getOrganizationTree = () => unwrap(api.get('/org/tree'))
+export const getOrganizationMembers = (orgId) => unwrap(api.get(`/org/${orgId}/members`))
+export const getMyOrganizationMembers = () => unwrap(api.get('/org/my/members'))
 
 export const changeMyPassword = (payload) => api.patch('/mypage/password', payload)
 

@@ -114,26 +114,26 @@
       <div class="alert-box warning" v-if="hasStaffShortage">
         <div class="alert-icon">⚠️</div>
         <div class="alert-text">
-          <strong>코어타임 인원 부족 경고 (수요일)</strong>
-          <p>2월 18일(수) 14:00 - 16:00 구간에 근무 인원이 부족합니다.</p>
+          <strong>코어타임 인원 부족 경고 ({{ selectedDayLabel }})</strong>
+          <p>{{ selectedDayDateLabel }} 14:00 - 16:00 구간에 근무 인원이 부족합니다.</p>
         </div>
       </div>
 
       <div class="content-card">
         <!-- Day Navigation -->
         <div class="day-nav-wrapper">
-           <div class="week-title">2026년 2월 3주차</div>
+           <div class="week-title">{{ weekTitle }}</div>
            <div class="day-tabs">
              <button 
                 v-for="(day, idx) in days" 
                 :key="idx"
                 class="day-tab"
-                :class="{ active: selectedDayIndex === idx, 'has-issue': idx === 2 }"
+                :class="{ active: selectedDayIndex === idx, 'has-issue': day.hasIssue }"
                 @click="selectedDayIndex = idx"
              >
                <span class="day-label">{{ day.label }}</span>
                <span class="day-date">{{ day.date }}</span>
-               <span class="dot-indicator" v-if="idx === 2"></span>
+               <span class="dot-indicator" v-if="day.hasIssue"></span>
              </button>
            </div>
         </div>
@@ -162,8 +162,8 @@
                    </div>
                  </div>
                  <div class="tl-track-cell">
-                    <!-- Current Day Bar -->
-                    <div 
+                    <div
+                      v-if="user.weekPlan[selectedDayIndex]"
                       class="time-bar-pill"
                       :class="getTimeClass(user.weekPlan[selectedDayIndex])"
                       :style="getBarStyle(user.weekPlan[selectedDayIndex])"
@@ -171,8 +171,10 @@
                       <span class="bar-time">{{ user.weekPlan[selectedDayIndex].start }} - {{ user.weekPlan[selectedDayIndex].end }}</span>
                       <span class="bar-type">{{ getTypeLabel(user.weekPlan[selectedDayIndex].type) }}</span>
                     </div>
+                    <div v-else class="empty-bar">신청 없음</div>
                  </div>
               </div>
+              <div v-if="scheduleData.length === 0" class="timeline-empty">해당 주차의 유연근무 신청이 없습니다.</div>
            </div>
 
            <!-- Legend -->
@@ -214,11 +216,11 @@
         </div>
         <div class="detail-item full">
            <label>신청 사유</label>
-           <div class="val box">{{ selectedPlan.reason || '육아로 인한 시차출퇴근 신청합니다.' }}</div>
+           <div class="val box">{{ selectedPlan.reason || '-' }}</div>
         </div>
         <div class="detail-item full" v-if="selectedPlan.status === 'rejected'">
            <label style="color: var(--red);">반려 사유</label>
-           <div class="val box reject-box">{{ selectedPlan.rejectionReason || '인력 부족으로 인한 반려' }}</div>
+           <div class="val box reject-box">{{ selectedPlan.rejectionReason || '반려 사유가 없습니다.' }}</div>
         </div>
       </div>
 
@@ -238,57 +240,65 @@
          <button class="btn-close" @click="showDetailModal = false">닫기</button>
       </div>
     </BaseModal>
+    <ActionConfirmModal
+      v-model="showActionModal"
+      :title="actionModalTitle"
+      :message="actionModalMessage"
+      :confirm-text="actionModalConfirmText"
+      :require-reason="actionRequiresReason"
+      :loading="actionLoading"
+      v-model:reason="actionReason"
+      @confirm="submitAction"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
 const store = useAttendanceStore()
 const currentTab = ref('list')
 const selectedIds = ref([])
-const hasStaffShortage = ref(true)
 const selectedDayIndex = ref(0) // 0: Mon, 1: Tue ...
 const selectedFilter = ref('all') // 'all' or 'pending'
 
 // Detail Modal State
 const showDetailModal = ref(false)
 const selectedPlan = ref(null)
+const showActionModal = ref(false)
+const actionReason = ref('')
+const actionMode = ref('')
+const actionIds = ref([])
+const actionLoading = ref(false)
 
 const handleViewDetail = (item) => {
   selectedPlan.value = item
   showDetailModal.value = true
 }
 
-const handleModalApprove = () => {
-  if (!confirm('승인하시겠습니까?')) return
-  store.updateFlexibleStatus(selectedPlan.value.id, 'approved')
-  showDetailModal.value = false
+const handleModalApprove = async () => {
+  actionMode.value = 'single-approve'
+  actionIds.value = [selectedPlan.value.id]
+  actionReason.value = ''
+  showActionModal.value = true
 }
 
-const handleModalReject = () => {
-  const reason = prompt('반려 사유를 입력하세요')
-  if (!reason) return
-  store.updateFlexibleStatus(selectedPlan.value.id, 'rejected', reason)
-  showDetailModal.value = false
+const handleModalReject = async () => {
+  actionMode.value = 'single-reject'
+  actionIds.value = [selectedPlan.value.id]
+  actionReason.value = ''
+  showActionModal.value = true
 }
-
-// Days for Tabs
-const days = [
-  { label: '월', date: '02.16' },
-  { label: '화', date: '02.17' },
-  { label: '수', date: '02.18' },
-  { label: '목', date: '02.19' },
-  { label: '금', date: '02.20' },
-]
 
 // Hours 08 ~ 20 (12 hours span)
 const hours = Array.from({length: 13}, (_, i) => i + 8) // 8, 9, ... 20
 
 // Use store data for plans
 const planList = computed(() => store.flexibleWorkPlans)
+const overviewDays = computed(() => store.teamWeeklyOverview?.days || [])
 const sortedPlanList = computed(() => {
   let list = [...planList.value]
 
@@ -304,49 +314,88 @@ const sortedPlanList = computed(() => {
   })
 })
 
-// Mock Schedule Data
-const scheduleData = ref([
-  { 
-    id: 1, name: '김철수', position: '대리',
-    weekPlan: [
-      { start: '09:00', end: '18:00', type: 'normal' },
-      { start: '09:00', end: '18:00', type: 'normal' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '09:00', end: '18:00', type: 'normal' },
-      { start: '08:00', end: '17:00', type: 'flex' },
-    ]
-  },
-  { 
-    id: 2, name: '이영희', position: '사원',
-    weekPlan: [
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-      { start: '10:00', end: '19:00', type: 'flex' },
-    ]
-  },
-  { 
-    id: 3, name: '박민수', position: '과장',
-    weekPlan: [
-      { start: '09:03', end: '18:10', type: 'normal' },
-      { start: '08:50', end: '17:55', type: 'normal' },
-      { start: '09:00', end: '16:00', type: 'short' }, 
-      { start: '09:00', end: '18:00', type: 'normal' },
-      { start: '09:00', end: '18:00', type: 'normal' },
-    ]
-  },
-   { 
-    id: 4, name: '최자바', position: '팀장',
-    weekPlan: [
-      { start: '08:00', end: '17:00', type: 'normal' },
-      { start: '08:00', end: '17:00', type: 'normal' },
-      { start: '08:00', end: '17:00', type: 'normal' }, 
-      { start: '08:00', end: '17:00', type: 'normal' },
-      { start: '08:00', end: '17:00', type: 'normal' },
-    ]
-  },
-])
+const parseIsoDate = (value) => {
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+const formatDateNumber = (value) =>
+  `${String(value.getMonth() + 1).padStart(2, '0')}.${String(value.getDate()).padStart(2, '0')}`
+
+const toDateKey = (value) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getMonday = (value) => {
+  const date = new Date(value)
+  const day = date.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  date.setDate(date.getDate() + diff)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+const mapPlanType = (plan) => {
+  const workForm = String(plan.type || '').toUpperCase()
+  if (workForm.includes('OFFICE')) return 'normal'
+  if (workForm.includes('SHORT')) return 'short'
+  return 'flex'
+}
+
+const days = computed(() =>
+  Array.from({ length: 5 }, (_, idx) => {
+    const planDate = overviewDays.value[idx]?.planDate
+    const date = planDate ? parseIsoDate(planDate) : new Date()
+    return {
+      label: ['월', '화', '수', '목', '금'][idx],
+      date: formatDateNumber(date),
+      fullDate: planDate || toDateKey(date),
+      hasIssue: Boolean(overviewDays.value[idx]?.coreTimeShortageRisk),
+    }
+  }),
+)
+
+const scheduleData = computed(() => {
+  const grouped = new Map()
+
+  overviewDays.value.forEach((day, dayIndex) => {
+    ;(day.entries || []).forEach((item) => {
+      if (!grouped.has(item.userId)) {
+        grouped.set(item.userId, {
+          id: item.userId,
+          name: item.name,
+          position: item.position,
+          dept: item.dept,
+          weekPlan: Array.from({ length: 5 }, () => null),
+        })
+      }
+
+      grouped.get(item.userId).weekPlan[dayIndex] = {
+        start: String(item.startDate).slice(11, 16),
+        end: String(item.endDate).slice(11, 16),
+        type: mapPlanType(item),
+      }
+    })
+  })
+
+  return Array.from(grouped.values())
+})
+const hasStaffShortage = computed(() => Boolean(overviewDays.value[selectedDayIndex.value]?.coreTimeShortageRisk))
+
+const weekTitle = computed(() => {
+  const start = overviewDays.value[0]?.planDate ? parseIsoDate(overviewDays.value[0].planDate) : getMonday(new Date())
+  const end = overviewDays.value[4]?.planDate ? parseIsoDate(overviewDays.value[4].planDate) : new Date(start)
+  if (!overviewDays.value[4]?.planDate) {
+    end.setDate(start.getDate() + 4)
+  }
+  return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${formatDateNumber(start)} - ${formatDateNumber(end)}`
+})
+
+const selectedDayLabel = computed(() => days.value[selectedDayIndex.value]?.label || '')
+const selectedDayDateLabel = computed(() => days.value[selectedDayIndex.value]?.date || '')
 
 const isAllSelected = computed(() => {
   const pendingItems = sortedPlanList.value.filter(i => i.status === 'pending')
@@ -363,25 +412,64 @@ const toggleAll = (e) => {
 
 const getStatusLabel = (s) => ({ pending: '승인 대기', approved: '승인됨', rejected: '반려됨' }[s])
 
-const handleBulkApprove = () => {
-  if (!confirm(`${selectedIds.value.length}건을 승인하시겠습니까?`)) return
-  selectedIds.value.forEach(id => {
-    store.updateFlexibleStatus(id, 'approved')
-  })
-  selectedIds.value = []
+const handleBulkApprove = async () => {
+  actionMode.value = 'bulk-approve'
+  actionIds.value = [...selectedIds.value]
+  actionReason.value = ''
+  showActionModal.value = true
 }
 
-const handleBulkReject = () => {
-  const reason = prompt('반려 사유를 입력하세요 (필수)')
-  if (!reason) return
-  selectedIds.value.forEach(id => {
-    store.updateFlexibleStatus(id, 'rejected', reason)
-  })
-  selectedIds.value = []
+const handleBulkReject = async () => {
+  actionMode.value = 'bulk-reject'
+  actionIds.value = [...selectedIds.value]
+  actionReason.value = ''
+  showActionModal.value = true
 }
+
+const actionRequiresReason = computed(() => actionMode.value.includes('reject'))
+const actionModalTitle = computed(() => (actionRequiresReason.value ? '반려 처리' : '승인 처리'))
+const actionModalMessage = computed(() =>
+  actionMode.value.startsWith('bulk')
+    ? `${actionIds.value.length}건을 ${actionRequiresReason.value ? '반려' : '승인'}하시겠습니까?`
+    : `이 신청을 ${actionRequiresReason.value ? '반려' : '승인'}하시겠습니까?`,
+)
+const actionModalConfirmText = computed(() => (actionRequiresReason.value ? '반려하기' : '승인하기'))
+
+const submitAction = async () => {
+  if (actionLoading.value) return
+  if (actionRequiresReason.value && !actionReason.value.trim()) {
+    alert('반려 사유를 입력해주세요.')
+    return
+  }
+  actionLoading.value = true
+  try {
+    await store.processFlexiblePlans(
+      actionIds.value,
+      !actionRequiresReason.value,
+      actionRequiresReason.value ? actionReason.value.trim() : '',
+    )
+    showActionModal.value = false
+    if (actionMode.value.startsWith('bulk')) {
+      selectedIds.value = []
+    } else {
+      showDetailModal.value = false
+    }
+    alert(`신청이 ${actionRequiresReason.value ? '반려' : '승인'}되었습니다.`)
+  } catch (error) {
+    alert(error?.response?.data?.message || `${actionRequiresReason.value ? '반려' : '승인'} 처리에 실패했습니다.`)
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  const today = toDateKey(new Date())
+  await Promise.all([store.fetchTeamFlexibleWorkPlans(), store.fetchTeamWeeklyOverview(today)])
+})
 
 // --- Timeline Helpers ---
 const getTimeClass = (day) => {
+  if (!day) return 'pill-gray'
   if (day.type === 'normal') return 'pill-blue'
   if (day.type === 'flex') return 'pill-green'
   return 'pill-gray'
@@ -394,6 +482,9 @@ const parseTime = (t) => {
 }
 
 const getBarStyle = (day) => {
+  if (!day) {
+    return { left: '0%', width: '0%' }
+  }
   const start = parseTime(day.start)
   const end = parseTime(day.end)
   const duration = end - start
@@ -562,6 +653,14 @@ const getBarStyle = (day) => {
 .g-pos { font-size: 0.8rem; color: var(--gray500); }
 
 .tl-track-cell { flex: 1; position: relative; height: 100%; margin-left: -6px; } /* micro adjust */
+.empty-bar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  color: var(--gray400);
+  font-size: 0.85rem;
+  padding-left: 12px;
+}
 
 .time-bar-pill {
   position: absolute; height: 40px; border-radius: 20px; top: 8px;
@@ -586,6 +685,12 @@ const getBarStyle = (day) => {
   background: rgba(255, 200, 0, 0.05); 
   border-left: 2px dashed rgba(245, 158, 11, 0.3); border-right: 2px dashed rgba(245, 158, 11, 0.3);
   z-index: 1; pointer-events: none;
+}
+.timeline-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--gray500);
+  font-size: 0.95rem;
 }
 
 .timeline-footer { margin-top: 32px; display: flex; gap: 24px; align-items: center; padding-top: 20px; border-top: 1px solid var(--gray100); }

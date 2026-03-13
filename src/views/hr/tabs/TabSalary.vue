@@ -63,34 +63,64 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { createHrSalaryHistoryMock, createHrSalarySummaryMock } from '@/mocks/hr/salary'
-import { AUTH_KEYS } from '@/utils/auth'
+import { usePayrollStore } from '@/store/payroll'
 
 const router = useRouter()
-const summary = ref(createHrSalarySummaryMock())
-const salaryHistory = ref(createHrSalaryHistoryMock())
-const isVerified = ref(false)
+const payrollStore = usePayrollStore()
 const passwordInput = ref('')
 const passwordError = ref('')
-const getPasswordStorageKey = (userId) => `accountPassword:${userId}`
+const isVerified = computed(() => payrollStore.isSalaryVerified)
 
-const expectedPassword = computed(() => {
-  const userId = sessionStorage.getItem(AUTH_KEYS.userId) || ''
-  if (!userId) return ''
-  return localStorage.getItem(getPasswordStorageKey(userId)) || `${userId}!`
+const salaryHistory = computed(() => payrollStore.recentPayrolls.slice(1, 6).map((item) => ({
+  id: item.id,
+  payDate: item.paymentDateLabel,
+  month: item.targetMonth,
+  grossAmount: item.totalPayment,
+})))
+
+const summary = computed(() => {
+  const latest = payrollStore.latestPayroll
+  if (!latest) {
+    return {
+      grossAmount: 0,
+      latestMonthLabel: '-',
+      payDate: '-',
+    }
+  }
+
+  return {
+    grossAmount: latest.totalPayment,
+    latestMonthLabel: latest.targetMonth,
+    payDate: latest.paymentDateLabel,
+  }
 })
 
 const formatWon = (amount) => {
   return `₩ ${Number(amount || 0).toLocaleString('ko-KR')}`
 }
 
-const verifyPassword = () => {
-  if (!expectedPassword.value || passwordInput.value !== expectedPassword.value) {
-    passwordError.value = '비밀번호가 올바르지 않습니다.'
+const verifyPassword = async () => {
+  if (!passwordInput.value.trim()) {
+    passwordError.value = '비밀번호를 입력해주세요.'
+    return
+  }
+
+  try {
+    const verified = await payrollStore.verifyPassword(passwordInput.value.trim())
+    if (!verified) {
+      passwordError.value = '비밀번호가 올바르지 않습니다.'
+      passwordInput.value = ''
+      return
+    }
+    passwordInput.value = ''
+    if (!payrollStore.recentPayrolls.length) {
+      await payrollStore.fetchRecentPayrolls(6)
+    }
+  } catch (error) {
+    passwordError.value = payrollStore.normalizeError(error, '비밀번호 확인에 실패했습니다.')
     passwordInput.value = ''
     return
   }
-  isVerified.value = true
 }
 
 const goSalaryPage = () => {
