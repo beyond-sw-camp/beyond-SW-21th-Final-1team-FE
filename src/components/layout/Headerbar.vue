@@ -2,10 +2,7 @@
   <header class="header">
     <div class="header-logo" @click="$emit('nav-click', '메인')">
       <div class="logo-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
-          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-          <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-        </svg>
+        <img class="logo-icon-img" :src="logo" alt="RHight logo" />
       </div>
       <span class="logo-text">RHight</span>
     </div>
@@ -37,6 +34,7 @@
       </button>
 
       <button
+        v-if="canViewNotices"
         class="header-icon-btn"
         type="button"
         title="공지사항"
@@ -105,8 +103,9 @@ import { computed, ref } from 'vue'
 import { getActivePinia } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import OrgSearchModal from '@/components/org/OrgSearchModal.vue'
-import { clearLoginSession, isAdminRole } from '@/utils/auth'
+import { clearLoginSession, isAdminRole, sessionAllowedViewCodesRef } from '@/utils/auth'
 import { logout } from '@/api/auth'
+import logo from '@/assets/logo-rhight.png'
 
 defineProps({
   activeNav: { type: String, default: '메인' }
@@ -115,11 +114,48 @@ defineEmits(['nav-click'])
 
 const router = useRouter()
 const route = useRoute()
-const navItems = ['메인', '인사', '근태', '급여', '성과', '전자결재']
+const NAV_CONFIG = [
+  { label: '메인', viewCodes: ['MAIN'] },
+  {
+    label: '인사',
+    viewCodes: ['HR_MYPAGE', 'HR_ORG', 'HR_ORGCHART', 'HR_MEMBER_ATTENDANCE', 'HR_MEMBER_GOAL'],
+  },
+  {
+    label: '근태',
+    viewCodes: [
+      'ATTENDANCE_MAIN',
+      'ATTENDANCE_RECORD',
+      'ATTENDANCE_HISTORY',
+      'ATTENDANCE_SCHEDULE',
+      'ATTENDANCE_VACATION',
+      'ATTENDANCE_TEAM',
+    ],
+  },
+  { label: '급여', viewCodes: ['ADMIN_SALARY'] },
+  { label: '성과', viewCodes: ['PERFORMANCE'] },
+  {
+    label: '전자결재',
+    viewCodes: [
+      'APPROVAL_MAIN',
+      'APPROVAL_DRAFT',
+      'APPROVAL_STATUS',
+      'APPROVAL_BOX',
+      'APPROVAL_BOX_LIST',
+      'APPROVAL_REVIEW',
+    ],
+  },
+]
 const showOrgSearchModal = ref(false)
 const headerSearchKeyword = ref('')
 const isAdmin = computed(() => isAdminRole())
 const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+const allowedViewCodeSet = computed(() => new Set(sessionAllowedViewCodesRef.value || []))
+const navItems = computed(() =>
+  NAV_CONFIG.filter((item) => item.viewCodes.some((code) => allowedViewCodeSet.value.has(code))).map(
+    (item) => item.label,
+  ),
+)
+const canViewNotices = computed(() => allowedViewCodeSet.value.has('NOTICE_LIST'))
 
 const goAdminMode = () => {
   router.push('/admin/main')
@@ -153,9 +189,10 @@ const handleLogout = async () => {
 }
 .header-logo{display:flex;align-items:center;gap:8px;cursor:pointer;margin-right:16px}
 .logo-icon{
-  width:28px;height:28px;background:var(--primary);border-radius:8px;
-  display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
 }
+.logo-icon-img{width:100%;height:100%;object-fit:contain;display:block}
 .logo-text{font-family:var(--font-num);font-size:1.15rem;font-weight:800;color:var(--gray800)}
 .header-nav{display:flex;gap:2px}
 .nav-item{
