@@ -34,6 +34,7 @@
       </button>
 
       <button
+        v-if="canViewNotices"
         class="header-icon-btn"
         type="button"
         title="공지사항"
@@ -102,7 +103,7 @@ import { computed, ref } from 'vue'
 import { getActivePinia } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import OrgSearchModal from '@/components/org/OrgSearchModal.vue'
-import { clearLoginSession, isAdminRole } from '@/utils/auth'
+import { clearLoginSession, isAdminRole, sessionAllowedViewCodesRef } from '@/utils/auth'
 import { logout } from '@/api/auth'
 import logo from '@/assets/logo-rhight.png'
 
@@ -113,11 +114,48 @@ defineEmits(['nav-click'])
 
 const router = useRouter()
 const route = useRoute()
-const navItems = ['메인', '인사', '근태', '급여', '성과', '전자결재']
+const NAV_CONFIG = [
+  { label: '메인', viewCodes: ['MAIN'] },
+  {
+    label: '인사',
+    viewCodes: ['HR_MYPAGE', 'HR_ORG', 'HR_ORGCHART', 'HR_MEMBER_ATTENDANCE', 'HR_MEMBER_GOAL'],
+  },
+  {
+    label: '근태',
+    viewCodes: [
+      'ATTENDANCE_MAIN',
+      'ATTENDANCE_RECORD',
+      'ATTENDANCE_HISTORY',
+      'ATTENDANCE_SCHEDULE',
+      'ATTENDANCE_VACATION',
+      'ATTENDANCE_TEAM',
+    ],
+  },
+  { label: '급여', viewCodes: ['ADMIN_SALARY'] },
+  { label: '성과', viewCodes: ['PERFORMANCE'] },
+  {
+    label: '전자결재',
+    viewCodes: [
+      'APPROVAL_MAIN',
+      'APPROVAL_DRAFT',
+      'APPROVAL_STATUS',
+      'APPROVAL_BOX',
+      'APPROVAL_BOX_LIST',
+      'APPROVAL_REVIEW',
+    ],
+  },
+]
 const showOrgSearchModal = ref(false)
 const headerSearchKeyword = ref('')
 const isAdmin = computed(() => isAdminRole())
 const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+const allowedViewCodeSet = computed(() => new Set(sessionAllowedViewCodesRef.value || []))
+const navItems = computed(() =>
+  NAV_CONFIG.filter((item) => item.viewCodes.some((code) => allowedViewCodeSet.value.has(code))).map(
+    (item) => item.label,
+  ),
+)
+const canViewNotices = computed(() => allowedViewCodeSet.value.has('NOTICE_LIST'))
 
 const goAdminMode = () => {
   router.push('/admin/main')

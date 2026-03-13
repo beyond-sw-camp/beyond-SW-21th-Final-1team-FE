@@ -8,9 +8,12 @@
           <p>대상 직원 선택</p>
           <div class="picker-row">
             <button type="button" class="btn-pick" @click="showOrgPicker = true">사원 찾기</button>
-            <div class="picked-summary" v-if="selectedEmployee">
-              <strong>{{ selectedEmployee.name }}</strong>
-              <span>{{ selectedEmployee.team }} / {{ selectedEmployee.job }} / {{ selectedEmployee.grade }}</span>
+            <div class="picked-summary" v-if="selectedEmployeeSummary">
+              <strong>{{ selectedEmployeeSummary.employeeName }}</strong>
+              <span>
+                {{ selectedEmployeeSummary.orgName || '-' }} / {{ selectedEmployeeSummary.jobName || '-' }} /
+                {{ selectedEmployeeSummary.rankName || '-' }}
+              </span>
             </div>
             <div class="picked-summary empty" v-else>선택된 직원이 없습니다.</div>
           </div>
@@ -19,76 +22,102 @@
         <div class="form-grid">
           <label>
             소속 팀
-            <select v-model="editForm.team">
-              <option v-for="item in teamOptions" :key="item" :value="item">{{ item }}</option>
+            <select v-model="editForm.orgId">
+              <option :value="''">선택</option>
+              <option v-for="item in options.organizations" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
           </label>
           <label>
             직무
-            <select v-model="editForm.job">
-              <option v-for="item in jobOptions" :key="item" :value="item">{{ item }}</option>
+            <select v-model="editForm.jobId">
+              <option :value="''">선택</option>
+              <option v-for="item in options.jobs" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
           </label>
           <label>
             직책
-            <select v-model="editForm.position">
-              <option v-for="item in positionOptions" :key="item" :value="item">{{ item }}</option>
+            <select v-model="editForm.positionId">
+              <option :value="''">선택</option>
+              <option v-for="item in options.positions" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
           </label>
           <label>
             직급
-            <select v-model="editForm.grade">
-              <option v-for="item in gradeOptions" :key="item" :value="item">{{ item }}</option>
+            <select v-model="editForm.rankId">
+              <option :value="''">선택</option>
+              <option v-for="item in options.ranks" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
           </label>
           <label>
             재직 상태
-            <select v-model="editForm.employmentStatus">
-              <option v-for="item in employmentStatusOptions" :key="item" :value="item">{{ item }}</option>
+            <select v-model="editForm.employeeState">
+              <option :value="''">선택</option>
+              <option value="WORK">재직</option>
+              <option value="LEAVE">휴직</option>
+              <option value="RESIGN">사직</option>
             </select>
           </label>
           <label>
             근무 형태
-            <select v-model="editForm.workType">
-              <option v-for="item in workTypeOptions" :key="item" :value="item">{{ item }}</option>
+            <select v-model="editForm.employType">
+              <option :value="''">선택</option>
+              <option value="REGULAR">정규직</option>
+              <option value="NON_REGULAR">비정규직</option>
+              <option value="CONTRACT">계약직</option>
             </select>
           </label>
           <label>
             근무지
-            <select v-model="editForm.workLocation">
-              <option v-for="item in workLocationOptions" :key="item" :value="item">{{ item }}</option>
+            <select v-model="editForm.areaId">
+              <option :value="''">선택</option>
+              <option v-for="item in options.workingAreas" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
           </label>
           <label>
             적용일
-            <input v-model="editForm.effectiveDate" type="date" />
+            <input v-model="editForm.effectiveFrom" type="date" />
+          </label>
+          <div class="role-picker span-2">
+            <p class="role-picker-title">권한 설정 (복수 선택)</p>
+            <div class="role-grid">
+              <label v-for="item in selectableRoles" :key="item.roleId" class="role-option">
+                <input v-model="editForm.roleIds" type="checkbox" :value="String(item.roleId)" />
+                <span>{{ item.roleName }}</span>
+              </label>
+            </div>
+            <p class="role-hint">피평가자 권한은 자동으로 포함됩니다.</p>
+          </div>
+          <label class="span-2">
+            변경 사유
+            <input v-model.trim="editForm.reason" type="text" placeholder="변경 사유를 입력하세요 (필수)" maxlength="255" />
           </label>
         </div>
 
         <p class="helper">변경 시 변경 전 정보와 적용일이 인사기록에 자동 저장됩니다.</p>
+        <p v-if="changedFieldCount > 1" class="helper warning">
+          한 번에 하나의 인사 항목만 변경할 수 있습니다.
+        </p>
 
         <div class="action-row">
           <button class="btn-ghost" type="button" @click="resetEditForm">초기화</button>
-          <button class="btn-primary" type="button" :disabled="!canApplyChanges" @click="applyHrChanges">
-            변경 적용
+          <button class="btn-primary" type="button" :disabled="isApplying || !canApplyChanges" @click="applyHrChanges">
+            {{ isApplying ? '적용 중...' : '변경 적용' }}
           </button>
         </div>
-
-        <p v-if="resultMessage" class="result-msg">{{ resultMessage }}</p>
       </article>
 
       <article class="card current-card">
         <h3>현재 인사 정보</h3>
-        <div v-if="selectedEmployee" class="current-box">
-          <p><span>이름</span><strong>{{ selectedEmployee.name }}</strong></p>
-          <p><span>소속 팀</span><strong>{{ selectedEmployee.team }}</strong></p>
-          <p><span>직무</span><strong>{{ selectedEmployee.job }}</strong></p>
-          <p><span>직책</span><strong>{{ selectedEmployee.position }}</strong></p>
-          <p><span>직급</span><strong>{{ selectedEmployee.grade }}</strong></p>
-          <p><span>재직 상태</span><strong>{{ selectedEmployee.employmentStatus }}</strong></p>
-          <p><span>근무 형태</span><strong>{{ selectedEmployee.workType }}</strong></p>
-          <p><span>근무지</span><strong>{{ selectedEmployee.workLocation }}</strong></p>
-          <p><span>최종 반영일</span><strong class="font-num">{{ selectedEmployee.lastAppliedDate || '-' }}</strong></p>
+        <div v-if="currentInfo" class="current-box">
+          <p><span>이름</span><strong>{{ currentInfo.employeeName }}</strong></p>
+          <p><span>소속 팀</span><strong>{{ currentInfo.orgName || '-' }}</strong></p>
+          <p><span>직무</span><strong>{{ currentInfo.jobName || '-' }}</strong></p>
+          <p><span>직책</span><strong>{{ currentInfo.positionName || '-' }}</strong></p>
+          <p><span>직급</span><strong>{{ currentInfo.rankName || '-' }}</strong></p>
+          <p><span>재직 상태</span><strong>{{ currentInfo.employeeStateDescription || '-' }}</strong></p>
+          <p><span>근무 형태</span><strong>{{ currentInfo.employTypeDescription || '-' }}</strong></p>
+          <p><span>근무지</span><strong>{{ currentInfo.areaName || '-' }}</strong></p>
+          <p><span>최종 반영일</span><strong class="font-num">{{ dotDate(currentInfo.effectiveFrom) }}</strong></p>
         </div>
         <div v-else class="current-empty">사원을 선택하면 현재 인사 정보가 표시됩니다.</div>
       </article>
@@ -99,13 +128,13 @@
       <div class="filter-row">
         <button
           v-for="type in historyTypeOptions"
-          :key="type"
+          :key="type.value"
           type="button"
           class="filter-chip"
-          :class="{ active: selectedHistoryType === type }"
-          @click="selectedHistoryType = type"
+          :class="{ active: selectedHistoryType === type.value }"
+          @click="selectedHistoryType = type.value"
         >
-          {{ type }}
+          {{ type.label }}
         </button>
       </div>
 
@@ -117,20 +146,18 @@
             <th>변경 전</th>
             <th>변경 후</th>
             <th>변경일(적용일)</th>
-            <th>처리자</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredHistory" :key="item.id">
-            <td>{{ item.changeType }}</td>
-            <td>{{ item.employeeName }}</td>
-            <td>{{ item.beforeValue }}</td>
-            <td>{{ item.afterValue }}</td>
-            <td class="font-num">{{ item.effectiveDate }}</td>
-            <td>{{ item.processor }}</td>
+          <tr v-for="item in historyRecords" :key="item.hrEventId">
+            <td>{{ item.eventTypeDescription || item.eventType }}</td>
+            <td>{{ item.employeeName || '-' }}</td>
+            <td>{{ formatChangedSide(item, 'before') }}</td>
+            <td>{{ formatChangedSide(item, 'after') }}</td>
+            <td class="font-num">{{ dotDate(item.effectiveFrom) }}</td>
           </tr>
-          <tr v-if="filteredHistory.length === 0">
-            <td colspan="6" class="empty">조건에 맞는 인사기록이 없습니다.</td>
+          <tr v-if="historyRecords.length === 0">
+            <td colspan="5" class="empty">조건에 맞는 인사기록이 없습니다.</td>
           </tr>
         </tbody>
       </table>
@@ -141,299 +168,268 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import EmployeePickerModal from '@/components/org/EmployeePickerModal.vue'
-
-const teamOptions = ['모바일1팀', '개발1팀', '개발2팀', '디자인팀', 'QA팀', '인사팀', '영업1팀', '영업2팀']
-const jobOptions = ['백엔드 개발', '프론트엔드 개발', '모바일 개발', 'QA엔지니어', '디자인', '기획', '인사 운영']
-const positionOptions = ['팀원', '선임', '파트장', '팀장', '실장', '본부장']
-const gradeOptions = ['사원', '주임', '대리', '과장', '차장', '부장']
-const employmentStatusOptions = ['재직', '휴직', '사직', '퇴직']
-const workTypeOptions = ['정규직', '계약직', '인턴', '파견']
-const workLocationOptions = ['서울 강남', '서울 여의도', '판교', '부산', '대전']
-
-const employeesById = reactive({
-  E001: {
-    employeeId: 'E001',
-    name: '박민수',
-    team: '개발2팀',
-    job: '백엔드 개발',
-    position: '파트장',
-    grade: '차장',
-    employmentStatus: '재직',
-    workType: '정규직',
-    workLocation: '판교',
-    lastAppliedDate: '2026.02.15'
-  },
-  E002: {
-    employeeId: 'E002',
-    name: '김봉식',
-    team: '모바일1팀',
-    job: '백엔드 개발',
-    position: '팀장',
-    grade: '과장',
-    employmentStatus: '재직',
-    workType: '정규직',
-    workLocation: '서울 강남',
-    lastAppliedDate: '2026.02.14'
-  },
-  E003: {
-    employeeId: 'E003',
-    name: '최수빈',
-    team: '모바일1팀',
-    job: '모바일 개발',
-    position: '팀원',
-    grade: '사원',
-    employmentStatus: '휴직',
-    workType: '정규직',
-    workLocation: '서울 강남',
-    lastAppliedDate: '2026.02.13'
-  }
-})
-
-const historyRecords = ref([
-  {
-    id: 'HR-001',
-    changeType: '직급 변경',
-    employeeName: '박민수',
-    beforeValue: '과장',
-    afterValue: '차장',
-    effectiveDate: '2026.02.15',
-    processor: '인사팀 관리자'
-  },
-  {
-    id: 'HR-002',
-    changeType: '발령',
-    employeeName: '김봉식',
-    beforeValue: '개발2팀',
-    afterValue: '모바일1팀',
-    effectiveDate: '2026.02.14',
-    processor: '인사팀 관리자'
-  },
-  {
-    id: 'HR-003',
-    changeType: '휴직',
-    employeeName: '최수빈',
-    beforeValue: '재직',
-    afterValue: '휴직',
-    effectiveDate: '2026.02.13',
-    processor: '인사팀 관리자'
-  }
-])
-
-const historyTypeOptions = ['전체', '재직', '휴직', '사직', '퇴직', '발령', '직급 변경']
-const selectedHistoryType = ref('전체')
+import {
+  getAdminHrChangeCurrentInfo,
+  getAdminHrChangeEvents,
+  getAdminHrChangeOptions,
+  updateAdminHrChangeEmployee,
+} from '@/api/hr'
 
 const showOrgPicker = ref(false)
-const selectedEmployeeId = ref('')
-const editForm = reactive({
-  team: '',
-  job: '',
-  position: '',
-  grade: '',
-  employmentStatus: '',
-  workType: '',
-  workLocation: '',
-  effectiveDate: ''
+const selectedEmployeeId = ref(null)
+const selectedEmployeeSummary = ref(null)
+const currentInfo = ref(null)
+const isApplying = ref(false)
+
+const options = reactive({
+  organizations: [],
+  jobs: [],
+  positions: [],
+  ranks: [],
+  workingAreas: [],
+  roles: [],
 })
-const resultMessage = ref('')
 
-const selectedEmployee = computed(() => employeesById[selectedEmployeeId.value] || null)
+const editForm = reactive({
+  orgId: '',
+  jobId: '',
+  positionId: '',
+  rankId: '',
+  employeeState: '',
+  employType: '',
+  areaId: '',
+  effectiveFrom: '',
+  roleIds: [],
+  reason: '',
+})
 
-const toDotDate = (dateText) => (dateText ? dateText.replaceAll('-', '.') : '')
-const normalizeStatus = (value) => {
-  if (['재직', '휴직', '사직', '퇴직'].includes(value)) return value
-  return '재직'
+const historyTypeOptions = [
+  { label: '전체', value: '' },
+  { label: '발령', value: 'TRANSFER' },
+  { label: '조직 변경', value: 'ORG_CHANGE' },
+  { label: '직책 변경', value: 'POSITION_CHANGE' },
+  { label: '직급 변경', value: 'PROMOTION' },
+  { label: '재직 상태 변경', value: 'STATE_CHANGE' },
+]
+const selectedHistoryType = ref('')
+const historyRecords = ref([])
+const selectableRoles = computed(() =>
+  options.roles.filter((role) => String(role.roleCode || '').toUpperCase() !== 'EVALUATEE'),
+)
+const evaluateeRoleId = computed(() => {
+  const row = options.roles.find((role) => String(role.roleCode || '').toUpperCase() === 'EVALUATEE')
+  return row?.roleId ? Number(row.roleId) : null
+})
+
+const dotDate = (value) => {
+  if (!value) return '-'
+  return String(value).slice(0, 10).replaceAll('-', '.')
 }
 
-const normalizeByOptions = (value, options, fallback) => {
-  return options.includes(value) ? value : fallback
+const resetEditFormValues = () => {
+  editForm.orgId = ''
+  editForm.jobId = ''
+  editForm.positionId = ''
+  editForm.rankId = ''
+  editForm.employeeState = ''
+  editForm.employType = ''
+  editForm.areaId = ''
+  editForm.effectiveFrom = ''
+  editForm.roleIds = []
+  editForm.reason = ''
 }
 
-const changeTypeOf = (field, afterValue) => {
-  if (field === 'grade') return '직급 변경'
-  if (field === 'employmentStatus') return afterValue
-  return '발령'
-}
-const fieldLabelMap = {
-  team: '소속 팀',
-  job: '직무',
-  position: '직책',
-  grade: '직급',
-  employmentStatus: '재직 상태',
-  workType: '근무 형태',
-  workLocation: '근무지'
+const normalizeRoleIds = (roleIds) => {
+  const excludedRoleId = evaluateeRoleId.value
+  return [
+    ...new Set(
+      (Array.isArray(roleIds) ? roleIds : [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  ]
+    .filter((id) => excludedRoleId == null || id !== excludedRoleId)
+    .sort((a, b) => a - b)
 }
 
-const syncFormFromSelected = () => {
-  if (!selectedEmployee.value) {
-    editForm.team = ''
-    editForm.job = ''
-    editForm.position = ''
-    editForm.grade = ''
-    editForm.employmentStatus = ''
-    editForm.workType = ''
-    editForm.workLocation = ''
-    editForm.effectiveDate = ''
-    resultMessage.value = ''
+const normalizeRoleIdsAsStrings = (roleIds) => normalizeRoleIds(roleIds).map((id) => String(id))
+
+const parseChangeMap = (text) => {
+  const source = String(text || '').trim()
+  if (!source) return {}
+  return source
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((acc, part) => {
+      const index = part.indexOf(':')
+      if (index < 0) return acc
+      const key = part.slice(0, index).trim()
+      const value = part.slice(index + 1).trim()
+      if (!key) return acc
+      acc[key] = value || '-'
+      return acc
+    }, {})
+}
+
+const getChangedEntries = (item) => {
+  const beforeMap = parseChangeMap(item?.beforeChange)
+  const afterMap = parseChangeMap(item?.afterChange)
+  const keys = [...new Set([...Object.keys(beforeMap), ...Object.keys(afterMap)])]
+  return keys.filter((key) => (beforeMap[key] ?? '-') !== (afterMap[key] ?? '-'))
+}
+
+const formatChangedSide = (item, side) => {
+  const beforeMap = parseChangeMap(item?.beforeChange)
+  const afterMap = parseChangeMap(item?.afterChange)
+  const changedKeys = getChangedEntries(item)
+  if (changedKeys.length === 0) return '-'
+  const targetMap = side === 'before' ? beforeMap : afterMap
+  return changedKeys
+    .map((key) => `${key}:${targetMap[key] ?? '-'}`)
+    .join(', ')
+}
+
+const syncFormFromCurrentInfo = () => {
+  if (!currentInfo.value) {
+    resetEditFormValues()
     return
   }
-  editForm.team = selectedEmployee.value.team
-  editForm.job = selectedEmployee.value.job
-  editForm.position = selectedEmployee.value.position
-  editForm.grade = selectedEmployee.value.grade
-  editForm.employmentStatus = selectedEmployee.value.employmentStatus
-  editForm.workType = selectedEmployee.value.workType
-  editForm.workLocation = selectedEmployee.value.workLocation
-  editForm.effectiveDate = ''
-  resultMessage.value = ''
+  editForm.orgId = currentInfo.value.orgId ?? ''
+  editForm.jobId = currentInfo.value.jobId ?? ''
+  editForm.positionId = currentInfo.value.positionId ?? ''
+  editForm.rankId = currentInfo.value.rankId ?? ''
+  editForm.employeeState = currentInfo.value.employeeState ?? ''
+  editForm.employType = currentInfo.value.employType ?? ''
+  editForm.areaId = currentInfo.value.areaId ?? ''
+  editForm.effectiveFrom = ''
+  editForm.roleIds = normalizeRoleIdsAsStrings(currentInfo.value.roleIds)
+  editForm.reason = ''
 }
 
-watch(
-  selectedEmployeeId,
-  () => {
-    syncFormFromSelected()
-  },
-  { immediate: true }
-)
+const roleIdsChanged = computed(() => {
+  if (!currentInfo.value) return false
+  const before = normalizeRoleIds(currentInfo.value.roleIds)
+  const after = normalizeRoleIds(editForm.roleIds)
+  if (before.length !== after.length) return true
+  return before.some((id, idx) => id !== after[idx])
+})
+
+const changedFieldCount = computed(() => {
+  if (!currentInfo.value) return 0
+  let count = 0
+  if (Number(editForm.orgId || 0) !== Number(currentInfo.value.orgId || 0)) count++
+  if (Number(editForm.jobId || 0) !== Number(currentInfo.value.jobId || 0)) count++
+  if (Number(editForm.positionId || 0) !== Number(currentInfo.value.positionId || 0)) count++
+  if (Number(editForm.rankId || 0) !== Number(currentInfo.value.rankId || 0)) count++
+  if (String(editForm.employeeState || '') !== String(currentInfo.value.employeeState || '')) count++
+  if (String(editForm.employType || '') !== String(currentInfo.value.employType || '')) count++
+  if (Number(editForm.areaId || 0) !== Number(currentInfo.value.areaId || 0)) count++
+  if (roleIdsChanged.value) count++
+  return count
+})
+
+const hasAnyChange = computed(() => {
+  return changedFieldCount.value > 0
+})
 
 const canApplyChanges = computed(() => {
-  if (!selectedEmployee.value) return false
-  return [
-    editForm.team,
-    editForm.job,
-    editForm.position,
-    editForm.grade,
-    editForm.employmentStatus,
-    editForm.workType,
-    editForm.workLocation,
-    editForm.effectiveDate
-  ].every((value) => String(value).trim().length > 0)
+  if (!selectedEmployeeId.value) return false
+  if (!editForm.effectiveFrom) return false
+  if (!hasAnyChange.value) return false
+  if (changedFieldCount.value !== 1) return false
+  if (!editForm.reason?.trim()) return false
+  return true
 })
 
-const filteredHistory = computed(() => {
-  if (selectedHistoryType.value === '전체') return historyRecords.value
-  return historyRecords.value.filter((item) => item.changeType === selectedHistoryType.value)
-})
-
-const addHistory = (field, beforeValue, afterValue, effectiveDate) => {
-  const emp = selectedEmployee.value
-  if (!emp) return
-  historyRecords.value.unshift({
-    id: `HR-${Date.now()}-${field}`,
-    changeType: changeTypeOf(field, afterValue),
-    employeeName: emp.name,
-    beforeValue,
-    afterValue,
-    effectiveDate: toDotDate(effectiveDate),
-    processor: '인사팀 관리자'
-  })
+const loadOptions = async () => {
+  const data = await getAdminHrChangeOptions()
+  options.organizations = Array.isArray(data?.organizations) ? data.organizations : []
+  options.jobs = Array.isArray(data?.jobs) ? data.jobs : []
+  options.positions = Array.isArray(data?.positions) ? data.positions : []
+  options.ranks = Array.isArray(data?.ranks) ? data.ranks : []
+  options.workingAreas = Array.isArray(data?.workingAreas) ? data.workingAreas : []
+  options.roles = Array.isArray(data?.roles) ? data.roles : []
 }
 
-const applyHrChanges = () => {
-  if (!selectedEmployee.value || !canApplyChanges.value) return
+const loadCurrentInfo = async (employeeId) => {
+  const data = await getAdminHrChangeCurrentInfo(employeeId)
+  currentInfo.value = data
+  syncFormFromCurrentInfo()
+}
 
-  const emp = selectedEmployee.value
-  const fields = ['team', 'job', 'position', 'grade', 'employmentStatus', 'workType', 'workLocation']
-  const pendingChanges = fields
-    .map((field) => {
-      const before = emp[field]
-      const after = editForm[field]
-      if (before === after) return null
-      return { field, label: fieldLabelMap[field] || field, before, after }
-    })
-    .filter(Boolean)
-
-  if (pendingChanges.length === 0) {
-    resultMessage.value = '변경된 항목이 없어 적용할 내용이 없습니다.'
-    return
-  }
-
-  const confirmMessage = [
-    '변경하시겠습니까?',
-    '',
-    `${emp.name} 사원 인사 정보 변경`,
-    `적용일: ${toDotDate(editForm.effectiveDate)}`,
-    '',
-    ...pendingChanges.map((item) => `${item.label}: ${item.before} -> ${item.after}`)
-  ].join('\n')
-
-  if (!window.confirm(confirmMessage)) return
-
-  let changedCount = 0
-
-  pendingChanges.forEach((item) => {
-    addHistory(item.field, item.before, item.after, editForm.effectiveDate)
-    emp[item.field] = item.after
-    changedCount += 1
+const loadHistory = async () => {
+  const data = await getAdminHrChangeEvents({
+    page: 1,
+    size: 20,
+    eventType: selectedHistoryType.value || undefined,
   })
+  historyRecords.value = Array.isArray(data?.content) ? data.content : []
+}
 
-  if (changedCount > 0) {
-    emp.lastAppliedDate = toDotDate(editForm.effectiveDate)
+const handlePickedMember = async (member) => {
+  if (!member?.employeeId) return
+  selectedEmployeeId.value = member.employeeId
+  selectedEmployeeSummary.value = member
+  try {
+    await loadCurrentInfo(member.employeeId)
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '현재 인사 정보 조회에 실패했습니다.')
   }
-  resultMessage.value =
-    changedCount > 0
-      ? `${emp.name}의 인사 정보 ${changedCount}건이 적용되었습니다.`
-      : '변경된 항목이 없어 적용할 내용이 없습니다.'
+}
+
+const applyHrChanges = async () => {
+  if (!canApplyChanges.value || !selectedEmployeeId.value || !currentInfo.value) return
+
+  const payload = {
+    orgId: Number(editForm.orgId || 0) !== Number(currentInfo.value.orgId || 0) ? Number(editForm.orgId) : null,
+    jobId: Number(editForm.jobId || 0) !== Number(currentInfo.value.jobId || 0) ? Number(editForm.jobId) : null,
+    positionId:
+      Number(editForm.positionId || 0) !== Number(currentInfo.value.positionId || 0)
+        ? Number(editForm.positionId)
+        : null,
+    rankId: Number(editForm.rankId || 0) !== Number(currentInfo.value.rankId || 0) ? Number(editForm.rankId) : null,
+    employeeState:
+      String(editForm.employeeState || '') !== String(currentInfo.value.employeeState || '')
+        ? editForm.employeeState
+        : null,
+    employType:
+      String(editForm.employType || '') !== String(currentInfo.value.employType || '') ? editForm.employType : null,
+    areaId: Number(editForm.areaId || 0) !== Number(currentInfo.value.areaId || 0) ? Number(editForm.areaId) : null,
+    effectiveFrom: editForm.effectiveFrom,
+    reason: editForm.reason.trim(),
+    roleIds: roleIdsChanged.value ? normalizeRoleIds(editForm.roleIds) : null,
+  }
+
+  isApplying.value = true
+  try {
+    await updateAdminHrChangeEmployee(selectedEmployeeId.value, payload)
+    await Promise.all([loadCurrentInfo(selectedEmployeeId.value), loadHistory()])
+    alert('인사 정보 변경이 저장되었습니다.')
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '인사 정보 변경 저장에 실패했습니다.')
+  } finally {
+    isApplying.value = false
+  }
 }
 
 const resetEditForm = () => {
-  selectedEmployeeId.value = ''
-  syncFormFromSelected()
+  syncFormFromCurrentInfo()
 }
 
-const normalizeJob = (value) => {
-  const map = {
-    백엔드개발자: '백엔드 개발',
-    프론트엔드개발자: '프론트엔드 개발',
-    QA엔지니어: 'QA엔지니어',
-    QA: 'QA엔지니어',
-    품질보증: 'QA엔지니어'
+watch(selectedHistoryType, () => {
+  loadHistory()
+})
+
+onMounted(async () => {
+  try {
+    await Promise.all([loadOptions(), loadHistory()])
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '초기 데이터 조회에 실패했습니다.')
   }
-  const key = String(value || '').replaceAll(' ', '')
-  return map[key] || value
-}
-
-const dutyToGrade = (duty) => {
-  const map = {
-    사원: '사원',
-    주임: '주임',
-    대리: '대리',
-    과장: '과장',
-    차장: '차장',
-    부장: '부장',
-    팀장: '과장',
-    파트장: '대리'
-  }
-  return map[duty] || '사원'
-}
-
-const handlePickedMember = (member) => {
-  if (!member?.employeeId) return
-
-  const normalizedJob = normalizeJob(member.job)
-  const normalizedDuty = normalizeByOptions(member.duty, positionOptions, '팀원')
-  const statusFromHr = String(member.hrInfo?.employmentStatus || '')
-    .replace('근무', '')
-    .replace('연차', '재직')
-    .trim()
-
-  const mapped = {
-    employeeId: member.employeeId,
-    name: member.name || '이름 없음',
-    team: normalizeByOptions(member.position, teamOptions, '모바일1팀'),
-    job: normalizeByOptions(normalizedJob, jobOptions, '백엔드 개발'),
-    position: normalizedDuty,
-    grade: normalizeByOptions(dutyToGrade(member.duty), gradeOptions, '사원'),
-    employmentStatus: normalizeStatus(statusFromHr),
-    workType: normalizeByOptions(member.hrInfo?.workType, workTypeOptions, '정규직'),
-    workLocation: normalizeByOptions(member.hrInfo?.workRegion || member.workLocation, workLocationOptions, '서울 강남'),
-    lastAppliedDate: toDotDate(member.hireDate) || ''
-  }
-
-  employeesById[mapped.employeeId] = mapped
-  selectedEmployeeId.value = mapped.employeeId
-}
+})
 </script>
 
 <style scoped>
@@ -482,6 +478,7 @@ const handlePickedMember = (member) => {
 
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 label { display: grid; gap: 6px; font-size: .8rem; color: var(--gray600); }
+label.span-2 { grid-column: span 2; }
 input, select {
   height: 36px;
   border: 1px solid var(--gray200);
@@ -490,8 +487,15 @@ input, select {
   color: var(--gray700);
   padding: 0 10px;
 }
+.role-picker { border: 1px solid var(--gray100); border-radius: 8px; padding: 10px; background: var(--gray50); }
+.role-picker-title { margin: 0 0 8px; color: var(--gray700); font-size: .8rem; font-weight: 700; }
+.role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; }
+.role-option { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--gray700); }
+.role-option input { width: 14px; height: 14px; }
+.role-hint { margin: 8px 0 0; color: var(--gray500); font-size: .76rem; }
 
 .helper { margin: 10px 0 0; color: var(--gray500); font-size: .78rem; }
+.helper.warning { color: #dc2626; font-weight: 600; }
 .action-row { margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px; }
 .btn-primary {
   height: 34px;
@@ -511,15 +515,6 @@ input, select {
   color: var(--gray600);
   padding: 0 12px;
   font-weight: 700;
-}
-.result-msg {
-  margin: 10px 0 0;
-  color: #0369a1;
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: .8rem;
 }
 
 .current-box {
@@ -579,5 +574,7 @@ input, select {
 }
 @media (max-width: 900px) {
   .form-grid { grid-template-columns: minmax(0, 1fr); }
+  label.span-2 { grid-column: span 1; }
+  .role-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

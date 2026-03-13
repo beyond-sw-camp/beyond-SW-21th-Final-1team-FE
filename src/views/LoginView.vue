@@ -177,6 +177,9 @@ const completeBackendLogin = (loginData, fallbackUserId = '') => {
 
   const profile = loginData.userProfile
   const accessToken = loginData.accessToken || ''
+  const allowedViewCodes = Array.isArray(loginData.views)
+    ? loginData.views.map((item) => item?.viewCode).filter(Boolean)
+    : []
   completeLogin({
     userId: profile?.employeeNum || fallbackUserId,
     employeeId: profile?.employeeId ? String(profile.employeeId) : '',
@@ -188,6 +191,7 @@ const completeBackendLogin = (loginData, fallbackUserId = '') => {
     jobName: profile?.jobName || '',
     role: getRoleFromToken(accessToken),
     roleCodes: getRoleCodesFromToken(accessToken),
+    allowedViewCodes,
     accessToken,
   })
 }

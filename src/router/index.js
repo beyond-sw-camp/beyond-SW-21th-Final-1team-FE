@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { AUTH_KEYS, isAdminRole } from '@/utils/auth'
+import { getFirstAllowedRouteName, getViewCodeByRouteName } from '@/constants/viewPermissions'
 
 const routes = [
   {
@@ -175,13 +176,25 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const isLoggedIn = sessionStorage.getItem(AUTH_KEYS.loggedIn) === 'true'
+  let allowedViewCodes = []
+  try {
+    allowedViewCodes = JSON.parse(sessionStorage.getItem(AUTH_KEYS.allowedViewCodes) || '[]')
+  } catch (_error) {
+    allowedViewCodes = []
+  }
+  const allowedSet = new Set(Array.isArray(allowedViewCodes) ? allowedViewCodes : [])
+  const targetViewCode = getViewCodeByRouteName(to.name)
+  const firstAllowedRouteName = getFirstAllowedRouteName(allowedViewCodes)
+  const fallbackPath = firstAllowedRouteName ? { name: firstAllowedRouteName } : '/'
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/login')
   } else if (to.meta.requiresAdmin && !isAdminRole()) {
-    next('/')
+    next(fallbackPath)
+  } else if (to.meta.requiresAuth && targetViewCode && !allowedSet.has(targetViewCode)) {
+    next(fallbackPath)
   } else if (to.path === '/login' && isLoggedIn) {
-    next('/')
+    next(fallbackPath)
   } else {
     next()
   }

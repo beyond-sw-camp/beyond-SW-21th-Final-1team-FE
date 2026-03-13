@@ -161,7 +161,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { createAdminEmployee, getAdminHrChangeOptions } from '@/api/hr'
+import { createAdminEmployee, getAdminEmployeeOptions } from '@/api/hr'
 
 const EMPLOYEE_STATE_OPTIONS = [
   { value: 'WORK', label: '재직' },
@@ -253,7 +253,7 @@ const normalizeDate = (value) => {
 }
 
 const loadOptions = async () => {
-  const data = await getAdminHrChangeOptions()
+  const data = await getAdminEmployeeOptions()
   organizationOptions.value = Array.isArray(data?.organizations) ? data.organizations : []
   jobOptions.value = Array.isArray(data?.jobs) ? data.jobs : []
   positionOptions.value = Array.isArray(data?.positions) ? data.positions : []

@@ -6,6 +6,7 @@
       </div>
 
       <div
+        v-if="adminDashboardMenu"
         class="sidebar-item"
         :class="{ active: currentPath === adminDashboardMenu.route }"
         @click="handleNavigate(adminDashboardMenu.route)"
@@ -37,7 +38,7 @@
 
       <div class="menu-section">
         <div
-            v-for="item in hrMenus"
+            v-for="item in filteredHrMenus"
             :key="item.label"
             class="sidebar-item"
             :class="{ active: currentPath === item.route }"
@@ -70,7 +71,7 @@
       <template v-if="isAttendanceManager">
         <div class="sidebar-section-label">내 근태 관리</div>
         <div
-            v-for="item in myAttendanceMenus"
+            v-for="item in filteredMyAttendanceMenus"
             :key="item.label"
             class="sidebar-item"
             :class="[{ 'active': currentPath.includes(item.route) }, item.className]"
@@ -84,7 +85,7 @@
 
         <div class="sidebar-section-label">팀 관리</div>
         <div
-            v-for="item in teamAttendanceMenus"
+            v-for="item in filteredTeamAttendanceMenus"
             :key="item.label"
             class="sidebar-item"
             :class="{ 'active': currentPath.includes(item.route) }"
@@ -98,7 +99,7 @@
       <template v-else>
         <div class="menu-section">
           <div
-              v-for="item in myAttendanceMenus"
+              v-for="item in filteredMyAttendanceMenus"
               :key="item.label"
               class="sidebar-item"
               :class="[{ 'active': currentPath.includes(item.route) }, item.className]"
@@ -119,7 +120,7 @@
       </div>
       <div class="menu-section">
         <div
-            v-for="item in salaryMenus"
+            v-for="item in filteredSalaryMenus"
             :key="item.label"
             class="sidebar-item"
             :class="{ active: currentPath.includes(item.route) }"
@@ -138,6 +139,7 @@
       </div>
 
       <div
+        v-if="approvalDashboardMenu"
         class="sidebar-item"
         :class="{ 'sidebar-item--active': isMenuActive(approvalDashboardMenu) }"
         @click="handleNavigate(approvalDashboardMenu.route)"
@@ -317,7 +319,14 @@
 import { h, computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePerformanceStore } from '@/store/performance'
-import { AUTH_KEYS, isAdminRole, isEvaluatorRole, sessionRoleCodesRef, sessionRoleRef } from '@/utils/auth'
+import {
+  AUTH_KEYS,
+  isAdminRole,
+  isEvaluatorRole,
+  sessionAllowedViewCodesRef,
+  sessionRoleCodesRef,
+  sessionRoleRef,
+} from '@/utils/auth'
 import BaseModal from '@/components/common/BaseModal.vue'
 
 const router = useRouter()
@@ -343,9 +352,14 @@ const isKmsMode = computed(() => route.path.startsWith('/kms'))
 const currentPath = computed(() => route.path)
 const isPerformance = computed(() => route.path.startsWith('/performance'))
 const currentUserId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
+const allowedViewCodeSet = computed(() => new Set(sessionAllowedViewCodesRef.value || []))
+const hasAnyAllowedViews = (viewCodes = []) =>
+  !Array.isArray(viewCodes) || viewCodes.length === 0
+    ? true
+    : viewCodes.some((code) => allowedViewCodeSet.value.has(code))
 const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
-const isAttendanceManager = computed(() => ['admin1234'].includes(currentUserId.value))
+const isAttendanceManager = computed(() => allowedViewCodeSet.value.has('ATTENDANCE_TEAM'))
 
 // SVG icon components (inline)
 const StarIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
@@ -488,17 +502,25 @@ const SlidersIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', f
 ])
 
 const adminMenus = [
-  { label: '인사 정보 조회', icon: DashboardIcon, route: '/admin/main' },
-  { label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees' },
-  { label: '인사 정보 변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change' },
-  { label: 'KMS 권한 변경 이력', icon: ClockIcon, route: '/admin/kms-permissions-history' },
-  { label: '근태 관리', icon: ClockIcon, route: '/admin/attendance' },
-  { label: '정책 관리', icon: ShieldIcon, route: '/admin/policies' },
-  { label: '공지사항 관리', icon: BellIcon, route: '/admin/notices' },
-  { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary' }
+  { label: '인사 정보 조회', icon: DashboardIcon, route: '/admin/main', viewCodes: ['ADMIN_MAIN'] },
+  { label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees', viewCodes: ['ADMIN_EMPLOYEES'] },
+  { label: '인사 정보 변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change', viewCodes: ['ADMIN_HR_CHANGE'] },
+  {
+    label: 'KMS 권한 변경 이력',
+    icon: ClockIcon,
+    route: '/admin/kms-permissions-history',
+    viewCodes: ['ADMIN_KMS_PERMISSION_HISTORY'],
+  },
+  { label: '근태 관리', icon: ClockIcon, route: '/admin/attendance', viewCodes: ['ADMIN_ATTENDANCE'] },
+  { label: '정책 관리', icon: ShieldIcon, route: '/admin/policies', viewCodes: ['ADMIN_POLICIES'] },
+  { label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
+  { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
 ]
-const adminDashboardMenu = adminMenus[0]
-const adminOtherMenus = adminMenus.slice(1)
+const filteredAdminMenus = computed(() =>
+  adminMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
+)
+const adminDashboardMenu = computed(() => filteredAdminMenus.value[0] || null)
+const adminOtherMenus = computed(() => filteredAdminMenus.value.slice(1))
 const myPerformanceMenuItems = [
   { id: 'dashboard', name: '대시보드', icon: DashboardIcon },
   { id: 'registration', name: '성과 등록', icon: PlusIcon },
@@ -551,41 +573,62 @@ const selectedShortcutKeys = ref([])
 const draftShortcutKeys = ref([])
 
 const baseShortcutOptions = [
-  { key: 'hr-my', label: '마이페이지', icon: StarIcon, route: '/hr/my' },
-  { key: 'hr-org', label: '내 조직 조회', icon: UsersIcon, route: '/hr/org' },
-  { key: 'hr-orgchart', label: '조직도', icon: TreeIcon, route: '/hr/orgchart' },
-  { key: 'attendance-my', label: '나의 근태', icon: ClockIcon, route: '/attendance/my' },
-  { key: 'attendance-record', label: '출퇴근 기록', icon: ListIcon, route: '/attendance/record' },
-  { key: 'attendance-history', label: '신청 내역 조회', icon: CheckIcon, route: '/attendance/history' },
-  { key: 'attendance-schedule', label: '근무 일정', icon: CalendarIcon, route: '/attendance/schedule' },
-  { key: 'salary-my', label: '급여 조회', icon: CreditCardIcon, route: '/salary/my' },
-  { key: 'approval-dashboard', label: '전자결재 대시보드', icon: DashboardIcon, route: '/approval' },
-  { key: 'approval-draft', label: '전자결재 기안', icon: PlusIcon, route: '/approval/draft' },
-  { key: 'approval-status', label: '전자결재 현황', icon: SearchIcon, route: '/approval/status' },
-  { key: 'approval-box', label: '전자결재 문서함', icon: FolderIcon, route: '/approval/box/all' },
+  { key: 'hr-my', label: '마이페이지', icon: StarIcon, route: '/hr/my', viewCodes: ['HR_MYPAGE'] },
+  { key: 'hr-org', label: '내 조직 조회', icon: UsersIcon, route: '/hr/org', viewCodes: ['HR_ORG'] },
+  { key: 'hr-orgchart', label: '조직도', icon: TreeIcon, route: '/hr/orgchart', viewCodes: ['HR_ORGCHART'] },
+  { key: 'attendance-my', label: '나의 근태', icon: ClockIcon, route: '/attendance/my', viewCodes: ['ATTENDANCE_MAIN'] },
+  {
+    key: 'attendance-record',
+    label: '출퇴근 기록',
+    icon: ListIcon,
+    route: '/attendance/record',
+    viewCodes: ['ATTENDANCE_RECORD'],
+  },
+  {
+    key: 'attendance-history',
+    label: '신청 내역 조회',
+    icon: CheckIcon,
+    route: '/attendance/history',
+    viewCodes: ['ATTENDANCE_HISTORY'],
+  },
+  {
+    key: 'attendance-schedule',
+    label: '근무 일정',
+    icon: CalendarIcon,
+    route: '/attendance/schedule',
+    viewCodes: ['ATTENDANCE_SCHEDULE'],
+  },
+  {
+    key: 'attendance-vacation',
+    label: '연차/휴가 현황',
+    icon: SunIcon,
+    route: '/attendance/vacation',
+    viewCodes: ['ATTENDANCE_VACATION'],
+  },
+  { key: 'salary-my', label: '급여 조회', icon: CreditCardIcon, route: '/salary/my', viewCodes: ['ADMIN_SALARY'] },
+  { key: 'approval-dashboard', label: '전자결재 대시보드', icon: DashboardIcon, route: '/approval', viewCodes: ['APPROVAL_MAIN'] },
+  { key: 'approval-draft', label: '전자결재 기안', icon: PlusIcon, route: '/approval/draft', viewCodes: ['APPROVAL_DRAFT'] },
+  { key: 'approval-status', label: '전자결재 현황', icon: SearchIcon, route: '/approval/status', viewCodes: ['APPROVAL_STATUS'] },
+  { key: 'approval-box', label: '전자결재 문서함', icon: FolderIcon, route: '/approval/box/all', viewCodes: ['APPROVAL_BOX'] },
 ]
 
 const adminOnlyShortcutOptions = [
-  { key: 'admin-main', label: '인사 정보 조회(관리자)', icon: DashboardIcon, route: '/admin/main' },
-  { key: 'admin-employees', label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees' },
-  { key: 'admin-hr-change', label: '인사변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change' },
-  { key: 'admin-attendance', label: '근태 관리(관리자)', icon: ClockIcon, route: '/admin/attendance' },
-  { key: 'admin-policies', label: '정책 관리', icon: ShieldIcon, route: '/admin/policies' },
-  { key: 'admin-notices', label: '공지사항 관리', icon: BellIcon, route: '/admin/notices' },
-  { key: 'admin-salary', label: '급여 관리(관리자)', icon: CreditCardIcon, route: '/admin/salary' },
+  { key: 'admin-main', label: '인사 정보 조회(관리자)', icon: DashboardIcon, route: '/admin/main', viewCodes: ['ADMIN_MAIN'] },
+  { key: 'admin-employees', label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees', viewCodes: ['ADMIN_EMPLOYEES'] },
+  { key: 'admin-hr-change', label: '인사변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change', viewCodes: ['ADMIN_HR_CHANGE'] },
+  { key: 'admin-attendance', label: '근태 관리(관리자)', icon: ClockIcon, route: '/admin/attendance', viewCodes: ['ADMIN_ATTENDANCE'] },
+  { key: 'admin-policies', label: '정책 관리', icon: ShieldIcon, route: '/admin/policies', viewCodes: ['ADMIN_POLICIES'] },
+  { key: 'admin-notices', label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
+  { key: 'admin-salary', label: '급여 관리(관리자)', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
 ]
 
-const shortcutOptionsByUser = computed(() => (
-  currentUserId.value === 'admin1234'
-    ? [...baseShortcutOptions, ...adminOnlyShortcutOptions]
-    : baseShortcutOptions
-))
+const shortcutOptionsByUser = computed(() =>
+  [...baseShortcutOptions, ...adminOnlyShortcutOptions].filter((item) =>
+    hasAnyAllowedViews(item.viewCodes),
+  ),
+)
 
-const defaultShortcutKeysByUser = computed(() => (
-  currentUserId.value === 'admin1234'
-    ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
-    : ['hr-my', 'hr-org', 'attendance-my']
-))
+const defaultShortcutKeysByUser = computed(() => [])
 
 const shortcuts = computed(() => {
   const selectedKeySet = new Set(selectedShortcutKeys.value)
@@ -637,62 +680,127 @@ watch(currentUserId, (userId) => {
 
 // --- 인사 모드 데이터 ---
 const hrMenus = [
-  { label: '마이페이지', icon: UserIcon, route: '/hr/my' },
-  { label: '내 조직 조회', icon: UsersIcon, route: '/hr/org' },
-  { label: '조직도', icon: TreeIcon, route: '/hr/orgchart' },
+  { label: '마이페이지', icon: UserIcon, route: '/hr/my', viewCodes: ['HR_MYPAGE'] },
+  { label: '내 조직 조회', icon: UsersIcon, route: '/hr/org', viewCodes: ['HR_ORG'] },
+  { label: '조직도', icon: TreeIcon, route: '/hr/orgchart', viewCodes: ['HR_ORGCHART'] },
 ]
+const filteredHrMenus = computed(() =>
+  hrMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
+)
 
 // --- 전자결재 모드 데이터 ---
 const userRank = computed(() => {
   const userId = sessionStorage.getItem(AUTH_KEYS.userId)
-  return ['admin1234'].includes(userId) ? 'manager' : 'user'
+  if (isAttendanceManager.value) return 'manager'
+  return userId ? 'user' : 'user'
 })
 
 // --- 근태 모드 데이터 ---
 const attendanceDashboardMenu = { label: '근태 대쉬보드', icon: DashboardIcon, route: '/attendance/my' }
 
 const myAttendanceMenus = [
-  { label: '출퇴근 기록', icon: CommuteIcon, route: '/attendance/record', className: 'sidebar-item--tight' },
-  { label: '신청 내역 조회', icon: CheckIcon, route: '/attendance/history' },
-  { label: '근무 일정', icon: CalendarIcon, route: '/attendance/schedule' },
-  { label: '연차/휴가 현황', icon: SunIcon, route: '/attendance/vacation' },
+  {
+    label: '출퇴근 기록',
+    icon: CommuteIcon,
+    route: '/attendance/record',
+    className: 'sidebar-item--tight',
+    viewCodes: ['ATTENDANCE_RECORD'],
+  },
+  { label: '신청 내역 조회', icon: CheckIcon, route: '/attendance/history', viewCodes: ['ATTENDANCE_HISTORY'] },
+  { label: '근무 일정', icon: CalendarIcon, route: '/attendance/schedule', viewCodes: ['ATTENDANCE_SCHEDULE'] },
+  { label: '연차/휴가 현황', icon: SunIcon, route: '/attendance/vacation', viewCodes: ['ATTENDANCE_VACATION'] },
 ]
 
 const teamAttendanceMenus = [
-  { label: '팀 일일 근태 현황', icon: UsersIcon, route: '/attendance/team' },
-  { label: '팀 근태 관리', icon: UsersIcon, route: '/attendance/manage' },
-  { label: '유연근무관리', icon: SlidersIcon, route: '/attendance/flexible' },
+  { label: '팀 일일 근태 현황', icon: UsersIcon, route: '/attendance/team', viewCodes: ['ATTENDANCE_TEAM'] },
+  { label: '팀 근태 관리', icon: UsersIcon, route: '/attendance/manage', viewCodes: ['ATTENDANCE_TEAM'] },
+  { label: '유연근무관리', icon: SlidersIcon, route: '/attendance/flexible', viewCodes: ['ATTENDANCE_TEAM'] },
 ]
 
+const filteredMyAttendanceMenus = computed(() =>
+  myAttendanceMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
+)
+const filteredTeamAttendanceMenus = computed(() =>
+  teamAttendanceMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
+)
+
 const attendanceMenus = computed(() => {
-  return isAttendanceManager.value ? [...myAttendanceMenus, ...teamAttendanceMenus] : myAttendanceMenus
+  return isAttendanceManager.value
+    ? [...filteredMyAttendanceMenus.value, ...filteredTeamAttendanceMenus.value]
+    : filteredMyAttendanceMenus.value
 })
 
 // --- 급여 모드 데이터 ---
 const salaryMenus = [
-  { label: '급여 조회', icon: CreditCardIcon, route: '/salary/my' },
+  { label: '급여 조회', icon: CreditCardIcon, route: '/salary/my', viewCodes: ['ADMIN_SALARY'] },
 ]
+const filteredSalaryMenus = computed(() =>
+  salaryMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
+)
 
 const approvalMenus = computed(() => {
   const topMenus = [
-    { label: '전자 결재 기안', icon: PlusIcon, route: '/approval/draft' },
-    { label: '전자 결재 현황', icon: SearchIcon, route: '/approval/status' },
-    { label: '전자 결재 검토', icon: CheckIcon, route: '/approval/review' }
+    { label: '전자 결재 기안', icon: PlusIcon, route: '/approval/draft', viewCodes: ['APPROVAL_DRAFT'] },
+    { label: '전자 결재 현황', icon: SearchIcon, route: '/approval/status', viewCodes: ['APPROVAL_STATUS'] },
+    { label: '전자 결재 검토', icon: CheckIcon, route: '/approval/review', viewCodes: ['APPROVAL_REVIEW'] },
   ]
 
-  const boxMenu = { label: '전자 결재 문서함', icon: FolderIcon, route: '/approval/box' }
+  const boxMenu = { label: '전자 결재 문서함', icon: FolderIcon, route: '/approval/box', viewCodes: ['APPROVAL_BOX'] }
   const boxSubMenus = [
-    { label: '전체 문서함', route: '/approval/box/all', routePrefix: '/approval/box/all', isSub: true },
-    { label: '수신 문서함', route: '/approval/box/received', routePrefix: '/approval/box/received', isSub: true },
-    { label: '보류/반려 문서함', route: '/approval/box/issue', routePrefix: '/approval/box/issue', isSub: true },
-    { label: '완료 문서함', route: '/approval/box/completed', routePrefix: '/approval/box/completed', isSub: true },
-    { label: '임시 보관함', route: '/approval/box/temp', routePrefix: '/approval/box/temp', isSub: true },
-    { label: '참조 문서함', route: '/approval/box/reference', routePrefix: '/approval/box/reference', isSub: true },
+    {
+      label: '전체 문서함',
+      route: '/approval/box/all',
+      routePrefix: '/approval/box/all',
+      isSub: true,
+      viewCodes: ['APPROVAL_BOX_LIST'],
+    },
+    {
+      label: '수신 문서함',
+      route: '/approval/box/received',
+      routePrefix: '/approval/box/received',
+      isSub: true,
+      viewCodes: ['APPROVAL_BOX_LIST'],
+    },
+    {
+      label: '보류/반려 문서함',
+      route: '/approval/box/issue',
+      routePrefix: '/approval/box/issue',
+      isSub: true,
+      viewCodes: ['APPROVAL_BOX_LIST'],
+    },
+    {
+      label: '완료 문서함',
+      route: '/approval/box/completed',
+      routePrefix: '/approval/box/completed',
+      isSub: true,
+      viewCodes: ['APPROVAL_BOX_LIST'],
+    },
+    {
+      label: '임시 보관함',
+      route: '/approval/box/temp',
+      routePrefix: '/approval/box/temp',
+      isSub: true,
+      viewCodes: ['APPROVAL_BOX_LIST'],
+    },
+    {
+      label: '참조 문서함',
+      route: '/approval/box/reference',
+      routePrefix: '/approval/box/reference',
+      isSub: true,
+      viewCodes: ['APPROVAL_BOX_LIST'],
+    },
   ]
 
-  return [...topMenus, boxMenu, ...boxSubMenus]
+  const visibleTopMenus = topMenus.filter((item) => hasAnyAllowedViews(item.viewCodes))
+  const visibleBoxMenu = hasAnyAllowedViews(boxMenu.viewCodes) ? [boxMenu] : []
+  const visibleBoxSubMenus = boxSubMenus.filter((item) => hasAnyAllowedViews(item.viewCodes))
+  return [...visibleTopMenus, ...visibleBoxMenu, ...visibleBoxSubMenus]
 })
-const approvalDashboardMenu = { label: '전자결재 대시보드', icon: DashboardIcon, route: '/approval' }
+const approvalDashboardMenu = computed(() =>
+  hasAnyAllowedViews(['APPROVAL_MAIN'])
+    ? { label: '전자결재 대시보드', icon: DashboardIcon, route: '/approval' }
+    : null,
+)
 const kmsCommonMenus = [
   { label: '통합 검색', icon: SearchIcon, route: '/kms/search' },
 ]
@@ -737,9 +845,9 @@ const isMenuActive = (item) => {
 }
 
 const handleNavigate = (route) => {
-  if (route) {
-    router.push(route)
-  }
+  if (!route) return
+  if (router.resolve(route).matched.length === 0) return
+  router.push(route)
 }
 </script>
 

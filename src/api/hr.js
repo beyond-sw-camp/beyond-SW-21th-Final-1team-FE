@@ -30,9 +30,31 @@ export const getMyOrganizationMembers = (page = 1, orgId) =>
     }),
   )
 export const getAdminEmployees = (params) => unwrap(api.get('/admin/employees', { params }))
+export const getAdminEmployeeTotalCount = () => unwrap(api.get('/admin/employees/total-count'))
+export const getAdminUpcomingHireCount = () => unwrap(api.get('/admin/employees/upcoming-hire-count'))
 export const getAdminEmployeeDetail = (employeeId) => unwrap(api.get(`/admin/employees/${employeeId}`))
+export const getAdminEmployeeOptions = () => unwrap(api.get('/admin/employees/options'))
+export const revealAdminEmployeeSensitiveField = (employeeId, payload) =>
+  unwrap(api.post(`/admin/employees/${employeeId}/sensitive/reveal`, payload))
 export const createAdminEmployee = (payload) => unwrap(api.post('/admin/employees', payload))
 export const getAdminHrChangeOptions = () => unwrap(api.get('/admin/hr-change/options'))
+export const getAdminHrChangeOrgTree = () => unwrap(api.get('/admin/hr-change/org-tree'))
+export const searchAdminHrChangeEmployees = (params) =>
+  unwrap(
+    api.get('/admin/hr-change/employees/search', {
+      params,
+    }),
+  )
+export const getAdminHrChangeCurrentInfo = (employeeId) =>
+  unwrap(api.get(`/admin/hr-change/employees/${employeeId}/current`))
+export const updateAdminHrChangeEmployee = (employeeId, payload) =>
+  unwrap(api.patch(`/admin/hr-change/employees/${employeeId}`, payload))
+export const getAdminHrChangeEvents = (params) =>
+  unwrap(
+    api.get('/admin/hr-change/events', {
+      params,
+    }),
+  )
 export const getAdminEmployeeSkillEvidence = (employeeId, skillId) =>
   unwrap(api.get(`/admin/employees/${employeeId}/skills/${skillId}/evidence`))
 export const getAdminEmployeeCareerEvidence = (employeeId, careerId) =>

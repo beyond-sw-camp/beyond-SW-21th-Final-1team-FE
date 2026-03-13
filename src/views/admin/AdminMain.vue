@@ -107,7 +107,6 @@
       <section class="detail-modal" v-if="selectedEmployee">
         <div class="card-head detail-head">
           <h3>{{ selectedEmployee.name }} 상세 정보</h3>
-          <span class="count">{{ isAdminViewer ? '민감정보 포함' : '민감정보 제외' }}</span>
         </div>
 
         <div class="detail-sections">
@@ -138,12 +137,30 @@
               <span>주민번호</span>
               <div class="sensitive-value">
                 <strong class="font-num">{{ selectedEmployeeSensitiveInfo.ssn }}</strong>
+                <button
+                  v-if="canRevealSensitive"
+                  type="button"
+                  class="reveal-btn"
+                  :disabled="sensitiveLoading.residentNumber"
+                  @click="toggleSensitiveValue('RESIDENT_NUMBER')"
+                >
+                  {{ sensitiveLoading.residentNumber ? '조회 중' : sensitiveButtonLabel('RESIDENT_NUMBER') }}
+                </button>
               </div>
             </div>
             <div class="detail-row detail-row-sensitive">
               <span>계좌번호</span>
               <div class="sensitive-value">
                 <strong class="font-num">{{ selectedEmployeeSensitiveInfo.bankAccount }}</strong>
+                <button
+                  v-if="canRevealSensitive"
+                  type="button"
+                  class="reveal-btn"
+                  :disabled="sensitiveLoading.accountNumber"
+                  @click="toggleSensitiveValue('ACCOUNT_NUMBER')"
+                >
+                  {{ sensitiveLoading.accountNumber ? '조회 중' : sensitiveButtonLabel('ACCOUNT_NUMBER') }}
+                </button>
               </div>
             </div>
             <div class="detail-row detail-row-sensitive">
@@ -227,6 +244,9 @@ import {
   getAdminEmployeeCareerEvidence,
   getAdminEmployeeDetail,
   getAdminEmployees,
+  getAdminEmployeeTotalCount,
+  getAdminUpcomingHireCount,
+  revealAdminEmployeeSensitiveField,
   getAdminEmployeeSkillEvidence,
   getOrganizationTree,
 } from '@/api/hr'
@@ -256,12 +276,21 @@ const filters = reactive({
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalElements = ref(0)
+const totalEmployeeCount = ref(0)
 const upcomingHireCount = ref(0)
 const allEmployees = ref([])
 const showDetailModal = ref(false)
 const selectedEmployee = ref(null)
 const orgOptions = ref([])
 const latestEmployeeListRequestId = ref(0)
+const sensitiveLoading = ref({
+  residentNumber: false,
+  accountNumber: false,
+})
+const revealedSensitive = ref({
+  residentNumber: null,
+  accountNumber: null,
+})
 
 const selectedEmployeeHistories = computed(() => selectedEmployee.value?.hrHistories || [])
 const isAdminViewer = computed(() => {
@@ -275,15 +304,35 @@ const isAdminViewer = computed(() => {
     roleCodes.includes('ROLE_HR_ADMIN_PAYROLL')
   )
 })
+const canRevealSensitive = computed(() => {
+  const roleCodes = JSON.parse(sessionStorage.getItem(AUTH_KEYS.roleCodes) || '[]')
+  return (
+    roleCodes.includes('HR_ADMIN_MASTER') ||
+    roleCodes.includes('ROLE_HR_ADMIN_MASTER') ||
+    roleCodes.includes('HR_ADMIN_PAYROLL') ||
+    roleCodes.includes('ROLE_HR_ADMIN_PAYROLL')
+  )
+})
 
 const selectedEmployeeSensitiveInfo = computed(() => {
   if (!selectedEmployee.value) return null
   return {
-    ssn: selectedEmployee.value.residentNumberMasked || '-',
-    bankAccount: selectedEmployee.value.accountNumberMasked || '-',
+    ssn: revealedSensitive.value.residentNumber || selectedEmployee.value.residentNumberMasked || '-',
+    bankAccount:
+      revealedSensitive.value.accountNumber || selectedEmployee.value.accountNumberMasked || '-',
     address: selectedEmployee.value.address || '-',
   }
 })
+
+const isSensitiveRevealed = (fieldType) => {
+  if (fieldType === 'RESIDENT_NUMBER') {
+    return !!revealedSensitive.value.residentNumber
+  }
+  return !!revealedSensitive.value.accountNumber
+}
+
+const sensitiveButtonLabel = (fieldType) =>
+  isSensitiveRevealed(fieldType) ? '숨기기' : '실조회'
 
 const pagedEmployees = computed(() =>
   allEmployees.value.map((row) => ({
@@ -301,7 +350,7 @@ const pagedEmployees = computed(() =>
 )
 
 const kpiCards = computed(() => [
-  { label: '전체 인원', value: `${totalElements.value}명`, note: '전 사원 목록 기준' },
+  { label: '전체 인원', value: `${totalEmployeeCount.value}명`, note: '전 사원 목록 기준' },
   { label: '신규 입사 예정', value: `${upcomingHireCount.value}명`, note: '입사일 기준' },
   { label: '최근 인사 변경', value: '-', note: '백엔드 미제공' },
 ])
@@ -328,17 +377,6 @@ const normalizeEmployeeStateText = (value) => {
   if (!text) return '-'
   if (text === '퇴사') return '사직'
   return text
-}
-
-const isFutureHireDate = (value) => {
-  if (!value) return false
-  const dateText = String(value).slice(0, 10)
-  const today = new Date()
-  const y = today.getFullYear()
-  const m = String(today.getMonth() + 1).padStart(2, '0')
-  const d = String(today.getDate()).padStart(2, '0')
-  const todayText = `${y}-${m}-${d}`
-  return dateText > todayText
 }
 
 const loadOrgOptions = async () => {
@@ -386,19 +424,19 @@ const loadEmployees = async (page = 1) => {
 
 const loadUpcomingHireCount = async () => {
   try {
-    const firstPage = await getAdminEmployees({ page: 1 })
-    const totalPageCount = Math.max(1, Number(firstPage?.totalPages || 1))
-    const allRows = [...(Array.isArray(firstPage?.content) ? firstPage.content : [])]
-
-    for (let page = 2; page <= totalPageCount; page += 1) {
-      const pageData = await getAdminEmployees({ page })
-      const pageRows = Array.isArray(pageData?.content) ? pageData.content : []
-      allRows.push(...pageRows)
-    }
-
-    upcomingHireCount.value = allRows.filter((row) => isFutureHireDate(row?.hireDate)).length
+    const count = await getAdminUpcomingHireCount()
+    upcomingHireCount.value = Number(count || 0)
   } catch (_error) {
     upcomingHireCount.value = 0
+  }
+}
+
+const loadTotalEmployeeCount = async () => {
+  try {
+    const count = await getAdminEmployeeTotalCount()
+    totalEmployeeCount.value = Number(count || 0)
+  } catch (_error) {
+    totalEmployeeCount.value = 0
   }
 }
 
@@ -425,9 +463,47 @@ const openDetail = async (employeeId) => {
         effectiveTo: normalizeDate(item?.effectiveTo),
       })),
     }
+    revealedSensitive.value = { residentNumber: null, accountNumber: null }
+    sensitiveLoading.value = { residentNumber: false, accountNumber: false }
     showDetailModal.value = true
   } catch (error) {
     alert(error?.response?.data?.error?.message || '사원 상세 조회에 실패했습니다.')
+  }
+}
+
+const toggleSensitiveValue = async (fieldType) => {
+  if (!canRevealSensitive.value || !selectedEmployee.value?.employeeId) return
+  if (isSensitiveRevealed(fieldType)) {
+    if (fieldType === 'RESIDENT_NUMBER') {
+      revealedSensitive.value.residentNumber = null
+    } else {
+      revealedSensitive.value.accountNumber = null
+    }
+    return
+  }
+
+  const reason = window.prompt('민감정보 조회 사유를 입력하세요.')
+  if (!reason || !reason.trim()) {
+    alert('조회 사유는 필수입니다.')
+    return
+  }
+
+  const targetKey = fieldType === 'RESIDENT_NUMBER' ? 'residentNumber' : 'accountNumber'
+  sensitiveLoading.value[targetKey] = true
+  try {
+    const data = await revealAdminEmployeeSensitiveField(selectedEmployee.value.employeeId, {
+      fieldType,
+      reason: reason.trim(),
+    })
+    if (targetKey === 'residentNumber') {
+      revealedSensitive.value.residentNumber = data?.value || '-'
+    } else {
+      revealedSensitive.value.accountNumber = data?.value || '-'
+    }
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '민감정보 조회에 실패했습니다.')
+  } finally {
+    sensitiveLoading.value[targetKey] = false
   }
 }
 
@@ -486,7 +562,7 @@ watch(currentPage, (nextPage, prevPage) => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadOrgOptions(), loadEmployees(1), loadUpcomingHireCount()])
+  await Promise.all([loadOrgOptions(), loadEmployees(1), loadTotalEmployeeCount(), loadUpcomingHireCount()])
 })
 </script>
 
