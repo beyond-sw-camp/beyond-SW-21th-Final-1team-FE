@@ -26,9 +26,6 @@
             </div>
             <div class="item-row bottom">
               <span class="change-value">{{ summarizeChanges(item.beforeChange, item.afterChange) }}</span>
-              <span class="status-tag done">
-                완료
-              </span>
             </div>
           </button>
 
@@ -90,6 +87,7 @@ import { getMyHrEventDetail, getMyHrEvents } from '@/api/hr'
 const selectedEventId = ref(null)
 const hrEvents = ref([])
 const selectedEvent = ref(null)
+const detailRequestSeq = ref(0)
 
 const employeeEvents = computed(() => hrEvents.value)
 const selectedEventDiffs = computed(() =>
@@ -108,12 +106,14 @@ watch(employeeEvents, (list) => {
 })
 
 watch(selectedEventId, async (id) => {
+  const requestSeq = ++detailRequestSeq.value
   if (!id) {
     selectedEvent.value = null
     return
   }
   try {
     const detail = await getMyHrEventDetail(id)
+    if (requestSeq !== detailRequestSeq.value) return
     selectedEvent.value = {
       ...detail,
       effectiveFrom: normalizeDate(detail?.effectiveFrom),
@@ -121,6 +121,7 @@ watch(selectedEventId, async (id) => {
       appliedAt: detail?.appliedAt ? String(detail.appliedAt).replace('T', ' ') : '-',
     }
   } catch (error) {
+    if (requestSeq !== detailRequestSeq.value) return
     selectedEvent.value = null
     alert(error?.response?.data?.error?.message || '인사 이력 상세 조회에 실패했습니다.')
   }
@@ -169,6 +170,10 @@ const parseChangeMap = (value) => {
 }
 
 const extractChangedFields = (beforeChange, afterChange) => {
+  const beforeRaw = String(beforeChange || '').trim()
+  const afterRaw = String(afterChange || '').trim()
+  if (!beforeRaw && !afterRaw) return []
+
   const beforeMap = parseChangeMap(beforeChange)
   const afterMap = parseChangeMap(afterChange)
   const keys = [...new Set([...Object.keys(beforeMap), ...Object.keys(afterMap)])]
@@ -182,6 +187,8 @@ const extractChangedFields = (beforeChange, afterChange) => {
     .filter((diff) => diff.before !== diff.after)
 
   if (diffs.length > 0) return diffs
+
+  if (!beforeRaw && !afterRaw) return []
 
   return [
     {

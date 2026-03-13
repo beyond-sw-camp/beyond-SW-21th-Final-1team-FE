@@ -124,6 +124,8 @@ const expandedNodes = ref({})
 const selectedNodeId = ref(null)
 const selectedMemberId = ref(null)
 const myOrgNodeId = ref(null)
+const isSearchIndexLoading = ref(false)
+const isSearchIndexReady = ref(false)
 
 const normalize = (value) => String(value || '').trim().toLowerCase()
 const isOpen = (nodeId) => Boolean(expandedNodes.value[nodeId])
@@ -192,6 +194,35 @@ const collectAllNodeIds = (node, acc = {}) => {
     collectAllNodeIds(child, acc)
   })
   return acc
+}
+
+const flattenNodeIds = (node, acc = []) => {
+  if (!node) return acc
+  acc.push(node.id)
+  ;(node.children || []).forEach((child) => flattenNodeIds(child, acc))
+  return acc
+}
+
+const ensureMembersLoadedForAll = async () => {
+  if (!orgRoot.value || isSearchIndexReady.value || isSearchIndexLoading.value) return
+
+  isSearchIndexLoading.value = true
+  try {
+    const allNodeIds = flattenNodeIds(orgRoot.value, [])
+    const pendingNodeIds = allNodeIds.filter(
+      (orgId) => !Object.prototype.hasOwnProperty.call(orgMembersMap.value, orgId)
+    )
+
+    const batchSize = 8
+    for (let i = 0; i < pendingNodeIds.length; i += batchSize) {
+      const batch = pendingNodeIds.slice(i, i + batchSize)
+      await Promise.all(batch.map((orgId) => ensureMembersLoaded(orgId)))
+    }
+
+    isSearchIndexReady.value = true
+  } finally {
+    isSearchIndexLoading.value = false
+  }
 }
 
 const findFirstNodeWithMembers = (node) => {
@@ -298,12 +329,13 @@ const resetToMyOrg = async () => {
 
 watch(
   () => normalize(searchKeyword.value),
-  (keyword) => {
+  async (keyword) => {
     if (keyword) {
-      expandedNodes.value = collectAllNodeIds(filteredRoot.value)
+      await ensureMembersLoadedForAll()
+      expandedNodes.value = collectAllNodeIds(filteredRoot.value || orgRoot.value)
       return
     }
-    resetToMyOrg()
+    await resetToMyOrg()
   },
   { immediate: true }
 )
@@ -340,7 +372,7 @@ const activeNode = computed(() => {
 const activeNodeName = computed(() => activeNode.value?.name || '')
 const activeMembers = computed(() => sortMembersByRule(activeNode.value?.members || []))
 
-const ensureMembersLoaded = async (orgId) => {
+async function ensureMembersLoaded(orgId) {
   if (!orgId || orgMembersMap.value[orgId] || loadingMembers.value[orgId]) return
   loadingMembers.value = { ...loadingMembers.value, [orgId]: true }
   try {

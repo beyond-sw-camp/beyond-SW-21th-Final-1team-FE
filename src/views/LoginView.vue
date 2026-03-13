@@ -148,7 +148,7 @@ const resetPwRules = computed(() => {
     { label: '8~15자', pass: value.length >= 8 && value.length <= 15 },
     { label: '영문 포함', pass: /[A-Za-z]/.test(value) },
     { label: '숫자 포함', pass: /\d/.test(value) },
-    { label: '특수문자 포함', pass: /[^A-Za-z0-9]/.test(value) },
+    { label: '특수문자 포함', pass: /[!@#$%^&*()\-_=+\[\]{}?]/.test(value) },
   ]
 })
 

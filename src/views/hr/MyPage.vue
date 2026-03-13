@@ -14,12 +14,12 @@
             class="avatar-image"
           />
           <span v-else class="avatar-text">{{ user.name.slice(-2) }}</span>
-          <span class="status-dot online"></span>
+          <span class="status-dot" :class="statusDotClass"></span>
         </div>
         <div class="profile-info">
           <div class="profile-name-row">
             <span class="profile-name">{{ user.name }}</span>
-            <span class="status-badge">{{ user.status || '-' }}</span>
+            <span class="status-badge" :class="statusBadgeClass">{{ user.status || '-' }}</span>
           </div>
           <div class="profile-dept">{{ user.team }} · {{ user.jobTitle }} · {{ user.position }}</div>
           <div class="profile-contacts">
@@ -70,6 +70,24 @@ const tabs = [
 ]
 
 const activeTabLabel = computed(() => tabs.find(t => t.key === activeTab.value)?.label)
+
+const normalizeStatus = (status) => String(status || '').trim().toUpperCase()
+
+const statusBadgeClass = computed(() => {
+  const status = normalizeStatus(user.value.status)
+  if (status === '재직'.toUpperCase() || status === 'WORK' || status === 'ONLINE') return 'ok'
+  if (status === '휴직'.toUpperCase() || status === 'LEAVE') return 'leave'
+  if (status === '퇴사'.toUpperCase() || status === 'RESIGN' || status === 'OFFLINE') return 'resigned'
+  return 'unknown'
+})
+
+const statusDotClass = computed(() => {
+  const status = normalizeStatus(user.value.status)
+  if (status === '재직'.toUpperCase() || status === 'WORK' || status === 'ONLINE') return 'ok'
+  if (status === '휴직'.toUpperCase() || status === 'LEAVE') return 'leave'
+  if (status === '퇴사'.toUpperCase() || status === 'RESIGN' || status === 'OFFLINE') return 'resigned'
+  return 'unknown'
+})
 
 const toSkillTypeLabel = (category) => {
   const map = {
@@ -183,11 +201,18 @@ onMounted(() => {
 .profile-avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#99F6E4,#0891B2);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
 .avatar-text{font-size:1.1rem;font-weight:700;color:#fff}
 .avatar-image{width:100%;height:100%;border-radius:50%;object-fit:cover;border:1px solid var(--gray200);background:#fff}
-.status-dot{position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;border:2.5px solid #fff}
-.status-dot.online{background:#22C55E}
+.status-dot{position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;border:2.5px solid #fff;background:#94A3B8}
+.status-dot.ok{background:#22C55E}
+.status-dot.leave{background:#3B82F6}
+.status-dot.resigned{background:#EF4444}
+.status-dot.unknown{background:#94A3B8}
 .profile-name-row{display:flex;align-items:center;gap:8px}
 .profile-name{font-size:1.2rem;font-weight:700;color:var(--gray800)}
-.status-badge{font-size:.7rem;font-weight:600;padding:3px 10px;border-radius:20px;background:#ECFDF5;color:#059669}
+.status-badge{font-size:.7rem;font-weight:600;padding:3px 10px;border-radius:20px;background:#F1F5F9;color:#475569}
+.status-badge.ok{background:#ECFDF5;color:#059669}
+.status-badge.leave{background:#EFF6FF;color:#2563EB}
+.status-badge.resigned{background:#FEF2F2;color:#DC2626}
+.status-badge.unknown{background:#F1F5F9;color:#475569}
 .profile-dept{font-size:.85rem;color:var(--gray500);margin:2px 0 8px}
 .profile-contacts{display:flex;gap:16px;flex-wrap:wrap}
 .profile-contacts span{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--gray500)}

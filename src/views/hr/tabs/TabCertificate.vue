@@ -49,10 +49,18 @@
               <td class="cell-strong">{{ record.certificateName }}</td>
               <td class="font-num">{{ record.issuedDate }}</td>
               <td>
-                <span class="status-badge">{{ record.statusName || statusText(record.status) }}</span>
+                <span class="status-badge" :class="statusClass(record.status)">
+                  {{ record.statusName || statusText(record.status) }}
+                </span>
               </td>
               <td class="col-download">
-                <button class="download-btn" type="button" @click="downloadCertificate(record)" aria-label="다운로드">
+                <button
+                  class="download-btn"
+                  type="button"
+                  :disabled="!isIssued(record.status)"
+                  @click="isIssued(record.status) && downloadCertificate(record)"
+                  aria-label="다운로드"
+                >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
@@ -172,9 +180,11 @@ const loadIssueHistory = async () => {
       status: row.status,
       statusName: row.statusName,
     }))
+    return true
   } catch (error) {
     issueHistory.value = []
     alert(error?.response?.data?.error?.message || '증명서 발급 이력 조회에 실패했습니다.')
+    return false
   }
 }
 
@@ -189,7 +199,8 @@ const issueCertificate = async () => {
       submitTo: issueForm.submitTo.trim(),
       purpose: issueForm.purpose.trim(),
     })
-    await loadIssueHistory()
+    const refreshed = await loadIssueHistory()
+    if (!refreshed) return
     showIssueModal.value = false
     resetIssueForm()
     alert('증명서 발급이 완료되었습니다.')
@@ -204,6 +215,14 @@ const statusText = (status) => {
   if (status === 'ISSUED') return '발급 완료'
   if (status === 'FAILED') return '발급 실패'
   return '처리중'
+}
+
+const isIssued = (status) => status === 'ISSUED'
+
+const statusClass = (status) => {
+  if (status === 'ISSUED') return 'is-issued'
+  if (status === 'FAILED') return 'is-failed'
+  return 'is-pending'
 }
 
 const downloadCertificate = async (record) => {
@@ -363,11 +382,15 @@ onMounted(async () => {
   align-items: center;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #DCFCE7;
-  color: #16A34A;
+  background: #F1F5F9;
+  color: #475569;
   font-size: .75rem;
   font-weight: 700;
 }
+
+.status-badge.is-issued { background: #DCFCE7; color: #16A34A; }
+.status-badge.is-failed { background: #FEE2E2; color: #DC2626; }
+.status-badge.is-pending { background: #FEF3C7; color: #B45309; }
 
 .download-btn {
   border: none;
@@ -378,6 +401,10 @@ onMounted(async () => {
 }
 
 .download-btn:hover { color: #0284C7; }
+.download-btn:disabled {
+  color: #94A3B8;
+  cursor: not-allowed;
+}
 
 .empty-history-row {
   text-align: center;

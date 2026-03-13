@@ -72,7 +72,7 @@
                 <span v-else class="muted">미등록</span>
               </td>
               <td>
-                <button type="button" class="link-btn danger" @click="deleteSkill(i)">삭제</button>
+                <button type="button" class="link-btn danger" :disabled="isSubmitting" @click="deleteSkill(i)">삭제</button>
               </td>
             </tr>
             </tbody>
@@ -107,7 +107,7 @@
                 <span v-else class="muted">미등록</span>
               </td>
               <td>
-                <button type="button" class="link-btn danger" @click="deleteCareer(i)">삭제</button>
+                <button type="button" class="link-btn danger" :disabled="isSubmitting" @click="deleteCareer(i)">삭제</button>
               </td>
             </tr>
             <tr v-if="!user.careers || user.careers.length === 0">
@@ -134,7 +134,7 @@
             <input
               ref="profileFileInputRef"
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/webp"
               style="display:none"
               @change="handleProfileImageSelect"
             />
@@ -154,7 +154,7 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn-confirm" @click="saveBasicInfo">확인</button>
+        <button class="btn-confirm" :disabled="isSubmitting" @click="saveBasicInfo">확인</button>
         <button class="btn-cancel" @click="showEditBasic = false">취소</button>
       </div>
     </BaseModal>
@@ -194,12 +194,18 @@
             <span v-if="!skillForm.file">파일 선택</span>
             <span v-else>{{ skillForm.file.name }}</span>
           </div>
-          <input ref="fileInputRef" type="file" accept="image/*,.pdf" style="display:none" @change="handleFileSelect" />
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            style="display:none"
+            @change="handleFileSelect"
+          />
           <span v-if="skillFileError" class="field-error">{{ skillFileError }}</span>
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn-confirm" :disabled="!canAddSkill" @click="addSkill">확인</button>
+        <button class="btn-confirm" :disabled="isSubmitting || !canAddSkill" @click="addSkill">확인</button>
         <button class="btn-cancel" @click="showAddSkill = false">취소</button>
       </div>
     </BaseModal>
@@ -236,12 +242,18 @@
             <span v-if="!careerForm.file">파일 선택</span>
             <span v-else>{{ careerForm.file.name }}</span>
           </div>
-          <input ref="careerFileInputRef" type="file" accept="image/*,.pdf" style="display:none" @change="handleCareerFileSelect" />
+          <input
+            ref="careerFileInputRef"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            style="display:none"
+            @change="handleCareerFileSelect"
+          />
           <span v-if="careerFileError" class="field-error">{{ careerFileError }}</span>
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn-confirm" :disabled="!canAddCareer" @click="addCareer">확인</button>
+        <button class="btn-confirm" :disabled="isSubmitting || !canAddCareer" @click="addCareer">확인</button>
         <button class="btn-cancel" @click="showAddCareer = false">취소</button>
       </div>
     </BaseModal>
@@ -277,7 +289,7 @@
         <div v-if="pwSuccess" class="success-box">비밀번호가 성공적으로 변경되었습니다.</div>
       </div>
       <div class="modal-actions">
-        <button class="btn-confirm" :disabled="!pwForm.current || !canChangePw" @click="changePassword">비밀번호 변경</button>
+        <button class="btn-confirm" :disabled="isSubmitting || !pwForm.current || !canChangePw" @click="changePassword">비밀번호 변경</button>
         <button class="btn-cancel" @click="closePwModal">취소</button>
       </div>
     </BaseModal>
@@ -328,9 +340,39 @@ watch(showEditBasic, (val) => {
 
 const triggerProfileFileInput = () => profileFileInputRef.value?.click()
 
+const ALLOWED_EVIDENCE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'application/pdf',
+])
+const ALLOWED_EVIDENCE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.pdf']
+
+const isAllowedEvidenceFile = (file) => {
+  if (!file) return false
+  const fileType = String(file.type || '').toLowerCase()
+  if (ALLOWED_EVIDENCE_MIME_TYPES.has(fileType)) return true
+
+  const fileName = String(file.name || '').toLowerCase()
+  return ALLOWED_EVIDENCE_EXTENSIONS.some((ext) => fileName.endsWith(ext))
+}
+
+const isAllowedProfileImageFile = (file) => {
+  if (!file) return false
+  const fileType = String(file.type || '').toLowerCase()
+  if (fileType === 'image/png' || fileType === 'image/jpeg' || fileType === 'image/webp') {
+    return true
+  }
+  const fileName = String(file.name || '').toLowerCase()
+  return ['.png', '.jpg', '.jpeg', '.webp'].some((ext) => fileName.endsWith(ext))
+}
+
 const handleProfileImageSelect = (e) => {
   const file = e.target.files?.[0]
-  if (!file || !String(file.type).startsWith('image/')) return
+  if (!file || !isAllowedProfileImageFile(file)) {
+    e.target.value = ''
+    return
+  }
 
   editForm.profileImageFile = file
   const reader = new FileReader()
@@ -342,6 +384,7 @@ const handleProfileImageSelect = (e) => {
 }
 
 const saveBasicInfo = async () => {
+  if (isSubmitting.value) return
   try {
     isSubmitting.value = true
     await updateBasicInfo({
@@ -388,11 +431,9 @@ const handleFileSelect = (e) => {
     skillForm.file = null
     return
   }
-  const validType =
-    String(file.type).startsWith('image/') || String(file.type).includes('pdf')
-  if (!validType) {
+  if (!isAllowedEvidenceFile(file)) {
     skillForm.file = null
-    skillFileError.value = '이미지 또는 PDF 파일만 업로드할 수 있습니다.'
+    skillFileError.value = 'PNG/JPG/JPEG/WEBP/PDF 파일만 업로드할 수 있습니다.'
     e.target.value = ''
     return
   }
@@ -401,6 +442,7 @@ const handleFileSelect = (e) => {
 }
 
 const addSkill = async () => {
+  if (isSubmitting.value) return
   if (!skillForm.name || !skillForm.date) return
   if (!skillForm.file) {
     skillFileError.value = '증빙 파일을 첨부해야 등록할 수 있습니다.'
@@ -447,6 +489,7 @@ const viewSkillFile = async (skill) => {
 }
 
 const deleteSkill = async (index) => {
+  if (isSubmitting.value) return
   const current = Array.isArray(props.user.skills) ? props.user.skills : []
   const target = current[index]
   if (!target?.skillId) return
@@ -492,11 +535,9 @@ const handleCareerFileSelect = (e) => {
     careerForm.file = null
     return
   }
-  const validType =
-    String(file.type).startsWith('image/') || String(file.type).includes('pdf')
-  if (!validType) {
+  if (!isAllowedEvidenceFile(file)) {
     careerForm.file = null
-    careerFileError.value = '이미지 또는 PDF 파일만 업로드할 수 있습니다.'
+    careerFileError.value = 'PNG/JPG/JPEG/WEBP/PDF 파일만 업로드할 수 있습니다.'
     e.target.value = ''
     return
   }
@@ -505,6 +546,7 @@ const handleCareerFileSelect = (e) => {
 }
 
 const addCareer = async () => {
+  if (isSubmitting.value) return
   if (!careerForm.company || !careerForm.role || !careerForm.startDate) return
   if (!careerForm.file) {
     careerFileError.value = '증빙 파일을 첨부해야 등록할 수 있습니다.'
@@ -551,6 +593,7 @@ const viewCareerFile = async (career) => {
 }
 
 const deleteCareer = async (index) => {
+  if (isSubmitting.value) return
   const current = Array.isArray(props.user.careers) ? props.user.careers : []
   const target = current[index]
   if (!target?.careerId) return
@@ -601,6 +644,7 @@ const validateConfirmPw = () => {
 }
 
 const changePassword = async () => {
+  if (isSubmitting.value) return
   pwErrors.current = ''
   if (!canChangePw.value) return
 
@@ -677,6 +721,7 @@ const closePwModal = () => { showChangePw.value = false }
 }
 .link-btn:hover{text-decoration:underline}
 .link-btn.danger{color:#DC2626}
+.link-btn:disabled{opacity:.5;cursor:not-allowed;text-decoration:none}
 .muted{font-size:.78rem;color:var(--gray400)}
 
 /* Career Table */
