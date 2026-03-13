@@ -94,10 +94,6 @@
         </div>
 
         <p class="helper">변경 시 변경 전 정보와 적용일이 인사기록에 자동 저장됩니다.</p>
-        <p v-if="changedFieldCount > 1" class="helper warning">
-          한 번에 하나의 인사 항목만 변경할 수 있습니다.
-        </p>
-
         <div class="action-row">
           <button class="btn-ghost" type="button" @click="resetEditForm">초기화</button>
           <button class="btn-primary" type="button" :disabled="isApplying || !canApplyChanges" @click="applyHrChanges">
@@ -339,7 +335,6 @@ const canApplyChanges = computed(() => {
   if (!selectedEmployeeId.value) return false
   if (!editForm.effectiveFrom) return false
   if (!hasAnyChange.value) return false
-  if (changedFieldCount.value !== 1) return false
   if (!editForm.reason?.trim()) return false
   return true
 })

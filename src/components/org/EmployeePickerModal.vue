@@ -210,15 +210,23 @@ const visibleRows = computed(() => {
 })
 
 const loadOrgTree = async () => {
-  const raw = await getAdminHrChangeOrgTree()
-  const rootCandidate = Array.isArray(raw) ? buildTreeFromFlat(raw) : normalizeTreeNode(raw)
-  orgRoot.value = rootCandidate || null
-  if (rootCandidate?.id != null) {
-    expandedNodes.value = { [rootCandidate.id]: true }
-    selectedOrgId.value = resolveDefaultSelectableOrgId(rootCandidate)
-  } else {
+  try {
+    const raw = await getAdminHrChangeOrgTree()
+    const rootCandidate = Array.isArray(raw) ? buildTreeFromFlat(raw) : normalizeTreeNode(raw)
+    orgRoot.value = rootCandidate || null
+    if (rootCandidate?.id != null) {
+      expandedNodes.value = { [rootCandidate.id]: true }
+      selectedOrgId.value = resolveDefaultSelectableOrgId(rootCandidate)
+    } else {
+      expandedNodes.value = {}
+      selectedOrgId.value = null
+    }
+  } catch (error) {
+    console.error('조직도 로딩 실패:', error)
+    orgRoot.value = null
     expandedNodes.value = {}
     selectedOrgId.value = null
+    alert(error?.response?.data?.error?.message || '조직도 조회에 실패했습니다.')
   }
 }
 
