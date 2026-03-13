@@ -16,23 +16,21 @@
         </label>
         <label>
           조직
-          <select v-model="filters.team">
+          <select v-model="filters.orgId">
             <option value="">전체</option>
-            <option v-for="item in teamOptions" :key="item" :value="item">{{ item }}</option>
+            <option v-for="item in orgOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
           </select>
         </label>
         <label>
-          직급
-          <select v-model="filters.duty">
-            <option value="">전체</option>
-            <option v-for="item in dutyOptions" :key="item" :value="item">{{ item }}</option>
+          근무 형태
+          <select v-model="filters.employType">
+            <option v-for="item in EMPLOY_TYPE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
           </select>
         </label>
         <label>
           재직 상태
-          <select v-model="filters.employmentStatus">
-            <option value="">전체</option>
-            <option v-for="item in employmentStatusOptions" :key="item" :value="item">{{ item }}</option>
+          <select v-model="filters.employeeState">
+            <option v-for="item in EMPLOYEE_STATE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
           </select>
         </label>
         <div class="filter-actions">
@@ -44,11 +42,21 @@
     <section class="card">
       <div class="card-head">
         <h3>사원 목록</h3>
-        <span class="count">총 {{ filteredEmployees.length }}명</span>
+        <span class="count">총 {{ totalElements }}명</span>
       </div>
 
       <div class="table-wrap">
         <table class="list-table">
+          <colgroup>
+            <col class="col-empno" />
+            <col class="col-name" />
+            <col class="col-org" />
+            <col class="col-role" />
+            <col class="col-state" />
+            <col class="col-date" />
+            <col class="col-type" />
+            <col class="col-area" />
+          </colgroup>
           <thead>
             <tr>
               <th>사번</th>
@@ -68,10 +76,10 @@
               class="row-click"
               @click="openDetail(item.employeeId)"
             >
-              <td class="font-num">{{ item.employeeId }}</td>
+              <td class="font-num">{{ item.employeeNum }}</td>
               <td>{{ item.name }}</td>
-              <td>{{ item.position }}</td>
-              <td>{{ item.duty }} · {{ item.job }} · {{ item.position }}</td>
+              <td>{{ item.orgName }}</td>
+              <td>{{ item.duty }} · {{ item.job }} · {{ item.rank }}</td>
               <td>
                 <span class="status-badge" :class="statusClass(item.normalizedEmploymentStatus)">
                   {{ item.normalizedEmploymentStatus }}
@@ -105,21 +113,23 @@
         <div class="detail-sections">
           <article class="sub-card">
             <h4>기본 정보</h4>
+            <div class="detail-row"><span>사번</span><strong>{{ selectedEmployee.employeeNum || '-' }}</strong></div>
             <div class="detail-row"><span>이름</span><strong>{{ selectedEmployee.name }}</strong></div>
             <div class="detail-row"><span>이메일</span><strong>{{ selectedEmployee.email }}</strong></div>
             <div class="detail-row"><span>연락처</span><strong>{{ selectedEmployee.phone }}</strong></div>
-            <div class="detail-row"><span>내선번호</span><strong>{{ selectedEmployee.extension }}</strong></div>
-            <div class="detail-row"><span>생년월일</span><strong>{{ selectedEmployee.personalInfo?.birthDate || '-' }}</strong></div>
+            <div class="detail-row"><span>내선번호</span><strong>{{ selectedEmployee.extensionNum || '-' }}</strong></div>
+            <div class="detail-row"><span>생년월일</span><strong>{{ selectedEmployee.birthDate || '-' }}</strong></div>
           </article>
 
           <article class="sub-card">
             <h4>인사 정보</h4>
-            <div class="detail-row"><span>조직</span><strong>{{ selectedEmployee.organizationText }}</strong></div>
-            <div class="detail-row"><span>직책/직무/직급</span><strong>{{ selectedEmployee.duty }} · {{ selectedEmployee.job }} · {{ selectedEmployee.position }}</strong></div>
-            <div class="detail-row"><span>재직 상태</span><strong>{{ selectedEmployee.normalizedEmploymentStatus }}</strong></div>
+            <div class="detail-row"><span>조직</span><strong>{{ selectedEmployee.orgName || '-' }}</strong></div>
+            <div class="detail-row"><span>직책/직무/직급</span><strong>{{ selectedEmployee.positionName || '-' }} · {{ selectedEmployee.jobName || '-' }} · {{ selectedEmployee.rankName || '-' }}</strong></div>
+            <div class="detail-row"><span>재직 상태</span><strong>{{ selectedEmployee.employeeStateDescription || '-' }}</strong></div>
             <div class="detail-row"><span>입사일</span><strong>{{ selectedEmployee.hireDate }}</strong></div>
-            <div class="detail-row"><span>근무 형태</span><strong>{{ selectedEmployee.workType }}</strong></div>
-            <div class="detail-row"><span>근무 지역</span><strong>{{ selectedEmployee.workRegion }}</strong></div>
+            <div class="detail-row"><span>입사 유형</span><strong>{{ selectedEmployee.recruitTypeDescription || '-' }}</strong></div>
+            <div class="detail-row"><span>근무 형태</span><strong>{{ selectedEmployee.employTypeDescription || '-' }}</strong></div>
+            <div class="detail-row"><span>근무 지역</span><strong>{{ selectedEmployee.areaName || '-' }}</strong></div>
           </article>
 
           <article class="sub-card" v-if="isAdminViewer && selectedEmployeeSensitiveInfo">
@@ -127,28 +137,25 @@
             <div class="detail-row detail-row-sensitive">
               <span>주민번호</span>
               <div class="sensitive-value">
-                <strong class="font-num">{{ sensitiveVisible.ssn ? selectedEmployeeSensitiveInfo.ssn : maskSsn(selectedEmployeeSensitiveInfo.ssn) }}</strong>
-                <button type="button" class="reveal-btn" @click="toggleSensitive('ssn')">
-                  {{ sensitiveVisible.ssn ? '숨기기' : '보기' }}
-                </button>
+                <strong class="font-num">{{ selectedEmployeeSensitiveInfo.ssn }}</strong>
               </div>
             </div>
             <div class="detail-row detail-row-sensitive">
               <span>계좌번호</span>
               <div class="sensitive-value">
-                <strong class="font-num">{{ sensitiveVisible.bankAccount ? selectedEmployeeSensitiveInfo.bankAccount : maskBankAccount(selectedEmployeeSensitiveInfo.bankAccount) }}</strong>
-                <button type="button" class="reveal-btn" @click="toggleSensitive('bankAccount')">
-                  {{ sensitiveVisible.bankAccount ? '숨기기' : '보기' }}
-                </button>
+                <strong class="font-num">{{ selectedEmployeeSensitiveInfo.bankAccount }}</strong>
+              </div>
+            </div>
+            <div class="detail-row detail-row-sensitive">
+              <span>은행명</span>
+              <div class="sensitive-value">
+                <strong>{{ selectedEmployee.bankName || '-' }}</strong>
               </div>
             </div>
             <div class="detail-row detail-row-sensitive">
               <span>주소</span>
               <div class="sensitive-value">
-                <strong>{{ sensitiveVisible.address ? selectedEmployeeSensitiveInfo.address : maskAddress(selectedEmployeeSensitiveInfo.address) }}</strong>
-                <button type="button" class="reveal-btn" @click="toggleSensitive('address')">
-                  {{ sensitiveVisible.address ? '숨기기' : '보기' }}
-                </button>
+                <strong>{{ selectedEmployeeSensitiveInfo.address }}</strong>
               </div>
             </div>
           </article>
@@ -157,8 +164,8 @@
             <h4>역량 정보</h4>
             <div class="scroll-list" v-if="selectedEmployee.skills?.length">
               <div class="chip-item" v-for="(skill, idx) in selectedEmployee.skills" :key="`${selectedEmployee.employeeId}-skill-${idx}`">
-                <strong>{{ skill.name }}</strong>
-                <span>{{ skill.type }} · {{ skill.issuer }} · {{ skill.date }}</span>
+                <strong>{{ skill.skillName }}</strong>
+                <span>{{ skill.category || '-' }} · {{ skill.acquisitionDate || '-' }} · {{ skill.licenseNumber || '-' }}</span>
                 <div class="item-actions">
                   <button type="button" class="link-btn" @click="openSkillEvidence(skill)">증빙 조회</button>
                 </div>
@@ -171,9 +178,9 @@
             <h4>경력 정보</h4>
             <div class="scroll-list" v-if="selectedEmployee.careers?.length">
               <div class="chip-item" v-for="(career, idx) in selectedEmployee.careers" :key="`${selectedEmployee.employeeId}-career-${idx}`">
-                <strong>{{ career.company }}</strong>
-                <span>{{ career.role }}</span>
-                <span class="font-num">{{ career.period }}</span>
+                <strong>{{ career.companyName }}</strong>
+                <span>{{ career.orgName || '-' }}</span>
+                <span class="font-num">{{ career.startDate || '-' }} ~ {{ career.endDate || '현재' }}</span>
                 <div class="item-actions">
                   <button type="button" class="link-btn" @click="openCareerEvidence(career)">증빙 조회</button>
                 </div>
@@ -188,17 +195,17 @@
               <div
                 class="history-item"
                 v-for="history in selectedEmployeeHistories"
-                :key="history.hr_event_id"
+                :key="history.hrEventId"
               >
                 <div class="history-top">
-                  <span class="history-type">{{ history.event_type }}</span>
-                  <strong>{{ history.event_title }}</strong>
+                  <span class="history-type">{{ history.eventTypeDescription || history.eventType }}</span>
+                  <strong>{{ history.eventTitle }}</strong>
                 </div>
                 <div class="history-meta">
-                  <span>적용일: {{ history.effective_from }}</span>
-                  <span>상태: {{ historyStatusText(history.event_status) }}</span>
+                  <span>적용일: {{ history.effectiveFrom }}</span>
+                  <span>상태: {{ history.eventStatusDescription || historyStatusText(history.eventStatus) }}</span>
                 </div>
-                <p class="history-change">{{ history.before_value }} → {{ history.after_value }}</p>
+                <p class="history-change">{{ history.beforeChange || '-' }} → {{ history.afterChange || '-' }}</p>
               </div>
             </div>
             <p v-else class="empty-text">등록된 인사 히스토리가 없습니다.</p>
@@ -214,198 +221,190 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
-import { createHrOrgTreeMock } from '@/mocks/hr/organization'
-import { createHrEventsMock } from '@/mocks/hr/hrEvents'
+import {
+  getAdminEmployeeCareerEvidence,
+  getAdminEmployeeDetail,
+  getAdminEmployees,
+  getAdminEmployeeSkillEvidence,
+  getOrganizationTree,
+} from '@/api/hr'
 import { AUTH_KEYS, USER_ROLES } from '@/utils/auth'
 
-const PAGE_SIZE = 10
-const orgRoot = ref(createHrOrgTreeMock())
-const hrEvents = ref(createHrEventsMock())
+const EMPLOYEE_STATE_OPTIONS = [
+  { value: '', label: '전체' },
+  { value: 'WORK', label: '재직' },
+  { value: 'LEAVE', label: '휴직' },
+  { value: 'RESIGN', label: '사직' },
+]
 
-const upcomingHirePlans = ref([
-  { id: 'P-1', name: '신규 입사 예정자 A', plannedDate: '2026.03.04' },
-  { id: 'P-2', name: '신규 입사 예정자 B', plannedDate: '2026.03.11' }
-])
-
-const normalizeEmploymentStatus = (rawStatus) => {
-  const text = String(rawStatus || '')
-  if (!text) return '재직'
-  if (text.includes('휴직') || text.includes('휴가') || text.includes('연차')) return '휴직'
-  if (text.includes('퇴직') || text.includes('퇴사') || text.includes('사직')) return '퇴사'
-  return '재직'
-}
-
-const collectMembers = (node, trail = []) => {
-  if (!node) return []
-
-  const nextTrail = [...trail, node.name]
-  const ownMembers = (node.members || []).map((member) => {
-    const organizationText = member.hrInfo?.organization || nextTrail.join(' · ')
-    const workType = member.hrInfo?.workType || '정규직'
-    const workRegion = member.hrInfo?.workRegion || member.workLocation || '서울 강남'
-    const rawEmploymentStatus = member.hrInfo?.employmentStatus || member.status || '재직'
-    return {
-      ...member,
-      organization: organizationText,
-      organizationText,
-      workType,
-      workRegion,
-      rawEmploymentStatus,
-      normalizedEmploymentStatus: normalizeEmploymentStatus(rawEmploymentStatus)
-    }
-  })
-
-  const childrenMembers = (node.children || []).flatMap((child) => collectMembers(child, nextTrail))
-  return [...ownMembers, ...childrenMembers]
-}
-
-const allEmployees = ref(collectMembers(orgRoot.value))
-
-const teamOptions = computed(() => [...new Set(allEmployees.value.map((item) => item.organization))])
-const dutyOptions = computed(() => [...new Set(allEmployees.value.map((item) => item.duty))])
-const employmentStatusOptions = ['재직', '휴직', '퇴사']
+const EMPLOY_TYPE_OPTIONS = [
+  { value: '', label: '전체' },
+  { value: 'REGULAR', label: '정규직' },
+  { value: 'NON_REGULAR', label: '비정규직' },
+  { value: 'CONTRACT', label: '계약직' },
+]
 
 const filters = reactive({
   keyword: '',
-  team: '',
-  duty: '',
-  employmentStatus: ''
+  orgId: '',
+  employType: '',
+  employeeState: '',
 })
 
 const currentPage = ref(1)
-const selectedEmployeeId = ref('')
+const totalPages = ref(1)
+const totalElements = ref(0)
+const allEmployees = ref([])
 const showDetailModal = ref(false)
-const sensitiveVisible = reactive({
-  ssn: false,
-  bankAccount: false,
-  address: false
-})
+const selectedEmployee = ref(null)
+const orgOptions = ref([])
+const latestEmployeeListRequestId = ref(0)
 
-const filteredEmployees = computed(() => {
-  const keyword = filters.keyword.trim().toLowerCase()
-  return allEmployees.value.filter((item) => {
-    const matchKeyword =
-      !keyword ||
-      String(item.name).toLowerCase().includes(keyword) ||
-      String(item.employeeId).includes(keyword)
-    const matchTeam = !filters.team || item.position === filters.team
-    const matchDuty = !filters.duty || item.duty === filters.duty
-    const matchStatus = !filters.employmentStatus || item.normalizedEmploymentStatus === filters.employmentStatus
-    return matchKeyword && matchTeam && matchDuty && matchStatus
-  })
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredEmployees.value.length / PAGE_SIZE)))
-const pagedEmployees = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return filteredEmployees.value.slice(start, start + PAGE_SIZE)
-})
-
-const selectedEmployee = computed(() => {
-  if (!selectedEmployeeId.value) return null
-  return allEmployees.value.find((item) => item.employeeId === selectedEmployeeId.value) || null
-})
+const selectedEmployeeHistories = computed(() => selectedEmployee.value?.hrHistories || [])
 const isAdminViewer = computed(() => {
   const role = sessionStorage.getItem(AUTH_KEYS.role) || USER_ROLES.user
-  const userId = sessionStorage.getItem(AUTH_KEYS.userId) || ''
-  return role === USER_ROLES.admin || userId === 'admin1234'
+  const roleCodes = JSON.parse(sessionStorage.getItem(AUTH_KEYS.roleCodes) || '[]')
+  return (
+    role === USER_ROLES.admin ||
+    roleCodes.includes('HR_ADMIN_MASTER') ||
+    roleCodes.includes('HR_ADMIN_PAYROLL') ||
+    roleCodes.includes('ROLE_HR_ADMIN_MASTER') ||
+    roleCodes.includes('ROLE_HR_ADMIN_PAYROLL')
+  )
 })
+
 const selectedEmployeeSensitiveInfo = computed(() => {
-  const emp = selectedEmployee.value
-  if (!emp) return null
-
-  const personal = emp.personalInfo || {}
-  const idTail = String(emp.employeeId || '').slice(-4) || '0000'
-  const idDigits = idTail.replace(/\D/g, '').padStart(4, '0')
-  const backSuffix = `${idDigits}${String((Number(idDigits) % 9) + 1)}${String((Number(idDigits) % 7) + 2)}`
-  const fallback = {
-    ssn: `950328-1${backSuffix}`,
-    bankAccount: `신한 110-${idDigits}-${
-      String((Number(idDigits) * 13) % 1000000).padStart(6, '0')
-    }`,
-    address: `서울시 강남구 테헤란로 ${Number(idTail) % 500 || 127}`
-  }
-
+  if (!selectedEmployee.value) return null
   return {
-    ssn: personal.ssn || fallback.ssn,
-    bankAccount: personal.bankAccount || fallback.bankAccount,
-    address: personal.address || fallback.address
+    ssn: selectedEmployee.value.residentNumberMasked || '-',
+    bankAccount: selectedEmployee.value.accountNumberMasked || '-',
+    address: selectedEmployee.value.address || '-',
   }
 })
-const selectedEmployeeHistories = computed(() => {
-  if (!selectedEmployee.value?.employeeId) return []
-  return hrEvents.value
-    .filter((item) => item.employee_id === selectedEmployee.value.employeeId)
-    .sort(
-      (a, b) =>
-        Number(String(b.effective_from || '').replaceAll('.', '')) -
-        Number(String(a.effective_from || '').replaceAll('.', ''))
-    )
-})
+
+const pagedEmployees = computed(() =>
+  allEmployees.value.map((row) => ({
+    ...row,
+    name: row.employeeName,
+    duty: row.positionName || '-',
+    job: row.jobName || '-',
+    rank: row.rankName || '-',
+    orgName: row.orgName || '-',
+    normalizedEmploymentStatus: normalizeEmployeeStateText(row.employeeStateDescription),
+    workType: row.employTypeDescription || '-',
+    workRegion: row.areaName || '-',
+    hireDate: normalizeDate(row.hireDate),
+  })),
+)
 
 const kpiCards = computed(() => [
-  {
-    label: '전체 인원',
-    value: `${allEmployees.value.length}명`,
-    note: 'organization.js 기준'
-  },
-  {
-    label: '신규 입사 예정',
-    value: `${upcomingHirePlans.value.length}명`,
-    note: '예정자 등록 기준'
-  },
-  {
-    label: '최근 인사 변경',
-    value: `${hrEvents.value.length}건`,
-    note: '인사 히스토리 기준'
-  }
+  { label: '전체 인원', value: `${totalElements.value}명`, note: '전 사원 목록 기준' },
+  { label: '신규 입사 예정', value: '-', note: '백엔드 미제공' },
+  { label: '최근 인사 변경', value: '-', note: '백엔드 미제공' },
 ])
 
-watch([() => filters.keyword, () => filters.team, () => filters.duty, () => filters.employmentStatus], () => {
-  currentPage.value = 1
-})
+const flattenOrgs = (node, bucket = []) => {
+  if (!node) return bucket
+  const id = node.id ?? node.orgId
+  const name = node.name ?? node.orgName
+  if (id != null && name) bucket.push({ id, name })
+  ;(node.children || []).forEach((child) => flattenOrgs(child, bucket))
+  return bucket
+}
 
-watch(totalPages, (nextTotal) => {
-  if (currentPage.value > nextTotal) currentPage.value = nextTotal
-})
+const normalizeDate = (value) => {
+  if (!value) return '-'
+  const text = String(value)
+  if (text.includes('.')) return text
+  if (text.includes('T')) return text.slice(0, 10).replaceAll('-', '.')
+  return text.replaceAll('-', '.')
+}
 
-watch(filteredEmployees, (nextList) => {
-  if (nextList.length === 0) {
-    selectedEmployeeId.value = ''
-    return
+const normalizeEmployeeStateText = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return '-'
+  if (text === '퇴사') return '사직'
+  return text
+}
+
+const loadOrgOptions = async () => {
+  try {
+    const raw = await getOrganizationTree()
+    const flat = Array.isArray(raw)
+      ? raw
+          .map((item) => ({ id: item?.orgId ?? item?.id, name: item?.orgName ?? item?.name }))
+          .filter((item) => item.id != null && item.name)
+      : flattenOrgs(raw, [])
+    orgOptions.value = [...new Map(flat.map((item) => [String(item.id), item])).values()].sort((a, b) =>
+      String(a.name).localeCompare(String(b.name), 'ko'),
+    )
+  } catch (_error) {
+    orgOptions.value = []
   }
-  if (!nextList.some((item) => item.employeeId === selectedEmployeeId.value)) {
-    selectedEmployeeId.value = nextList[0].employeeId
-  }
-}, { immediate: true })
+}
 
-const openDetail = (employeeId) => {
-  selectedEmployeeId.value = employeeId
-  sensitiveVisible.ssn = false
-  sensitiveVisible.bankAccount = false
-  sensitiveVisible.address = false
-  showDetailModal.value = true
+const loadEmployees = async (page = 1) => {
+  const requestId = latestEmployeeListRequestId.value + 1
+  latestEmployeeListRequestId.value = requestId
+  try {
+    const payload = await getAdminEmployees({
+      page,
+      keyword: filters.keyword || undefined,
+      orgId: filters.orgId ? Number(filters.orgId) : undefined,
+      employType: filters.employType || undefined,
+      employeeState: filters.employeeState || undefined,
+    })
+    if (requestId !== latestEmployeeListRequestId.value) return
+    const content = Array.isArray(payload?.content) ? payload.content : []
+    allEmployees.value = content
+    currentPage.value = Number(payload?.currentPage || page || 1)
+    totalPages.value = Math.max(1, Number(payload?.totalPages || 1))
+    totalElements.value = Number(payload?.totalElements || content.length || 0)
+  } catch (error) {
+    if (requestId !== latestEmployeeListRequestId.value) return
+    allEmployees.value = []
+    currentPage.value = 1
+    totalPages.value = 1
+    totalElements.value = 0
+    alert(error?.response?.data?.error?.message || '사원 목록 조회에 실패했습니다.')
+  }
 }
 
 const resetFilters = () => {
   filters.keyword = ''
-  filters.team = ''
-  filters.duty = ''
-  filters.employmentStatus = ''
-  currentPage.value = 1
+  filters.orgId = ''
+  filters.employType = ''
+  filters.employeeState = ''
 }
 
-const statusClass = (status) => {
-  if (status === '재직') return 'ok'
-  if (status === '휴직') return 'hold'
-  return 'end'
+const openDetail = async (employeeId) => {
+  try {
+    const detail = await getAdminEmployeeDetail(employeeId)
+    selectedEmployee.value = {
+      ...detail,
+      name: detail?.employeeName,
+      hireDate: normalizeDate(detail?.hireDate),
+      birthDate: normalizeDate(detail?.birthDate),
+      skills: Array.isArray(detail?.skills) ? detail.skills : [],
+      careers: Array.isArray(detail?.careers) ? detail.careers : [],
+      hrHistories: (detail?.hrHistories || []).map((item) => ({
+        ...item,
+        effectiveFrom: normalizeDate(item?.effectiveFrom),
+        effectiveTo: normalizeDate(item?.effectiveTo),
+      })),
+    }
+    showDetailModal.value = true
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '사원 상세 조회에 실패했습니다.')
+  }
 }
+
 const historyStatusText = (status) => {
-  if (status === 'APPROVED') return '완료'
-  if (status === 'REJECTED') return '반려'
-  return '진행중'
+  if (status === 'APPLIED') return '완료'
+  if (status === 'FAILED') return '실패'
+  return '대기'
 }
 
 const openDataUrl = (url) => {
@@ -413,52 +412,52 @@ const openDataUrl = (url) => {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-const buildSkillEvidenceFallback = (skill) => {
-  const text = `${skill?.name || '역량'} 증빙 더미 파일`
-  return `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`
+const openSkillEvidence = async (skill) => {
+  if (!selectedEmployee.value?.employeeId || !skill?.skillId) return
+  try {
+    const data = await getAdminEmployeeSkillEvidence(selectedEmployee.value.employeeId, skill.skillId)
+    openDataUrl(data?.fileUrl)
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '역량 증빙 조회에 실패했습니다.')
+  }
 }
 
-const buildCareerEvidenceFallback = (career) => {
-  const text = `${career?.company || '경력'} 증빙 더미 파일`
-  return `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`
+const openCareerEvidence = async (career) => {
+  if (!selectedEmployee.value?.employeeId || !career?.careerId) return
+  try {
+    const data = await getAdminEmployeeCareerEvidence(selectedEmployee.value.employeeId, career.careerId)
+    openDataUrl(data?.fileUrl)
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '경력 증빙 조회에 실패했습니다.')
+  }
 }
 
-const openSkillEvidence = (skill) => {
-  openDataUrl(skill?.fileUrl || buildSkillEvidenceFallback(skill))
+const statusClass = (status) => {
+  if (status === '재직') return 'ok'
+  if (status === '휴직') return 'hold'
+  if (status === '사직' || status === '퇴사') return 'end'
+  return ''
 }
 
-const openCareerEvidence = (career) => {
-  openDataUrl(career?.fileUrl || buildCareerEvidenceFallback(career))
-}
+watch(
+  [() => filters.keyword, () => filters.orgId, () => filters.employType, () => filters.employeeState],
+  () => {
+    if (currentPage.value !== 1) {
+      currentPage.value = 1
+      return
+    }
+    loadEmployees(1)
+  },
+)
 
-const toggleSensitive = (field) => {
-  if (!(field in sensitiveVisible)) return
-  sensitiveVisible[field] = !sensitiveVisible[field]
-}
+watch(currentPage, (nextPage, prevPage) => {
+  if (nextPage === prevPage) return
+  loadEmployees(nextPage)
+})
 
-const maskSsn = (value) => {
-  const text = String(value || '')
-  const [frontRaw, backRaw = ''] = text.split('-')
-  const front = (frontRaw || '').replace(/\D/g, '').slice(0, 6).padEnd(6, '*')
-  const backFirst = (backRaw || '').replace(/\D/g, '').charAt(0) || '*'
-  return `${front}-${backFirst}${'*'.repeat(6)}`
-}
-
-const maskBankAccount = (value) => {
-  const text = String(value || '').trim()
-  if (!text) return '***'
-  const parts = text.split(' ')
-  if (parts.length <= 1) return '****-****-****'
-  return `${parts[0]} ****-****-****`
-}
-
-const maskAddress = (value) => {
-  const text = String(value || '').trim()
-  if (!text) return '주소 비공개'
-  const chunks = text.split(' ')
-  if (chunks.length <= 2) return `${chunks[0]} ${chunks[1] || ''} ***`.trim()
-  return `${chunks[0]} ${chunks[1]} ***`
-}
+onMounted(async () => {
+  await Promise.all([loadOrgOptions(), loadEmployees(1)])
+})
 </script>
 
 <style scoped>
@@ -535,15 +534,26 @@ const maskAddress = (value) => {
 .list-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: .82rem;
   color: var(--gray700);
 }
+.list-table col.col-empno { width: 150px; }
+.list-table col.col-name { width: 105px; }
+.list-table col.col-org { width: 130px; }
+.list-table col.col-role { width: 275px; }
+.list-table col.col-state { width: 110px; }
+.list-table col.col-date { width: 130px; }
+.list-table col.col-type { width: 110px; }
+.list-table col.col-area { width: 130px; }
 .list-table th,
 .list-table td {
   border-bottom: 1px solid var(--gray100);
   padding: 10px 8px;
   text-align: left;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .list-table th { color: var(--gray500); font-weight: 700; font-size: .78rem; background: var(--gray50); }
 .row-click { cursor: pointer; }

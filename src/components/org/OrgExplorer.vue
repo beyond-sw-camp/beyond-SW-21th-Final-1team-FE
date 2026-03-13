@@ -32,7 +32,6 @@
             <template v-if="row.kind === 'node'">
               <span class="node-accent" :style="nodeAccentStyle(row.node.type)" aria-hidden="true"></span>
               <span class="chevron" :class="{ open: isOpen(row.node.id) }">{{ row.expandable ? '▸' : '•' }}</span>
-              <span class="icon">📂</span>
               <strong>{{ row.node.name }}</strong>
               <span class="type-chip">{{ row.node.typeLabel }}</span>
               <span v-if="row.node.memberCount" class="count">{{ row.node.memberCount }}명</span>
@@ -40,7 +39,6 @@
 
             <template v-else>
               <span class="chevron">•</span>
-              <span class="icon">👤</span>
               <strong>{{ row.member.name }}</strong>
               <span class="meta">{{ row.member.duty }}</span>
             </template>
@@ -659,7 +657,6 @@ onMounted(async () => {
 }
 
 .chevron.open { transform: rotate(90deg); }
-.icon { width: 16px; display: inline-flex; justify-content: center; }
 
 .type-chip {
   display: inline-flex;
