@@ -7,14 +7,19 @@
     <div class="profile-header">
       <div class="profile-left">
         <div class="profile-avatar">
-          <img v-if="user.profileImage" :src="user.profileImage" alt="프로필 이미지" class="avatar-image" />
+          <img
+            v-if="user.profileImage"
+            :src="user.profileImage"
+            alt="프로필 이미지"
+            class="avatar-image"
+          />
           <span v-else class="avatar-text">{{ user.name.slice(-2) }}</span>
-          <span class="status-dot online"></span>
+          <span class="status-dot" :class="statusDotClass"></span>
         </div>
         <div class="profile-info">
           <div class="profile-name-row">
             <span class="profile-name">{{ user.name }}</span>
-            <span class="status-badge">정상 근무</span>
+            <span class="status-badge" :class="statusBadgeClass">{{ user.status || '-' }}</span>
           </div>
           <div class="profile-dept">{{ user.team }} · {{ user.jobTitle }} · {{ user.position }}</div>
           <div class="profile-contacts">
@@ -41,39 +46,149 @@
     </div>
 
     <!-- 탭 컨텐츠 -->
-    <TabInfo v-if="activeTab === 'info'" :user="user" @update:user="user = $event"/>
-    <TabSalary v-else-if="activeTab === 'salary'" />
-    <TabHistory v-else-if="activeTab === 'history'" :employee-id="user.empNo" />
-    <TabCertificate v-else-if="activeTab === 'certificate'" :user="user" />
+    <TabInfo v-if="activeTab === 'info'" :user="user" @refresh="loadMyPageData" />
+    <TabHistory v-else-if="activeTab === 'history'" />
+    <TabCertificate v-else-if="activeTab === 'certificate'" />
     <!-- 추후 탭 추가 -->
     <div v-else class="tab-placeholder">{{ activeTabLabel }} 탭은 준비 중입니다.</div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import TabInfo from './tabs/TabInfo.vue'
-import TabSalary from './tabs/TabSalary.vue'
 import TabHistory from './tabs/TabHistory.vue'
 import TabCertificate from './tabs/TabCertificate.vue'
-import { createHrMyPageUserMock } from '@/mocks/hr/myPageUser'
+import { getMyPage, getMyPageHeader } from '@/api/hr'
 import { AUTH_KEYS } from '@/utils/auth'
 
 const activeTab = ref('info')
 const tabs = [
   { key: 'info', label: '정보' },
-  { key: 'salary', label: '급여' },
   { key: 'history', label: '인사 히스토리' },
   { key: 'certificate', label: '증명서' },
 ]
 
 const activeTabLabel = computed(() => tabs.find(t => t.key === activeTab.value)?.label)
 
-const user = ref(createHrMyPageUserMock())
-const sessionLastLogin = sessionStorage.getItem(AUTH_KEYS.lastLoginAt)
-if (sessionLastLogin) {
-  user.value.lastLogin = sessionLastLogin
+const normalizeStatus = (status) => String(status || '').trim().toUpperCase()
+
+const statusBadgeClass = computed(() => {
+  const status = normalizeStatus(user.value.status)
+  if (status === '재직'.toUpperCase() || status === 'WORK' || status === 'ONLINE') return 'ok'
+  if (status === '휴직'.toUpperCase() || status === 'LEAVE') return 'leave'
+  if (status === '퇴사'.toUpperCase() || status === 'RESIGN' || status === 'OFFLINE') return 'resigned'
+  return 'unknown'
+})
+
+const statusDotClass = computed(() => {
+  const status = normalizeStatus(user.value.status)
+  if (status === '재직'.toUpperCase() || status === 'WORK' || status === 'ONLINE') return 'ok'
+  if (status === '휴직'.toUpperCase() || status === 'LEAVE') return 'leave'
+  if (status === '퇴사'.toUpperCase() || status === 'RESIGN' || status === 'OFFLINE') return 'resigned'
+  return 'unknown'
+})
+
+const toSkillTypeLabel = (category) => {
+  const map = {
+    CERTIFICATE: '자격',
+    LANGUAGE: '어학',
+    LICENSE: '면허',
+    ETC: '기타',
+  }
+  return map[category] || category || '-'
 }
+
+const toCareerPeriod = (startDate, endDate) => `${startDate || '-'} ~ ${endDate || '재직중'}`
+
+const user = ref({
+  profileImage: '',
+  name: '',
+  team: '',
+  jobTitle: '',
+  position: '',
+  email: '',
+  phone: '',
+  extension: '',
+  workLocation: '',
+  lastLogin: '',
+  empNo: '',
+  birthDate: '',
+  address: '',
+  ssn: '',
+  bankAccount: '',
+  orgPosition: '',
+  jobRole: '',
+  rank: '',
+  status: '',
+  hireDate: '',
+  tenure: '',
+  workType: '',
+  workRegion: '',
+  hireType: '',
+  skills: [],
+  careers: [],
+})
+
+const loadMyPageData = async () => {
+  try {
+    const [header, page] = await Promise.all([getMyPageHeader(), getMyPage()])
+    const basicInfo = page?.basicInfo || {}
+    const hrInfo = page?.hrInfo || {}
+    const sessionLastLogin = sessionStorage.getItem(AUTH_KEYS.lastLoginAt) || ''
+
+    user.value = {
+      profileImage: basicInfo.profileFileUrl || header?.profileFileUrl || '',
+      name: basicInfo.employeeName || header?.employeeName || '',
+      team: hrInfo.orgName || header?.orgName || '',
+      jobTitle: hrInfo.jobName || header?.jobName || '',
+      position: hrInfo.positionName || header?.positionName || '',
+      email: basicInfo.email || header?.email || '',
+      phone: basicInfo.phone || header?.phone || '',
+      extension: basicInfo.extensionNum || header?.extensionNum || '',
+      workLocation: hrInfo.areaName || header?.areaName || '',
+      lastLogin: sessionLastLogin,
+      empNo: basicInfo.employeeNum || '',
+      birthDate: basicInfo.birthDate || '',
+      address: basicInfo.address || '',
+      ssn: basicInfo.residentNumberMasked || '',
+      bankAccount: `${basicInfo.bankName || ''} ${basicInfo.accountNumberMasked || ''}`.trim(),
+      orgPosition: `${hrInfo.orgName || '-'} · ${hrInfo.positionName || '-'}`,
+      jobRole: hrInfo.jobName || '-',
+      rank: hrInfo.rankName || '-',
+      status: hrInfo.employeeStateDescription || header?.employeeStateDescription || '',
+      hireDate: hrInfo.hireDate || '',
+      tenure: hrInfo.tenureText || '',
+      workType: hrInfo.employTypeDescription || '',
+      workRegion: hrInfo.areaName || '',
+      hireType: hrInfo.recruitTypeDescription || '',
+      skills: (page?.skills || []).map((skill) => ({
+        skillId: skill.skillId,
+        type: toSkillTypeLabel(skill.category),
+        category: skill.category,
+        name: skill.skillName,
+        date: skill.acquisitionDate,
+        licenseNumber: skill.licenseNumber,
+        hrFileId: skill.hrFileId,
+      })),
+      careers: (page?.careers || []).map((career) => ({
+        careerId: career.careerId,
+        company: career.companyName,
+        role: career.orgName,
+        period: toCareerPeriod(career.startDate, career.endDate),
+        startDate: career.startDate,
+        endDate: career.endDate,
+        hrFileId: career.hrFileId,
+      })),
+    }
+  } catch (error) {
+    console.error('마이페이지 데이터 조회 실패:', error)
+  }
+}
+
+onMounted(() => {
+  loadMyPageData()
+})
 </script>
 
 <style scoped>
@@ -86,11 +201,18 @@ if (sessionLastLogin) {
 .profile-avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#99F6E4,#0891B2);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
 .avatar-text{font-size:1.1rem;font-weight:700;color:#fff}
 .avatar-image{width:100%;height:100%;border-radius:50%;object-fit:cover;border:1px solid var(--gray200);background:#fff}
-.status-dot{position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;border:2.5px solid #fff}
-.status-dot.online{background:#22C55E}
+.status-dot{position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;border:2.5px solid #fff;background:#94A3B8}
+.status-dot.ok{background:#22C55E}
+.status-dot.leave{background:#3B82F6}
+.status-dot.resigned{background:#EF4444}
+.status-dot.unknown{background:#94A3B8}
 .profile-name-row{display:flex;align-items:center;gap:8px}
 .profile-name{font-size:1.2rem;font-weight:700;color:var(--gray800)}
-.status-badge{font-size:.7rem;font-weight:600;padding:3px 10px;border-radius:20px;background:#ECFDF5;color:#059669}
+.status-badge{font-size:.7rem;font-weight:600;padding:3px 10px;border-radius:20px;background:#F1F5F9;color:#475569}
+.status-badge.ok{background:#ECFDF5;color:#059669}
+.status-badge.leave{background:#EFF6FF;color:#2563EB}
+.status-badge.resigned{background:#FEF2F2;color:#DC2626}
+.status-badge.unknown{background:#F1F5F9;color:#475569}
 .profile-dept{font-size:.85rem;color:var(--gray500);margin:2px 0 8px}
 .profile-contacts{display:flex;gap:16px;flex-wrap:wrap}
 .profile-contacts span{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--gray500)}

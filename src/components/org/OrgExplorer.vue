@@ -34,8 +34,8 @@
               <span class="chevron" :class="{ open: isOpen(row.node.id) }">{{ row.expandable ? '▸' : '•' }}</span>
               <span class="icon">📂</span>
               <strong>{{ row.node.name }}</strong>
-              <span class="type-chip">{{ row.node.type }}</span>
-              <span v-if="(row.node.members || []).length" class="count">{{ row.node.members.length }}명</span>
+              <span class="type-chip">{{ row.node.typeLabel }}</span>
+              <span v-if="row.node.memberCount" class="count">{{ row.node.memberCount }}명</span>
             </template>
 
             <template v-else>
@@ -69,7 +69,13 @@
             <div class="profile-layout">
               <div class="profile-avatar-wrap">
                 <div class="profile-avatar">
-                  <span>{{ member.profileInitial }}</span>
+                  <img
+                    v-if="member.profileFileUrl"
+                    :src="member.profileFileUrl"
+                    alt="프로필 이미지"
+                    class="profile-avatar-image"
+                  />
+                  <span v-else>{{ member.profileInitial }}</span>
                 </div>
               </div>
 
@@ -97,14 +103,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
-import {
-  createHrCurrentUserMock,
-  createHrOrgTreeMock,
-  findNodeById,
-  findPathByNodeId,
-  sortMembersByRule
-} from '@/mocks/hr/organization'
+import { computed, onMounted, ref, watch } from 'vue'
+import { AUTH_KEYS } from '@/utils/auth'
+import { getOrganizationMembers, getOrganizationTree } from '@/api/hr'
 
 const props = defineProps({
   initialKeyword: { type: String, default: '' },
@@ -115,15 +116,125 @@ const modeClass = computed(() => ({
   'mode-modal': props.mode === 'modal'
 }))
 
-const currentUser = ref(createHrCurrentUserMock())
-const orgRoot = ref(createHrOrgTreeMock())
+const orgRoot = ref(null)
+const orgMembersMap = ref({})
+const loadingMembers = ref({})
 const searchKeyword = ref('')
 const expandedNodes = ref({})
-const selectedNodeId = ref(currentUser.value.teamNodeId)
+const selectedNodeId = ref(null)
 const selectedMemberId = ref(null)
+const myOrgNodeId = ref(null)
+const isSearchIndexLoading = ref(false)
+const isSearchIndexReady = ref(false)
 
 const normalize = (value) => String(value || '').trim().toLowerCase()
 const isOpen = (nodeId) => Boolean(expandedNodes.value[nodeId])
+
+const orgIdFromSession = ref(sessionStorage.getItem(AUTH_KEYS.orgId) || '')
+const orgNameFromSession = ref(sessionStorage.getItem(AUTH_KEYS.orgName) || '')
+
+const orgTypeLabel = (type) => {
+  const map = {
+    COMPANY: '회사',
+    HEADQUARTER: '본부',
+    CENTER: '센터',
+    DIVISION: '부문',
+    DEPARTMENT: '부',
+    TEAM: '팀',
+  }
+  return map[type] || type || '-'
+}
+
+const sortMembersByRule = (members = []) => {
+  return [...members]
+}
+
+const mapMember = (row) => ({
+  employeeId: row.employeeId,
+  name: row.employeeName,
+  orgId: row.orgId,
+  orgName: row.orgName || '-',
+  profileFileUrl: row.profileFileUrl || '',
+  profileInitial: String(row.employeeName || '').slice(-2) || '직원',
+  email: row.email || '-',
+  phone: row.phone || '-',
+  extension: row.extensionNum || '-',
+  position: row.positionName || '-',
+  job: row.jobName || '-',
+  duty: row.rankName || '-',
+  workLocation: row.areaName || '-',
+  status: row.employeeStateDescription || '-',
+})
+
+const findNodeById = (node, nodeId) => {
+  if (!node) return null
+  if (node.id === nodeId) return node
+  for (const child of node.children || []) {
+    const found = findNodeById(child, nodeId)
+    if (found) return found
+  }
+  return null
+}
+
+const findPathByNodeId = (node, nodeId, path = []) => {
+  if (!node) return null
+  const nextPath = [...path, node.id]
+  if (node.id === nodeId) return nextPath
+  for (const child of node.children || []) {
+    const found = findPathByNodeId(child, nodeId, nextPath)
+    if (found) return found
+  }
+  return null
+}
+
+const collectAllNodeIds = (node, acc = {}) => {
+  if (!node) return acc
+  acc[node.id] = true
+  ;(node.children || []).forEach((child) => {
+    collectAllNodeIds(child, acc)
+  })
+  return acc
+}
+
+const flattenNodeIds = (node, acc = []) => {
+  if (!node) return acc
+  acc.push(node.id)
+  ;(node.children || []).forEach((child) => flattenNodeIds(child, acc))
+  return acc
+}
+
+const ensureMembersLoadedForAll = async () => {
+  if (!orgRoot.value || isSearchIndexReady.value || isSearchIndexLoading.value) return
+
+  isSearchIndexLoading.value = true
+  try {
+    const allNodeIds = flattenNodeIds(orgRoot.value, [])
+    const pendingNodeIds = allNodeIds.filter(
+      (orgId) => !Object.prototype.hasOwnProperty.call(orgMembersMap.value, orgId)
+    )
+
+    const batchSize = 8
+    for (let i = 0; i < pendingNodeIds.length; i += batchSize) {
+      const batch = pendingNodeIds.slice(i, i + batchSize)
+      await Promise.all(batch.map((orgId) => ensureMembersLoaded(orgId)))
+    }
+
+    isSearchIndexReady.value = true
+  } finally {
+    isSearchIndexLoading.value = false
+  }
+}
+
+const findFirstNodeWithMembers = (node) => {
+  if (!node) return null
+  const cached = orgMembersMap.value[node.id]
+  if (Array.isArray(cached) && cached.length > 0) return node
+  for (const child of node.children || []) {
+    const found = findFirstNodeWithMembers(child)
+    if (found) return found
+  }
+  return node
+}
 
 const matchesMember = (member, keyword) => {
   const text = [
@@ -142,12 +253,12 @@ const matchesMember = (member, keyword) => {
 const filterNode = (node, keyword) => {
   if (!node) return null
 
-  const nodeMatch = !keyword || normalize(`${node.name} ${node.type}`).includes(keyword)
+  const nodeMatch = !keyword || normalize(`${node.name} ${node.typeLabel}`).includes(keyword)
   const children = (node.children || [])
     .map((child) => filterNode(child, keyword))
     .filter(Boolean)
 
-  const members = sortMembersByRule(node.members || [])
+  const members = sortMembersByRule(orgMembersMap.value[node.id] || [])
   const filteredMembers = nodeMatch
     ? members
     : members.filter((member) => matchesMember(member, keyword))
@@ -166,30 +277,13 @@ const filteredRoot = computed(() => {
   return filterNode(orgRoot.value, keyword)
 })
 
-const collectAllNodeIds = (node, acc = {}) => {
-  if (!node) return acc
-  acc[node.id] = true
-  ;(node.children || []).forEach((child) => collectAllNodeIds(child, acc))
-  return acc
-}
-
-const findFirstNodeWithMembers = (node) => {
-  if (!node) return null
-  if ((node.members || []).length > 0) return node
-  for (const child of node.children || []) {
-    const found = findFirstNodeWithMembers(child)
-    if (found) return found
-  }
-  return null
-}
-
 const visibleRows = computed(() => {
   if (!filteredRoot.value) return []
 
   const rows = []
   const walk = (node, depth = 0) => {
     const hasChildren = (node.children || []).length > 0
-    const hasMembers = (node.members || []).length > 0
+    const hasMembers = Number(node.memberCount || 0) > 0
 
     rows.push({
       key: `node-${node.id}`,
@@ -203,7 +297,7 @@ const visibleRows = computed(() => {
 
     ;(node.children || []).forEach((child) => walk(child, depth + 1))
 
-    sortMembersByRule(node.members || []).forEach((member) => {
+    sortMembersByRule(orgMembersMap.value[node.id] || []).forEach((member) => {
       rows.push({
         key: `member-${node.id}-${member.employeeId}`,
         kind: 'member',
@@ -218,25 +312,30 @@ const visibleRows = computed(() => {
   return rows
 })
 
-const resetToMyOrg = () => {
-  const path = findPathByNodeId(orgRoot.value, currentUser.value.teamNodeId) || []
+const resetToMyOrg = async () => {
+  const targetNodeId = myOrgNodeId.value || selectedNodeId.value || orgRoot.value?.id
+  if (!targetNodeId) return
+
+  const path = findPathByNodeId(orgRoot.value, targetNodeId) || []
   const next = {}
   path.forEach((id) => {
     next[id] = true
   })
   expandedNodes.value = next
-  selectedNodeId.value = currentUser.value.teamNodeId
+  selectedNodeId.value = targetNodeId
   selectedMemberId.value = null
+  await ensureMembersLoaded(targetNodeId)
 }
 
 watch(
   () => normalize(searchKeyword.value),
-  (keyword) => {
+  async (keyword) => {
     if (keyword) {
-      expandedNodes.value = collectAllNodeIds(filteredRoot.value)
+      await ensureMembersLoadedForAll()
+      expandedNodes.value = collectAllNodeIds(filteredRoot.value || orgRoot.value)
       return
     }
-    resetToMyOrg()
+    await resetToMyOrg()
   },
   { immediate: true }
 )
@@ -273,16 +372,36 @@ const activeNode = computed(() => {
 const activeNodeName = computed(() => activeNode.value?.name || '')
 const activeMembers = computed(() => sortMembersByRule(activeNode.value?.members || []))
 
-const handleRowClick = (row) => {
+async function ensureMembersLoaded(orgId) {
+  if (!orgId || orgMembersMap.value[orgId] || loadingMembers.value[orgId]) return
+  loadingMembers.value = { ...loadingMembers.value, [orgId]: true }
+  try {
+    const members = await getOrganizationMembers(orgId)
+    orgMembersMap.value = {
+      ...orgMembersMap.value,
+      [orgId]: Array.isArray(members) ? members.map(mapMember) : [],
+    }
+  } catch (_error) {
+    orgMembersMap.value = {
+      ...orgMembersMap.value,
+      [orgId]: [],
+    }
+  } finally {
+    const next = { ...loadingMembers.value }
+    delete next[orgId]
+    loadingMembers.value = next
+  }
+}
+
+const handleRowClick = async (row) => {
   if (row.kind === 'node') {
     if (row.expandable) {
       expandedNodes.value[row.node.id] = !expandedNodes.value[row.node.id]
     }
 
-    if ((row.node.members || []).length > 0) {
-      selectedNodeId.value = row.node.id
-      selectedMemberId.value = null
-    }
+    selectedNodeId.value = row.node.id
+    selectedMemberId.value = null
+    await ensureMembersLoaded(row.node.id)
     return
   }
 
@@ -306,26 +425,101 @@ const rowClass = (row) => {
   }
 }
 
-const levelPrefix = (depth) => `${'--- '.repeat(depth)}`.trim()
-
 const nodeAccentStyle = (type) => {
   const palette = {
-    회사: '#E2E8F0',
-    본부: '#FDE68A',
-    센터: '#BFDBFE',
-    부: '#C7D2FE',
-    팀: '#A7F3D0',
-    실: '#FBCFE8'
+    COMPANY: '#E2E8F0',
+    HEADQUARTER: '#FDE68A',
+    CENTER: '#BFDBFE',
+    DIVISION: '#C7D2FE',
+    DEPARTMENT: '#A7F3D0',
+    TEAM: '#FBCFE8'
   }
 
   return { backgroundColor: palette[type] || '#E2E8F0' }
 }
 
 const statusClass = (status) => {
-  if (status === '정상') return 'ok'
-  if (status === '재택') return 'remote'
+  if (status === '재직') return 'ok'
+  if (status === '휴직') return 'remote'
   return 'leave'
 }
+
+const buildTree = (rows) => {
+  const map = new Map()
+  rows.forEach((row) => {
+    map.set(row.orgId, {
+      id: row.orgId,
+      parentId: row.parentOrgId,
+      name: row.orgName,
+      type: row.orgType,
+      typeLabel: orgTypeLabel(row.orgType),
+      orgLevel: row.orgLevel,
+      sortOrder: row.sortOrder,
+      memberCount: row.memberCount || 0,
+      children: [],
+      members: [],
+    })
+  })
+
+  const roots = []
+  map.forEach((node) => {
+    if (node.parentId && map.has(node.parentId)) {
+      map.get(node.parentId).children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+
+  const sortNodes = (nodes) => {
+    nodes.sort((a, b) => {
+      const levelDiff = Number(a.orgLevel || 0) - Number(b.orgLevel || 0)
+      if (levelDiff !== 0) return levelDiff
+      const sortDiff = Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
+      if (sortDiff !== 0) return sortDiff
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ko')
+    })
+    nodes.forEach((n) => {
+      sortNodes(n.children)
+    })
+  }
+
+  sortNodes(roots)
+  return roots[0] || null
+}
+
+const loadOrganizationTree = async () => {
+  try {
+    const rows = await getOrganizationTree()
+    orgRoot.value = buildTree(Array.isArray(rows) ? rows : [])
+    if (!orgRoot.value) return
+
+    const all = []
+    const walk = (node) => {
+      all.push(node)
+      ;(node.children || []).forEach(walk)
+    }
+    walk(orgRoot.value)
+
+    let initNode = null
+    const sessionOrgId = Number(orgIdFromSession.value)
+    if (Number.isFinite(sessionOrgId) && sessionOrgId > 0) {
+      initNode = all.find((node) => Number(node.id) === sessionOrgId) || null
+    }
+    if (!initNode && orgNameFromSession.value) {
+      initNode = all.find((node) => node.name === orgNameFromSession.value) || null
+    }
+
+    myOrgNodeId.value = initNode?.id || orgRoot.value.id
+    selectedNodeId.value = myOrgNodeId.value
+    await resetToMyOrg()
+  } catch (_error) {
+    orgRoot.value = null
+  }
+}
+
+onMounted(async () => {
+  await loadOrganizationTree()
+})
 </script>
 
 <style scoped>
@@ -333,7 +527,9 @@ const statusClass = (status) => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
-  min-height: 640px;
+  height: calc(100vh - 190px);
+  min-height: 620px;
+  max-height: calc(100vh - 190px);
 }
 
 .org-explorer.mode-modal {
@@ -525,6 +721,13 @@ const statusClass = (status) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.profile-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-main { min-width: 0; }
@@ -574,6 +777,11 @@ const statusClass = (status) => {
 .status.leave { background: #FEF3C7; color: #D97706; }
 
 @media (max-width: 1100px) {
-  .org-explorer { grid-template-columns: minmax(0, 1fr); }
+  .org-explorer {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
 }
 </style>

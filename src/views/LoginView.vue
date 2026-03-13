@@ -66,8 +66,11 @@
       </div>
     </div>
     <PasswordResetModal v-model="showResetModal" @confirm="handleResetIdentity" />
-    <BaseModal v-model="showResetPasswordModal" width="460px">
-      <h2 class="modal-title">비밀번호 변경</h2>
+    <BaseModal v-model="showResetPasswordModal" width="460px" :closable="false">
+      <div class="force-header">
+        <h2 class="modal-title">비밀번호 변경</h2>
+        <button class="force-close" type="button" @click="showResetPasswordModal = false" aria-label="닫기">×</button>
+      </div>
       <p class="force-desc">초기화된 비밀번호입니다. 보안을 위해 비밀번호를 변경해주세요.</p>
       <div class="force-fields">
         <div class="field-group">
@@ -139,6 +142,24 @@ const validateResetPassword = () => {
   resetPasswordError.value = ''
 }
 
+const resetPwRules = computed(() => {
+  const value = resetPasswordForm.value.newPassword || ''
+  return [
+    { label: '8~15자', pass: value.length >= 8 && value.length <= 15 },
+    { label: '영문 포함', pass: /[A-Za-z]/.test(value) },
+    { label: '숫자 포함', pass: /\d/.test(value) },
+    { label: '특수문자 포함', pass: /[!@#$%^&*()\-_=+\[\]{}?]/.test(value) },
+  ]
+})
+
+const allResetPwRulesPass = computed(() => resetPwRules.value.every((rule) => rule.pass))
+
+const canSubmitResetPassword = computed(() => {
+  const newPassword = resetPasswordForm.value.newPassword || ''
+  const confirmPassword = resetPasswordForm.value.confirmPassword || ''
+  return Boolean(passwordChangeTicket.value) && allResetPwRulesPass.value && newPassword === confirmPassword
+})
+
 const formatLoginTimestamp = () => {
   const now = new Date()
   const yyyy = String(now.getFullYear())
@@ -160,6 +181,7 @@ const completeBackendLogin = (loginData, fallbackUserId = '') => {
     userId: profile?.employeeNum || fallbackUserId,
     employeeId: profile?.employeeId ? String(profile.employeeId) : '',
     userName: profile?.employeeName || fallbackUserId,
+    orgId: profile?.orgId ? String(profile.orgId) : '',
     orgName: profile?.orgName || '',
     positionName: profile?.positionName || '',
     rankName: profile?.rankName || '',
@@ -173,7 +195,7 @@ const completeBackendLogin = (loginData, fallbackUserId = '') => {
 const handleResetIdentity = async ({ empNo, ssn }) => {
   try {
     await initializePassword(empNo, ssn)
-    alert(`비밀번호가 ${empNo}(으)로 초기화되었습니다. 초기 비밀번호로 로그인 후 변경해주세요.`)
+    alert('초기 비밀번호가 메일로 발송되었습니다. 로그인 후 비밀번호를 변경해주세요.')
   } catch (error) {
     alert(error?.response?.data?.error?.message || '비밀번호 초기화에 실패했습니다.')
   }
@@ -374,6 +396,24 @@ const submitResetPassword = async () => {
   margin: 0 0 16px;
   font-size: .85rem;
   color: #64748B;
+}
+.force-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.force-close {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #64748B;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.force-close:hover {
+  color: #0F172A;
 }
 .force-fields {
   display: flex;

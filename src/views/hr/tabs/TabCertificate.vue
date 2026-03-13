@@ -45,14 +45,22 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="record in issueHistory" :key="record.id">
-              <td class="cell-strong">{{ record.kindLabel }}</td>
+            <tr v-for="record in issueHistory" :key="record.requestId">
+              <td class="cell-strong">{{ record.certificateName }}</td>
               <td class="font-num">{{ record.issuedDate }}</td>
               <td>
-                <span class="status-badge">{{ statusText(record.status) }}</span>
+                <span class="status-badge" :class="statusClass(record.status)">
+                  {{ record.statusName || statusText(record.status) }}
+                </span>
               </td>
               <td class="col-download">
-                <button class="download-btn" type="button" @click="downloadCertificate(record)" aria-label="다운로드">
+                <button
+                  class="download-btn"
+                  type="button"
+                  :disabled="!isIssued(record.status)"
+                  @click="isIssued(record.status) && downloadCertificate(record)"
+                  aria-label="다운로드"
+                >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
@@ -60,6 +68,9 @@
                   </svg>
                 </button>
               </td>
+            </tr>
+            <tr v-if="issueHistory.length === 0">
+              <td colspan="4" class="empty-history-row">발급 이력이 없습니다.</td>
             </tr>
           </tbody>
         </table>
@@ -82,7 +93,7 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn-confirm" type="button" @click="issueCertificate">발급하기</button>
+        <button class="btn-confirm" type="button" :disabled="loading" @click="issueCertificate">발급하기</button>
         <button class="btn-cancel" type="button" @click="showIssueModal = false">취소</button>
       </div>
     </BaseModal>
@@ -96,103 +107,36 @@
         <li v-for="(line, index) in policyLines" :key="index">{{ line }}</li>
       </ul>
     </BaseModal>
-
-    <BaseModal v-model="showPreviewModal" width="920px">
-      <div class="preview-header">
-        <h3>{{ previewTitle }}</h3>
-        <div class="preview-actions">
-          <button class="btn-print" type="button" @click="printPreview">인쇄</button>
-          <button class="modal-close" type="button" @click="showPreviewModal = false">&times;</button>
-        </div>
-      </div>
-
-      <div class="preview-frame">
-        <div class="preview-paper">
-          <h2 class="cert-main-title">{{ previewMainTitle }}</h2>
-
-          <div class="cert-body">
-            <table class="cert-form-table">
-              <tbody>
-                <tr>
-                  <th class="group-cell" rowspan="2">인적<br />사항</th>
-                  <th>성명</th>
-                  <td>{{ user.name }}</td>
-                  <th>주민등록번호</th>
-                  <td>{{ user.ssn }}</td>
-                </tr>
-                <tr>
-                  <th>주소</th>
-                  <td colspan="3">{{ user.address }}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <table class="cert-form-table">
-              <tbody>
-                <tr>
-                  <th class="group-cell" rowspan="3">재직<br />사항</th>
-                  <th>소속</th>
-                  <td colspan="3">{{ user.team }}</td>
-                </tr>
-                <tr>
-                  <th>직위</th>
-                  <td colspan="3">{{ user.position }}</td>
-                </tr>
-                <tr>
-                  <th>재직기간</th>
-                  <td colspan="3">{{ employmentPeriodText }}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <table class="cert-form-table purpose-table">
-              <tbody>
-                <tr>
-                  <th>용도</th>
-                  <td>{{ latestIssued?.purpose || '-' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="cert-footer">
-            <p class="preview-statement">위와 같이 재직하고 있음을 증명합니다.</p>
-            <p class="preview-date">{{ issueDateSplit.year }} 년 {{ issueDateSplit.month }} 월 {{ issueDateSplit.day }} 일</p>
-
-            <div class="preview-sign-area">
-              <p><span>발급담당자 :</span><span>(인)</span></p>
-              <p><span>직 위 :</span><span>인사담당자</span></p>
-            </div>
-
-            <p class="preview-company">R H i g h t (직인)</p>
-          </div>
-        </div>
-      </div>
-    </BaseModal>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import {
-  createHrCertificateKindsMock,
-  createHrCertificateHistoryMock,
-  createHrCertificatePolicyMock
-} from '@/mocks/hr/certificates'
+  createCertificateRequest,
+  downloadCertificateByRequestId,
+  getCertificateRequestHistories,
+} from '@/api/hr'
 
-const props = defineProps({
-  user: { type: Object, required: true }
-})
-
-const certificateKinds = ref(createHrCertificateKindsMock())
-const issueHistory = ref(createHrCertificateHistoryMock())
-const policyLines = ref(createHrCertificatePolicyMock())
+const certificateKinds = ref([
+  {
+    key: 'EMPLOYMENT_KO',
+    title: '재직 증명서',
+    description: '재직 상태 및 소속 정보가 포함된\n국문 증명서입니다.',
+  },
+])
+const issueHistory = ref([])
+const policyLines = ref([
+  '증명서 발급 요청 시 제출처와 용도는 필수입니다.',
+  '발급된 문서는 발급 이력에서 다시 다운로드할 수 있습니다.',
+  '증명서는 PDF 파일로 발급됩니다.',
+])
 const selectedKind = ref(certificateKinds.value[0] || null)
 
 const showIssueModal = ref(false)
 const showPolicyModal = ref(false)
-const showPreviewModal = ref(false)
+const loading = ref(false)
 
 const issueForm = reactive({
   submitTo: '',
@@ -200,21 +144,6 @@ const issueForm = reactive({
 })
 
 const issueModalTitle = computed(() => `${selectedKind.value?.title || '증명서'} 발급`)
-const previewTitle = computed(
-  () => selectedKind.value?.title || latestIssued.value?.kindLabel || '증명서'
-)
-const previewMainTitle = computed(() => toSpacedTitle(previewTitle.value))
-const latestIssued = computed(() => issueHistory.value[0] || null)
-const employmentPeriodText = computed(() => {
-  const base = `${toKoreanDate(props.user.hireDate)}부터 현재 재직 중임`
-  return `${base} (총 ${tenureText(props.user.hireDate)})`
-})
-
-const issueDateSplit = computed(() => {
-  const raw = latestIssued.value?.issuedDate || formatToday()
-  const [year = '-', month = '-', day = '-'] = String(raw).split('.')
-  return { year, month, day }
-})
 
 const formatToday = () => {
   const now = new Date()
@@ -224,28 +153,9 @@ const formatToday = () => {
   return `${yyyy}.${mm}.${dd}`
 }
 
-const toKoreanDate = (dateStr) => {
-  if (!dateStr) return '-'
-  const [year = '', month = '', day = ''] = String(dateStr).split('.')
-  return `${year}년 ${month}월 ${day}일`
-}
-
-const toSpacedTitle = (title) => {
-  const compact = String(title || '증명서').replace(/\s+/g, '')
-  return compact.split('').join(' ')
-}
-
-const tenureText = (hireDate) => {
-  if (!hireDate) return '-'
-  const [y = 0, m = 1, d = 1] = String(hireDate).split('.').map(Number)
-  const from = new Date(y, (m || 1) - 1, d || 1)
-  const now = new Date()
-  let months = (now.getFullYear() - from.getFullYear()) * 12 + (now.getMonth() - from.getMonth())
-  if (now.getDate() < from.getDate()) months -= 1
-  if (months < 0) months = 0
-  const years = Math.floor(months / 12)
-  const restMonths = months % 12
-  return `${years}년 ${restMonths}개월`
+const normalizeDate = (value) => {
+  if (!value) return '-'
+  return String(value).replaceAll('-', '.')
 }
 
 const resetIssueForm = () => {
@@ -259,224 +169,81 @@ const openIssueModal = (kind) => {
   showIssueModal.value = true
 }
 
-const issueCertificate = () => {
+const loadIssueHistory = async () => {
+  try {
+    const rows = await getCertificateRequestHistories()
+    issueHistory.value = (rows || []).map((row) => ({
+      requestId: row.requestId,
+      certificateType: row.certificateType,
+      certificateName: row.certificateName,
+      issuedDate: normalizeDate(row.issuedDate),
+      status: row.status,
+      statusName: row.statusName,
+    }))
+    return true
+  } catch (error) {
+    issueHistory.value = []
+    alert(error?.response?.data?.error?.message || '증명서 발급 이력 조회에 실패했습니다.')
+    return false
+  }
+}
+
+const issueCertificate = async () => {
   if (!selectedKind.value) return
   if (!issueForm.submitTo.trim() || !issueForm.purpose.trim()) return
 
-  const issuedDate = formatToday()
-  const kindLabel = selectedKind.value.title
-  const kindSafe = kindLabel.replaceAll(' ', '')
-  const newRecord = {
-    id: `CERT-${Date.now()}`,
-    kindKey: selectedKind.value.key,
-    kindLabel,
-    issuedDate,
-    status: 'ISSUED',
-    submitTo: issueForm.submitTo.trim(),
-    purpose: issueForm.purpose.trim(),
-    fileName: `${kindSafe}_${issuedDate.replaceAll('.', '')}.pdf`
+  try {
+    loading.value = true
+    await createCertificateRequest({
+      certificateType: selectedKind.value.key,
+      submitTo: issueForm.submitTo.trim(),
+      purpose: issueForm.purpose.trim(),
+    })
+    const refreshed = await loadIssueHistory()
+    if (!refreshed) return
+    showIssueModal.value = false
+    resetIssueForm()
+    alert('증명서 발급이 완료되었습니다.')
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '증명서 발급에 실패했습니다.')
+  } finally {
+    loading.value = false
   }
-
-  issueHistory.value.unshift(newRecord)
-  showIssueModal.value = false
-  showPreviewModal.value = true
 }
 
 const statusText = (status) => {
   if (status === 'ISSUED') return '발급 완료'
+  if (status === 'FAILED') return '발급 실패'
   return '처리중'
 }
 
-const buildCertificateText = (record) => {
-  return [
-    `${record.kindLabel}`,
-    `성명: ${props.user.name}`,
-    `사번: ${props.user.empNo}`,
-    `입사일: ${props.user.hireDate}`,
-    `소속: ${props.user.team}`,
-    `직위: ${props.user.position}`,
-    `제출처: ${record.submitTo}`,
-    `용도: ${record.purpose}`,
-    `발급일: ${record.issuedDate}`
-  ].join('\n')
+const isIssued = (status) => status === 'ISSUED'
+
+const statusClass = (status) => {
+  if (status === 'ISSUED') return 'is-issued'
+  if (status === 'FAILED') return 'is-failed'
+  return 'is-pending'
 }
 
-const downloadCertificate = (record) => {
-  const blob = new Blob([`\uFEFF${buildCertificateText(record)}`], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = record.fileName
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+const downloadCertificate = async (record) => {
+  try {
+    const blob = await downloadCertificateByRequestId(record.requestId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${record.certificateName || 'certificate'}_${record.issuedDate?.replaceAll?.('.', '') || formatToday().replaceAll('.', '')}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '증명서 다운로드에 실패했습니다.')
+  }
 }
 
-const printPreview = () => {
-  if (!latestIssued.value) return
-
-  const previewWindow = window.open('', '_blank', 'width=900,height=980')
-  if (!previewWindow) return
-
-  const html = `
-    <!DOCTYPE html>
-    <html lang="ko">
-    <head>
-      <meta charset="UTF-8" />
-      <title>${previewTitle.value}</title>
-      <style>
-        @page { size: A4 portrait; margin: 0; }
-        * { box-sizing: border-box; }
-        body {
-          font-family: 'Noto Sans KR', sans-serif;
-          margin: 0;
-          color: #111827;
-          background: #fff;
-        }
-        .paper {
-          width: 210mm;
-          min-height: 297mm;
-          margin: 0 auto;
-          border: 1px solid #111827;
-          padding: 18mm 16mm 14mm;
-          display: flex;
-          flex-direction: column;
-        }
-        .title {
-          text-align: center;
-          letter-spacing: .42em;
-          margin: 0 0 18mm;
-          font-size: 13mm;
-          font-weight: 700;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        .form-table + .form-table { margin-top: 3.4mm; }
-        th, td {
-          border: 1px solid #1f2937;
-          padding: 3.2mm 3mm;
-          font-size: 3.6mm;
-          font-weight: 500;
-        }
-        th {
-          width: 12%;
-          text-align: center;
-        }
-        .group {
-          width: 9%;
-          font-weight: 700;
-          letter-spacing: .1em;
-          line-height: 1.45;
-        }
-        .purpose th { width: 9%; }
-        .footer {
-          margin-top: auto;
-          padding-top: 22mm;
-        }
-        .statement {
-          text-align: right;
-          margin: 0 1mm 16mm 0;
-          font-size: 5.2mm;
-          font-weight: 600;
-          text-decoration: underline;
-          text-underline-offset: 0.9mm;
-        }
-        .date {
-          text-align: center;
-          margin: 0 0 14mm;
-          font-size: 5.5mm;
-          letter-spacing: .12em;
-          font-weight: 600;
-        }
-        .sign {
-          width: 44%;
-          margin-left: auto;
-          display: grid;
-          gap: 4.2mm;
-          margin-bottom: 14mm;
-        }
-        .sign p {
-          margin: 0;
-          display: flex;
-          justify-content: space-between;
-          font-size: 4.6mm;
-        }
-        .company {
-          margin: 0;
-          text-align: center;
-          font-size: 8mm;
-          letter-spacing: .22em;
-          font-weight: 600;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="paper">
-        <h1 class="title">${previewMainTitle.value}</h1>
-
-        <table class="form-table">
-          <tr>
-            <th class="group" rowspan="2">인적<br/>사항</th>
-            <th>성명</th>
-            <td>${props.user.name}</td>
-            <th>주민등록번호</th>
-            <td>${props.user.ssn}</td>
-          </tr>
-          <tr>
-            <th>주소</th>
-            <td colspan="3">${props.user.address}</td>
-          </tr>
-        </table>
-
-        <table class="form-table">
-          <tr>
-            <th class="group" rowspan="3">재직<br/>사항</th>
-            <th>소속</th>
-            <td colspan="3">${props.user.team}</td>
-          </tr>
-          <tr>
-            <th>직위</th>
-            <td colspan="3">${props.user.position}</td>
-          </tr>
-          <tr>
-            <th>재직기간</th>
-            <td colspan="3">${employmentPeriodText.value}</td>
-          </tr>
-        </table>
-
-        <table class="form-table purpose">
-          <tr>
-            <th>용도</th>
-            <td>${latestIssued.value.purpose}</td>
-          </tr>
-        </table>
-
-        <div class="footer">
-          <p class="statement">위와 같이 재직하고 있음을 증명합니다.</p>
-          <p class="date">${issueDateSplit.value.year} 년 ${issueDateSplit.value.month} 월 ${issueDateSplit.value.day} 일</p>
-          <div class="sign">
-            <p><span>발급담당자 :</span><span>(인)</span></p>
-            <p><span>직 위 :</span><span>인사담당자</span></p>
-          </div>
-          <p class="company">R H i g h t (직인)</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `
-
-  previewWindow.document.open()
-  previewWindow.document.write(html)
-  previewWindow.document.close()
-  previewWindow.focus()
-  setTimeout(() => {
-    previewWindow.print()
-    previewWindow.onafterprint = () => previewWindow.close()
-  }, 150)
-}
+onMounted(async () => {
+  await loadIssueHistory()
+})
 </script>
 
 <style scoped>
@@ -488,6 +255,7 @@ const printPreview = () => {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  min-height: 0;
 }
 
 .cert-card-header {
@@ -577,7 +345,11 @@ const printPreview = () => {
 .issue-btn:hover { background: var(--primary-dark); }
 
 .history-card { min-height: 290px; }
-.history-table-wrap { overflow-x: auto; }
+.history-table-wrap {
+  height: 360px;
+  overflow: auto;
+  min-height: 0;
+}
 
 .history-table {
   width: 100%;
@@ -596,6 +368,10 @@ const printPreview = () => {
   color: var(--gray500);
   font-size: .8rem;
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
 }
 
 .cell-strong { font-weight: 700; color: var(--gray800); }
@@ -606,11 +382,15 @@ const printPreview = () => {
   align-items: center;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #DCFCE7;
-  color: #16A34A;
+  background: #F1F5F9;
+  color: #475569;
   font-size: .75rem;
   font-weight: 700;
 }
+
+.status-badge.is-issued { background: #DCFCE7; color: #16A34A; }
+.status-badge.is-failed { background: #FEE2E2; color: #DC2626; }
+.status-badge.is-pending { background: #FEF3C7; color: #B45309; }
 
 .download-btn {
   border: none;
@@ -621,6 +401,15 @@ const printPreview = () => {
 }
 
 .download-btn:hover { color: #0284C7; }
+.download-btn:disabled {
+  color: #94A3B8;
+  cursor: not-allowed;
+}
+
+.empty-history-row {
+  text-align: center;
+  color: var(--gray400);
+}
 
 .modal-title-row {
   display: flex;

@@ -1,56 +1,35 @@
 <template>
   <div class="tab-history">
-    <div class="filter-bar">
-      <button class="filter-icon" type="button" aria-label="필터">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
-        </svg>
-      </button>
-      <button
-        v-for="filter in filters"
-        :key="filter.key"
-        type="button"
-        class="filter-chip"
-        :class="{ active: activeFilter === filter.key }"
-        @click="activeFilter = filter.key"
-      >
-        {{ filter.label }}
-      </button>
-    </div>
-
     <div class="history-grid">
       <section class="history-card">
         <div class="card-header"><h3>인사 변경 이력</h3></div>
         <div class="history-list">
           <button
-            v-for="item in filteredHistory"
-            :key="item.hr_event_id"
+            v-for="item in employeeEvents"
+            :key="item.hrEventId"
             type="button"
             class="history-item"
-            :class="{ active: selectedEventId === item.hr_event_id }"
-            @click="selectedEventId = item.hr_event_id"
+            :class="{ active: selectedEventId === item.hrEventId }"
+            @click="selectedEventId = item.hrEventId"
           >
             <div class="item-row top">
               <div class="item-title-wrap">
-                <span class="type-tag">{{ item.event_type }}</span>
-                <strong class="item-title">{{ item.event_title }}</strong>
+                <span class="type-tag">{{ item.eventTypeDescription }}</span>
+                <strong class="item-title">{{ item.eventTitle }}</strong>
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </div>
             <div class="item-meta">
-              <span>적용일: {{ item.effective_from }}</span>
+              <span>적용일: {{ item.effectiveFrom }}</span>
             </div>
             <div class="item-row bottom">
-              <span class="change-value">{{ item.before_value }} -> {{ item.after_value }}</span>
-              <span class="status-tag" :class="statusClass(item.event_status)">
-                {{ statusText(item.event_status) }}
-              </span>
+              <span class="change-value">{{ summarizeChanges(item.beforeChange, item.afterChange) }}</span>
             </div>
           </button>
 
-          <div v-if="filteredHistory.length === 0" class="empty-history">
+          <div v-if="employeeEvents.length === 0" class="empty-history">
             해당 조건의 히스토리가 없습니다.
           </div>
         </div>
@@ -61,27 +40,30 @@
 
         <div v-if="selectedEvent" class="detail-rows">
           <div class="detail-top">
-            <span class="type-tag">{{ selectedEvent.event_type }}</span>
-            <strong class="detail-title">{{ selectedEvent.event_title }}</strong>
+            <span class="type-tag">{{ selectedEvent.eventTypeDescription }}</span>
+            <strong class="detail-title">{{ selectedEvent.eventTitle }}</strong>
           </div>
 
-          <div class="detail-row"><span>적용일</span><strong>{{ selectedEvent.effective_from }}</strong></div>
-          <div class="detail-row"><span>변경 전</span><strong>{{ selectedEvent.before_value }}</strong></div>
-          <div class="detail-row"><span>변경 후</span><strong>{{ selectedEvent.after_value }}</strong></div>
-          <div class="detail-row"><span>기간</span><strong>{{ selectedEvent.start_date }} ~ {{ selectedEvent.effective_to || '현재' }}</strong></div>
-          <div class="detail-row"><span>변경 사유</span><strong>{{ selectedEvent.reason }}</strong></div>
+          <div class="detail-row"><span>적용일</span><strong>{{ selectedEvent.effectiveFrom }}</strong></div>
+          <div class="detail-row detail-row-multi">
+            <span>변경 항목</span>
+            <strong class="change-diff-list">
+              <template v-for="(diff, idx) in selectedEventDiffs" :key="`${diff.key}-${idx}`">
+                <div class="change-diff-item">{{ diff.key }}: {{ diff.before }} -> {{ diff.after }}</div>
+              </template>
+            </strong>
+          </div>
+          <div class="detail-row"><span>기간</span><strong>{{ selectedEvent.effectiveFrom }} ~ {{ selectedEvent.effectiveTo || '현재' }}</strong></div>
+          <div class="detail-row"><span>변경 사유</span><strong>{{ selectedEvent.reason || '-' }}</strong></div>
           <div class="detail-row">
             <span>처리 상태</span>
             <strong>
-              <span class="status-tag" :class="statusClass(selectedEvent.event_status)">
-                {{ statusText(selectedEvent.event_status) }}
+              <span class="status-tag" :class="statusClass(selectedEvent.eventStatus)">
+                {{ selectedEvent.eventStatusDescription || statusText(selectedEvent.eventStatus) }}
               </span>
             </strong>
           </div>
-          <template v-if="selectedEvent.event_type === '재직 상태'">
-            <div class="detail-row"><span>요청일시</span><strong>{{ selectedEvent.requested_at }}</strong></div>
-            <div class="detail-row"><span>승인일시</span><strong>{{ selectedEvent.approved_at || '-' }}</strong></div>
-          </template>
+          <div class="detail-row"><span>처리일시</span><strong>{{ selectedEvent.appliedAt || '-' }}</strong></div>
         </div>
 
         <div v-else class="detail-empty">
@@ -99,105 +81,157 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { createHrEventsMock } from '@/mocks/hr/hrEvents'
+import { computed, ref, watch, onMounted } from 'vue'
+import { getMyHrEventDetail, getMyHrEvents } from '@/api/hr'
 
-const props = defineProps({
-  employeeId: { type: String, required: true }
-})
-
-const filters = [
-  { key: 'all', label: '전체', types: [] },
-  { key: 'rank', label: '직급', types: ['직급'] },
-  { key: 'status', label: '재직 상태', types: ['재직 상태'] },
-  { key: 'assignment', label: '발령', types: ['발령'] }
-]
-
-const activeFilter = ref('all')
 const selectedEventId = ref(null)
-const normalizeDate = (value) => Number(String(value ?? '').replaceAll('.', '')) || 0
-const hrEvents = ref(createHrEventsMock())
+const hrEvents = ref([])
+const selectedEvent = ref(null)
+const detailRequestSeq = ref(0)
 
-const employeeEvents = computed(() => {
-  return hrEvents.value
-    .filter((item) => item.employee_id === props.employeeId)
-      .sort((a, b) => normalizeDate(b.start_date) - normalizeDate(a.start_date))
-})
+const employeeEvents = computed(() => hrEvents.value)
+const selectedEventDiffs = computed(() =>
+  extractChangedFields(selectedEvent.value?.beforeChange, selectedEvent.value?.afterChange),
+)
 
-const filteredHistory = computed(() => {
-  const filter = filters.find((item) => item.key === activeFilter.value)
-  if (!filter || filter.key === 'all') return employeeEvents.value
-  return employeeEvents.value.filter((item) => filter.types.includes(item.event_type))
-})
-
-watch(filteredHistory, (list) => {
-  if (!list.some((item) => item.hr_event_id === selectedEventId.value)) {
+watch(employeeEvents, (list) => {
+  if (!list.some((item) => item.hrEventId === selectedEventId.value)) {
+    if (list.length > 0) {
+      selectedEventId.value = list[0].hrEventId
+      return
+    }
     selectedEventId.value = null
+    selectedEvent.value = null
   }
 })
 
-const selectedEvent = computed(() => {
-  return filteredHistory.value.find((item) => item.hr_event_id === selectedEventId.value) || null
+watch(selectedEventId, async (id) => {
+  const requestSeq = ++detailRequestSeq.value
+  if (!id) {
+    selectedEvent.value = null
+    return
+  }
+  try {
+    const detail = await getMyHrEventDetail(id)
+    if (requestSeq !== detailRequestSeq.value) return
+    selectedEvent.value = {
+      ...detail,
+      effectiveFrom: normalizeDate(detail?.effectiveFrom),
+      effectiveTo: normalizeDate(detail?.effectiveTo),
+      appliedAt: detail?.appliedAt ? String(detail.appliedAt).replace('T', ' ') : '-',
+    }
+  } catch (error) {
+    if (requestSeq !== detailRequestSeq.value) return
+    selectedEvent.value = null
+    alert(error?.response?.data?.error?.message || '인사 이력 상세 조회에 실패했습니다.')
+  }
 })
 
 const statusText = (status) => {
-  if (status === 'APPROVED') return '완료'
-  if (status === 'REJECTED') return '반려'
+  if (status === 'APPLIED') return '완료'
+  if (status === 'FAILED') return '실패'
   return '진행중'
 }
 
 const statusClass = (status) => {
-  if (status === 'APPROVED') return 'done'
-  if (status === 'REJECTED') return 'rejected'
+  if (status === 'APPLIED') return 'done'
+  if (status === 'FAILED') return 'rejected'
   return 'pending'
 }
+
+const normalizeDate = (value) => {
+  if (!value) return '-'
+  return String(value).replaceAll('-', '.')
+}
+
+const parseChangeMap = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return {}
+
+  const entries = text
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const idx = part.indexOf(':')
+      if (idx < 0) return null
+      const key = part.slice(0, idx).trim()
+      const val = part.slice(idx + 1).trim()
+      if (!key) return null
+      return [key, val || '-']
+    })
+    .filter(Boolean)
+
+  if (entries.length === 0) {
+    return { 변경값: text }
+  }
+
+  return Object.fromEntries(entries)
+}
+
+const extractChangedFields = (beforeChange, afterChange) => {
+  const beforeRaw = String(beforeChange || '').trim()
+  const afterRaw = String(afterChange || '').trim()
+  if (!beforeRaw && !afterRaw) return []
+
+  const beforeMap = parseChangeMap(beforeChange)
+  const afterMap = parseChangeMap(afterChange)
+  const keys = [...new Set([...Object.keys(beforeMap), ...Object.keys(afterMap)])]
+
+  const diffs = keys
+    .map((key) => ({
+      key,
+      before: beforeMap[key] ?? '-',
+      after: afterMap[key] ?? '-',
+    }))
+    .filter((diff) => diff.before !== diff.after)
+
+  if (diffs.length > 0) return diffs
+
+  if (!beforeRaw && !afterRaw) return []
+
+  return [
+    {
+      key: '변경값',
+      before: beforeChange || '-',
+      after: afterChange || '-',
+    },
+  ]
+}
+
+const summarizeChanges = (beforeChange, afterChange) => {
+  const diffs = extractChangedFields(beforeChange, afterChange)
+  if (diffs.length === 0) return '-'
+  if (diffs.length === 1) {
+    const only = diffs[0]
+    return `${only.key}: ${only.before} -> ${only.after}`
+  }
+  const first = diffs[0]
+  return `${first.key}: ${first.before} -> ${first.after} 외 ${diffs.length - 1}건`
+}
+
+onMounted(async () => {
+  try {
+    const rows = await getMyHrEvents()
+    hrEvents.value = (rows || []).map((row) => ({
+      ...row,
+      effectiveFrom: normalizeDate(row.effectiveFrom),
+      effectiveTo: normalizeDate(row.effectiveTo),
+    }))
+    if (hrEvents.value.length > 0) {
+      selectedEventId.value = hrEvents.value[0].hrEventId
+    }
+  } catch (error) {
+    hrEvents.value = []
+    alert(error?.response?.data?.error?.message || '인사 이력 조회에 실패했습니다.')
+  }
+})
 </script>
 
 <style scoped>
 .tab-history { margin-top: 20px; }
 
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-.filter-icon {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--gray500);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.filter-chip {
-  height: 32px;
-  padding: 0 14px;
-  border: none;
-  border-radius: 10px;
-  background: var(--gray100);
-  color: var(--gray600);
-  font-size: .84rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.filter-chip.active {
-  background: var(--primary);
-  color: #fff;
-}
-
 .history-grid {
-  margin-top: 14px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
@@ -226,6 +260,11 @@ const statusClass = (status) => {
 }
 
 .history-list {
+  max-height: 492px;
+  overflow-y: auto;
+}
+
+.detail-rows {
   max-height: 492px;
   overflow-y: auto;
 }
@@ -288,8 +327,12 @@ const statusClass = (status) => {
 
 .change-value {
   color: var(--gray800);
-  font-size: .97rem;
+  font-size: .92rem;
   font-weight: 700;
+  line-height: 1.35;
+  display: inline-block;
+  max-width: 92%;
+  word-break: break-word;
 }
 
 .status-tag {
@@ -368,6 +411,23 @@ const statusClass = (status) => {
   color: var(--gray800);
   font-size: .94rem;
   font-family: var(--font-num);
+}
+
+.detail-row-multi {
+  align-items: flex-start;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.change-diff-list {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.change-diff-item {
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .empty-history {
