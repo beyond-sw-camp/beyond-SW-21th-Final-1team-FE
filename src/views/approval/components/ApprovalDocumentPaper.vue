@@ -152,15 +152,12 @@ const formatPerson = (value) => {
 const formalTitle = computed(() => {
   const category = props.item.category || props.item.templateName || '기안서';
   let title = category;
-  if (category === '휴가 신청서') title = '연가 신청서';
+  if (category === '휴가 신청서') title = '휴가 신청서';
   else if (category === '유연근무 신청서') title = '유연근무 신청서';
   else if (category === '외근/출장 신청서') title = '외근/출장 신청서';
   else if (category === '연장근무 신청서') title = '연장근무 신청서';
   else if (category === '휴직신청서') title = '휴직신청서';
   else if (category === '복직신청서') title = '복직신청서';
-  else if (category === '기안서') title = '기안서';
-  else if (category === '품의서') title = '품의서';
-  else if (category === '보고서') title = '보고서';
 
   return title.split('').join('  ');
 });

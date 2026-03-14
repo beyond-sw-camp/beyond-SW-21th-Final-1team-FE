@@ -57,7 +57,6 @@
         :items="referenceItems"
         count-label="건"
         link-type="reference"
-        variant="reference"
         @click-item="openDetail"
       />
     </div>

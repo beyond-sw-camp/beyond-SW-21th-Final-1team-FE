@@ -119,7 +119,7 @@ watch([activeTab, searchQuery], loadStatusSearch)
     <header class="page-header">
       <div class="header-content">
         <h1 class="page-title">전자 결재 현황</h1>
-        <p class="page-subtitle">본인이 기안자/결재자로 포함된 문서의 결재 진행 상태를 확인합니다.</p>
+        <p class="page-subtitle">본인이 기안자로 포함된 문서의 결재 진행 상태를 확인합니다.</p>
       </div>
 
       <div class="search-box">
