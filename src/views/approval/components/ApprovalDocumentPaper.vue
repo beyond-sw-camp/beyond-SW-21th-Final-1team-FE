@@ -51,11 +51,22 @@
       </div>
     </div>
 
-    <div v-if="item.referrers && item.referrers.length > 0" class="referrer-section">
+    <div class="referrer-section">
       <span class="section-label">참조:</span>
       <div class="referrer-list">
-        <span v-for="(refItem, idx) in item.referrers" :key="idx" class="referrer-tag">
-          {{ refItem }}
+        <span v-if="!hasReferrers" class="referrer-tag">-</span>
+        <span v-else v-for="(refItem, idx) in item.referrers" :key="idx" class="referrer-tag">
+          {{ formatPerson(refItem) }}
+        </span>
+      </div>
+    </div>
+
+    <div class="referrer-section">
+      <span class="section-label">수신:</span>
+      <div class="referrer-list">
+        <span v-if="!hasReceivers" class="referrer-tag">-</span>
+        <span v-else v-for="(receiver, idx) in item.receivers" :key="idx" class="referrer-tag">
+          {{ formatPerson(receiver) }}
         </span>
       </div>
     </div>
@@ -122,18 +133,31 @@ const isRejectedStatus = computed(() => {
   return props.item.status === '반려';
 });
 
+const hasReferrers = computed(() => {
+  return Array.isArray(props.item.referrers) && props.item.referrers.length > 0;
+});
+
+const hasReceivers = computed(() => {
+  return Array.isArray(props.item.receivers) && props.item.receivers.length > 0;
+});
+
+const formatPerson = (value) => {
+  if (!value) return '-';
+  if (typeof value === 'string') return value;
+  const name = value.name || value.receiverName || value.referencerName || '';
+  const position = value.position || value.rank || value.receiverRank || value.referenceRank || '';
+  return [name, position].filter(Boolean).join(' ');
+};
+
 const formalTitle = computed(() => {
   const category = props.item.category || props.item.templateName || '기안서';
   let title = category;
-  if (category === '휴가 신청서') title = '연가 신청서';
+  if (category === '휴가 신청서') title = '휴가 신청서';
   else if (category === '유연근무 신청서') title = '유연근무 신청서';
   else if (category === '외근/출장 신청서') title = '외근/출장 신청서';
   else if (category === '연장근무 신청서') title = '연장근무 신청서';
   else if (category === '휴직신청서') title = '휴직신청서';
   else if (category === '복직신청서') title = '복직신청서';
-  else if (category === '기안서') title = '기안서';
-  else if (category === '품의서') title = '품의서';
-  else if (category === '보고서') title = '보고서';
 
   return title.split('').join('  ');
 });

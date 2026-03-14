@@ -8,7 +8,6 @@
         <div>
           <div class="title-row">
             <h2>{{ pageTitle }}</h2>
-            <span v-if="currentType === 'reference'" class="reference-badge">참조</span>
           </div>
           <p class="subtitle">{{ pageSubtitle }}</p>
         </div>
@@ -125,7 +124,7 @@ const pageSubtitle = computed(() => {
     return '참조자로 지정된 문서를 빠르게 확인할 수 있습니다.';
   }
   if (currentType.value === 'received' || currentType.value === 'ing') {
-    return '내가 결재/참조로 수신한 문서를 확인할 수 있습니다.';
+    return '수신 문서함에서 본인이 수신선으로 되어있는 문서를 확인할 수 있습니다.';
   }
   return `${pageTitle.value}의 모든 문서를 조회합니다.`;
 });
