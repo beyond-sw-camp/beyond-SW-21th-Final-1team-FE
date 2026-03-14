@@ -537,7 +537,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { usePayrollStore } from '@/store/payroll'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
@@ -578,6 +578,7 @@ const saveToastMessage = ref('')
 const recentSavedSettingId = ref(null)
 const showFinalizeModal = ref(false)
 let saveToastTimer = null
+let highlightTimer = null
 
 const salaryForm = reactive({
   settingId: null,
@@ -694,12 +695,27 @@ const showSaveToast = (message) => {
 
 const highlightSavedSetting = (settingId) => {
   recentSavedSettingId.value = settingId
-  window.setTimeout(() => {
+  if (highlightTimer) {
+    window.clearTimeout(highlightTimer)
+  }
+  highlightTimer = window.setTimeout(() => {
     if (Number(recentSavedSettingId.value) === Number(settingId)) {
       recentSavedSettingId.value = null
     }
+    highlightTimer = null
   }, 3200)
 }
+
+onUnmounted(() => {
+  if (saveToastTimer) {
+    window.clearTimeout(saveToastTimer)
+    saveToastTimer = null
+  }
+  if (highlightTimer) {
+    window.clearTimeout(highlightTimer)
+    highlightTimer = null
+  }
+})
 
 const reloadMonthlyData = async () => {
   ledgerLoading.value = true

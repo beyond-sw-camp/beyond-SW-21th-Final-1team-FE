@@ -352,12 +352,7 @@ const isKmsMode = computed(() => route.path.startsWith('/kms'))
 const currentPath = computed(() => route.path)
 const isPerformance = computed(() => route.path.startsWith('/performance'))
 const currentUserId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
-<<<<<<< HEAD
 const isAdminUser = computed(() => isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
-const isPerformanceManager = computed(() =>
-  isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
-const isAttendanceManager = computed(() => isAdminUser.value)
-=======
 const allowedViewCodeSet = computed(() => new Set(sessionAllowedViewCodesRef.value || []))
 const hasAnyAllowedViews = (viewCodes = []) =>
   !Array.isArray(viewCodes) || viewCodes.length === 0
@@ -365,8 +360,8 @@ const hasAnyAllowedViews = (viewCodes = []) =>
     : viewCodes.some((code) => allowedViewCodeSet.value.has(code))
 const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
-const isAttendanceManager = computed(() => allowedViewCodeSet.value.has('ATTENDANCE_TEAM'))
->>>>>>> 8fe9575eadcc3033d0f0529cb7143462cce2febf
+const isAttendanceManager = computed(() =>
+  isAdminUser.value || allowedViewCodeSet.value.has('ATTENDANCE_TEAM'))
 
 // SVG icon components (inline)
 const StarIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
@@ -629,27 +624,17 @@ const adminOnlyShortcutOptions = [
   { key: 'admin-salary', label: '급여 관리(관리자)', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
 ]
 
-<<<<<<< HEAD
-const shortcutOptionsByUser = computed(() => (
-  isAdminUser.value
-    ? [...baseShortcutOptions, ...adminOnlyShortcutOptions]
-    : baseShortcutOptions
-))
-
-const defaultShortcutKeysByUser = computed(() => (
-  isAdminUser.value
-    ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
-    : ['hr-my', 'hr-org', 'attendance-my']
-))
-=======
 const shortcutOptionsByUser = computed(() =>
   [...baseShortcutOptions, ...adminOnlyShortcutOptions].filter((item) =>
     hasAnyAllowedViews(item.viewCodes),
   ),
 )
 
-const defaultShortcutKeysByUser = computed(() => [])
->>>>>>> 8fe9575eadcc3033d0f0529cb7143462cce2febf
+const defaultShortcutKeysByUser = computed(() =>
+  isAdminUser.value
+    ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
+    : ['hr-my', 'hr-org', 'attendance-my'],
+)
 
 const shortcuts = computed(() => {
   const selectedKeySet = new Set(selectedShortcutKeys.value)
@@ -711,13 +696,7 @@ const filteredHrMenus = computed(() =>
 
 // --- 전자결재 모드 데이터 ---
 const userRank = computed(() => {
-<<<<<<< HEAD
-  return isAdminUser.value ? 'manager' : 'user'
-=======
-  const userId = sessionStorage.getItem(AUTH_KEYS.userId)
-  if (isAttendanceManager.value) return 'manager'
-  return userId ? 'user' : 'user'
->>>>>>> 8fe9575eadcc3033d0f0529cb7143462cce2febf
+  return isAttendanceManager.value || isAdminUser.value ? 'manager' : 'user'
 })
 
 // --- 근태 모드 데이터 ---

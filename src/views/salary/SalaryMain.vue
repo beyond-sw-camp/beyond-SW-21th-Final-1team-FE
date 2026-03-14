@@ -178,8 +178,8 @@
                       <button
                         class="btn-icon"
                         type="button"
-                        :disabled="detailLoading && selectedLedgerId === item.id"
-                        @click.stop="selectPayroll(item.id)"
+                        :disabled="downloading || (detailLoading && selectedLedgerId === item.id)"
+                        @click.stop="downloadPayslipById(item.id)"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
@@ -390,19 +390,18 @@ const selectPayroll = async (ledgerId) => {
   }
 }
 
-const handleDownload = async () => {
-  if (!selectedDetail.value?.id || downloading.value) return
-
+const downloadPayslipById = async (ledgerId) => {
+  if (!ledgerId || downloading.value) return
   downloading.value = true
   pageError.value = ''
 
   try {
-    const fileData = await payrollStore.downloadPayrollPdf(selectedDetail.value.id)
+    const fileData = await payrollStore.downloadPayrollPdf(ledgerId)
     const blob = new Blob([fileData], { type: 'application/pdf' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `payslip_${selectedDetail.value.id}.pdf`
+    link.download = `payslip_${ledgerId}.pdf`
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -412,6 +411,11 @@ const handleDownload = async () => {
   } finally {
     downloading.value = false
   }
+}
+
+const handleDownload = async () => {
+  if (!selectedDetail.value?.id) return
+  await downloadPayslipById(selectedDetail.value.id)
 }
 </script>
 
