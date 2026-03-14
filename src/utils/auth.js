@@ -4,6 +4,7 @@ export const AUTH_KEYS = {
   loggedIn: 'isLoggedIn',
   role: 'userRole',
   roleCodes: 'userRoleCodes',
+  allowedViewCodes: 'allowedViewCodes',
   userId: 'userId',
   employeeId: 'employeeId',
   userName: 'userName',
@@ -22,7 +23,10 @@ export const USER_ROLES = {
   appraisee: 'EVALUATEE',
 }
 
-const ADMIN_ROLE_CODES = new Set([
+export const ADMIN_ROLE_CODES = new Set([
+  'HR_ADMIN_MASTER',
+  'HR_ADMIN_BASIC',
+  'HR_ADMIN_PAYROLL',
   'ROLE_HR_ADMIN_MASTER',
   'ROLE_HR_ADMIN_BASIC',
   'ROLE_HR_ADMIN_PAYROLL',
@@ -49,15 +53,26 @@ const readSessionRoleCodes = () => {
   }
 }
 
+const readSessionAllowedViewCodes = () => {
+  if (typeof window === 'undefined') return []
+  try {
+    return JSON.parse(sessionStorage.getItem(AUTH_KEYS.allowedViewCodes) || '[]')
+  } catch (_error) {
+    return []
+  }
+}
+
 const hasAnyRoleCode = (roleCodes = [], candidates = new Set()) =>
   roleCodes.some((role) => candidates.has(role))
 
 export const sessionRoleRef = ref(readSessionItem(AUTH_KEYS.role, USER_ROLES.user))
 export const sessionRoleCodesRef = ref(readSessionRoleCodes())
+export const sessionAllowedViewCodesRef = ref(readSessionAllowedViewCodes())
 
 const syncSessionAuthState = () => {
   sessionRoleRef.value = readSessionItem(AUTH_KEYS.role, USER_ROLES.user)
   sessionRoleCodesRef.value = readSessionRoleCodes()
+  sessionAllowedViewCodesRef.value = readSessionAllowedViewCodes()
 }
 
 const handleStorageEvent = (event) => {
@@ -113,6 +128,7 @@ export const getRoleCodesFromToken = (token) => {
 
 export const getSessionRole = () => sessionRoleRef.value
 export const getSessionRoleCodes = () => sessionRoleCodesRef.value
+export const getAllowedViewCodes = () => sessionAllowedViewCodesRef.value
 export const isAdminRole = (
   roleCodes = sessionRoleCodesRef.value,
   role = sessionRoleRef.value,
@@ -133,6 +149,7 @@ export const getLoginSession = () => ({
   jobName: sessionStorage.getItem(AUTH_KEYS.jobName) || '',
   role: getSessionRole(),
   roleCodes: getSessionRoleCodes(),
+  allowedViewCodes: getAllowedViewCodes(),
   accessToken: getAccessToken(),
   lastLoginAt: sessionStorage.getItem(AUTH_KEYS.lastLoginAt) || '',
 })
@@ -147,6 +164,7 @@ export const setLoginSession = ({
   jobName,
   role,
   roleCodes,
+  allowedViewCodes,
   accessToken,
   lastLoginAt,
 }) => {
@@ -160,6 +178,10 @@ export const setLoginSession = ({
   sessionStorage.setItem(AUTH_KEYS.jobName, jobName || '')
   sessionStorage.setItem(AUTH_KEYS.role, role || USER_ROLES.user)
   sessionStorage.setItem(AUTH_KEYS.roleCodes, JSON.stringify(Array.isArray(roleCodes) ? roleCodes : []))
+  sessionStorage.setItem(
+    AUTH_KEYS.allowedViewCodes,
+    JSON.stringify(Array.isArray(allowedViewCodes) ? allowedViewCodes : []),
+  )
   sessionStorage.setItem(AUTH_KEYS.accessToken, accessToken || '')
   sessionStorage.setItem(AUTH_KEYS.lastLoginAt, lastLoginAt || '')
   syncSessionAuthState()
@@ -177,6 +199,7 @@ export const clearLoginSession = () => {
   sessionStorage.removeItem(AUTH_KEYS.jobName)
   sessionStorage.removeItem(AUTH_KEYS.role)
   sessionStorage.removeItem(AUTH_KEYS.roleCodes)
+  sessionStorage.removeItem(AUTH_KEYS.allowedViewCodes)
   sessionStorage.removeItem(AUTH_KEYS.accessToken)
   sessionStorage.removeItem(AUTH_KEYS.lastLoginAt)
   syncSessionAuthState()
