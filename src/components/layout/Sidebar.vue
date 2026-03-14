@@ -343,9 +343,10 @@ const isKmsMode = computed(() => route.path.startsWith('/kms'))
 const currentPath = computed(() => route.path)
 const isPerformance = computed(() => route.path.startsWith('/performance'))
 const currentUserId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
+const isAdminUser = computed(() => isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
 const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
-const isAttendanceManager = computed(() => ['admin1234'].includes(currentUserId.value))
+const isAttendanceManager = computed(() => isAdminUser.value)
 
 // SVG icon components (inline)
 const StarIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
@@ -576,13 +577,13 @@ const adminOnlyShortcutOptions = [
 ]
 
 const shortcutOptionsByUser = computed(() => (
-  currentUserId.value === 'admin1234'
+  isAdminUser.value
     ? [...baseShortcutOptions, ...adminOnlyShortcutOptions]
     : baseShortcutOptions
 ))
 
 const defaultShortcutKeysByUser = computed(() => (
-  currentUserId.value === 'admin1234'
+  isAdminUser.value
     ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
     : ['hr-my', 'hr-org', 'attendance-my']
 ))
@@ -644,8 +645,7 @@ const hrMenus = [
 
 // --- 전자결재 모드 데이터 ---
 const userRank = computed(() => {
-  const userId = sessionStorage.getItem(AUTH_KEYS.userId)
-  return ['admin1234'].includes(userId) ? 'manager' : 'user'
+  return isAdminUser.value ? 'manager' : 'user'
 })
 
 // --- 근태 모드 데이터 ---

@@ -18,6 +18,7 @@ import {
   searchPayrollEmployees,
   sendPayrollLedger,
   sendMonthlyPayrolls,
+  paySeverance,
   updateInsuranceRate,
   updateSalarySetting,
   verifySalaryPassword,
@@ -279,6 +280,12 @@ export const usePayrollStore = defineStore('payroll', () => {
     severancePreview.value = null
   }
 
+  const runSeverancePayment = async (employeeId, retirementDate) => {
+    const { data } = await paySeverance(employeeId, retirementDate)
+    await fetchSeverancePreview(employeeId, retirementDate)
+    return data
+  }
+
   const saveSalarySetting = async ({ employeeId, settingId, ...payload }) => {
     if (!employeeId && !settingId) {
       throw new Error('사원 ID가 필요합니다.')
@@ -306,6 +313,7 @@ export const usePayrollStore = defineStore('payroll', () => {
     fetchPayrollsByYear,
     fetchRecentPayrolls,
     fetchSeverancePreview,
+    runSeverancePayment,
     clearSeverancePreview,
     fetchSalarySettings,
     insuranceRates,

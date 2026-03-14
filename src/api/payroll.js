@@ -86,6 +86,9 @@ export const searchPayrollEmployees = (params) =>
 export const getSeverancePreview = (employeeId, retirementDate) =>
   payrollApi.get(`/admin/severance/${employeeId}`, { params: { retirementDate } })
 
+export const paySeverance = (employeeId, retirementDate) =>
+  payrollApi.post(`/admin/severance/${employeeId}/pay`, null, { params: { retirementDate } })
+
 export const getInsuranceRates = () =>
   payrollApi.get('/admin/insurance-rates')
 
