@@ -352,6 +352,7 @@ const isKmsMode = computed(() => route.path.startsWith('/kms'))
 const currentPath = computed(() => route.path)
 const isPerformance = computed(() => route.path.startsWith('/performance'))
 const currentUserId = computed(() => sessionStorage.getItem(AUTH_KEYS.userId) || '')
+const isAdminUser = computed(() => isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
 const allowedViewCodeSet = computed(() => new Set(sessionAllowedViewCodesRef.value || []))
 const hasAnyAllowedViews = (viewCodes = []) =>
   !Array.isArray(viewCodes) || viewCodes.length === 0
@@ -359,7 +360,8 @@ const hasAnyAllowedViews = (viewCodes = []) =>
     : viewCodes.some((code) => allowedViewCodeSet.value.has(code))
 const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, sessionRoleRef.value))
-const isAttendanceManager = computed(() => allowedViewCodeSet.value.has('ATTENDANCE_TEAM'))
+const isAttendanceManager = computed(() =>
+  isAdminUser.value || allowedViewCodeSet.value.has('ATTENDANCE_TEAM'))
 
 // SVG icon components (inline)
 const StarIcon = () => h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2' }, [
@@ -628,7 +630,11 @@ const shortcutOptionsByUser = computed(() =>
   ),
 )
 
-const defaultShortcutKeysByUser = computed(() => [])
+const defaultShortcutKeysByUser = computed(() =>
+  isAdminUser.value
+    ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
+    : ['hr-my', 'hr-org', 'attendance-my'],
+)
 
 const shortcuts = computed(() => {
   const selectedKeySet = new Set(selectedShortcutKeys.value)
@@ -690,9 +696,7 @@ const filteredHrMenus = computed(() =>
 
 // --- 전자결재 모드 데이터 ---
 const userRank = computed(() => {
-  const userId = sessionStorage.getItem(AUTH_KEYS.userId)
-  if (isAttendanceManager.value) return 'manager'
-  return userId ? 'user' : 'user'
+  return isAttendanceManager.value || isAdminUser.value ? 'manager' : 'user'
 })
 
 // --- 근태 모드 데이터 ---

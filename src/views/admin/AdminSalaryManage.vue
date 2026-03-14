@@ -16,6 +16,19 @@
 
     <div v-if="pageError" class="page-error">{{ pageError }}</div>
     <div v-if="pageNotice" class="page-notice">{{ pageNotice }}</div>
+    <Transition name="toast-fade">
+      <div v-if="saveToastMessage" class="save-toast">
+        {{ saveToastMessage }}
+      </div>
+    </Transition>
+    <ActionConfirmModal
+      v-model="showFinalizeModal"
+      title="급여 마감 확인"
+      :message="`${targetMonth} 급여를 마감합니다. 마감 후에는 해당 월 급여 대장을 다시 계산할 수 없습니다. 계속 진행할까요?`"
+      confirm-text="급여 마감"
+      :loading="actionLoading"
+      @confirm="finalizeSalary"
+    />
 
     <section v-if="currentTab === 'monthly'" class="section-container">
       <div class="card control-bar">
@@ -29,10 +42,7 @@
         <div class="control-actions">
           <button class="btn-secondary" :disabled="ledgerLoading" @click="reloadMonthlyData">조회</button>
           <button class="btn-primary" :disabled="actionLoading" @click="runCalculation">일괄 급여 계산</button>
-          <button class="btn-warning" :disabled="actionLoading || monthStatus === 'initial' || ledgerSummary.pendingFinalizeCount === 0" @click="finalizeSalary">급여 마감</button>
-          <button class="btn-outline" :disabled="actionLoading || monthStatus !== 'closed' || ledgerSummary.pendingSendCount === 0" @click="sendPayStubs">명세서 발송 처리</button>
-          <button class="btn-secondary" :disabled="exportLoading" @click="downloadLedgerCsv(false)">대장 CSV</button>
-          <button class="btn-secondary" :disabled="exportLoading" @click="downloadLedgerCsv(true)">이체 CSV</button>
+          <button class="btn-warning" :disabled="actionLoading || monthStatus === 'initial' || ledgerSummary.pendingFinalizeCount === 0" @click="openFinalizeModal">급여 마감</button>
         </div>
       </div>
 
@@ -154,7 +164,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in employeeSearchResults" :key="item.employeeId">
+                <tr
+                  v-for="item in employeeSearchResults"
+                  :key="item.employeeId"
+                  :class="{ selected: Number(selectedEmployee?.employeeId) === Number(item.employeeId) }"
+                >
                   <td>{{ item.employeeNum }}</td>
                   <td>{{ item.employeeName }}</td>
                   <td>{{ item.departmentName || '-' }}</td>
@@ -172,7 +186,10 @@
         <div class="card">
           <div class="card-header">
             <h3>급여 설정 이력</h3>
-            <span class="count">총 {{ salarySettings.length }}건</span>
+            <div class="card-header-tools">
+              <span class="count">총 {{ salarySettings.length }}건</span>
+              <button class="btn-secondary" :disabled="!employeeIdInput" @click="openSalaryCreateModal">급여 설정 등록</button>
+            </div>
           </div>
           <div v-if="employeeLoading" class="empty-state">급여 설정 이력을 불러오는 중입니다.</div>
           <div v-else-if="!salarySettings.length" class="empty-state">조회된 급여 설정이 없습니다.</div>
@@ -190,7 +207,14 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in salarySettings" :key="item.id">
+                <tr
+                  v-for="item in salarySettings"
+                  :key="item.id"
+                  :class="{
+                    selected: Number(salaryForm.settingId) === Number(item.id),
+                    'recent-saved': Number(recentSavedSettingId) === Number(item.id),
+                  }"
+                >
                   <td>{{ item.id }}</td>
                   <td>{{ formatNumber(item.baseSalary) }}</td>
                   <td>{{ formatNumber(item.mealAllowance) }}</td>
@@ -205,14 +229,59 @@
             </table>
           </div>
         </div>
+      </div>
 
-        <div class="card">
-          <div class="card-header">
-            <h3>{{ salaryForm.settingId ? '급여 설정 수정' : '급여 설정 등록' }}</h3>
+      <BaseModal v-model="showSalaryFormModal" width="780px">
+        <div class="salary-form-modal">
+          <div class="modal-topbar">
+            <div>
+              <h3>{{ salaryForm.settingId ? '급여 설정 수정' : '급여 설정 등록' }}</h3>
+              <p class="card-subtitle">
+                {{ salaryForm.settingId ? '선택한 설정 이력을 기준으로 급여 조건을 수정합니다.' : '선택한 사원의 급여 설정을 새로 등록합니다.' }}
+              </p>
+            </div>
+            <div class="modal-topbar-actions">
+              <span class="mode-badge" :class="salaryForm.settingId ? 'edit' : 'create'">
+                {{ salaryForm.settingId ? '수정 모드' : '등록 모드' }}
+              </span>
+              <button class="btn-secondary" @click="closeSalaryFormModal">닫기</button>
+            </div>
           </div>
-          <p class="helper-text" v-if="selectedEmployee">
-            선택된 사원: {{ selectedEmployee.employeeName }} ({{ selectedEmployee.employeeNum }}) / {{ selectedEmployee.departmentName || '-' }}
-          </p>
+          <div v-if="selectedEmployee" class="selection-banner">
+            <div>
+              <strong>{{ selectedEmployee.employeeName }}</strong>
+              <span>({{ selectedEmployee.employeeNum }})</span>
+            </div>
+            <div class="selection-meta">
+              <span>{{ selectedEmployee.departmentName || '부서 미등록' }}</span>
+              <span>{{ selectedEmployee.positionName || '직급 미등록' }}</span>
+              <span>{{ selectedEmployee.employState || '상태 미등록' }}</span>
+            </div>
+          </div>
+          <div v-if="activeSalarySetting" class="setting-focus-panel">
+            <div class="setting-focus-header">
+              <strong>현재 편집 중인 이력</strong>
+              <span>#{{ activeSalarySetting.id }}</span>
+            </div>
+            <div class="setting-focus-grid">
+              <div>
+                <span class="focus-label">적용 기간</span>
+                <strong>{{ activeSalarySetting.applyStartDate }} ~ {{ activeSalarySetting.applyEndDate || '현재 적용 중' }}</strong>
+              </div>
+              <div>
+                <span class="focus-label">기본급 / 식대</span>
+                <strong>{{ formatNumber(activeSalarySetting.baseSalary) }}원 / {{ formatNumber(activeSalarySetting.mealAllowance) }}원</strong>
+              </div>
+              <div>
+                <span class="focus-label">은행</span>
+                <strong>{{ activeSalarySetting.bankName || '은행 미등록' }}</strong>
+              </div>
+              <div>
+                <span class="focus-label">계좌 / 예금주</span>
+                <strong>{{ activeSalarySetting.maskedAccountNumber || '계좌번호 미등록' }} / {{ activeSalarySetting.accountHolder || '예금주 미등록' }}</strong>
+              </div>
+            </div>
+          </div>
           <div class="form-grid">
             <div class="form-group">
               <label>사원 ID</label>
@@ -235,6 +304,12 @@
               <input v-model="salaryForm.applyEndDate" type="date" />
             </div>
           </div>
+          <div v-if="salaryFormError" class="modal-feedback error">
+            {{ salaryFormError }}
+          </div>
+          <div v-if="salaryFormNotice" class="modal-feedback success">
+            {{ salaryFormNotice }}
+          </div>
           <div class="form-actions">
             <button class="btn-secondary" @click="resetSalaryForm">초기화</button>
             <button class="btn-save" :disabled="savingEmployeeSetting || !canSaveSalarySetting" @click="saveEmployeeSalary">
@@ -242,7 +317,7 @@
             </button>
           </div>
         </div>
-      </div>
+      </BaseModal>
     </section>
 
     <section v-else-if="currentTab === 'settings'" class="section-container settings-grid">
@@ -350,33 +425,30 @@
           </div>
           <div v-if="severanceLoading && !severancePreview" class="empty-state">사원을 조회하는 중입니다.</div>
           <div v-else-if="!severanceSearchResults.length" class="empty-state">검색된 사원이 없습니다.</div>
-          <div v-else class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>사번</th>
-                  <th>이름</th>
-                  <th>부서</th>
-                  <th>직급</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="item in severanceSearchResults"
-                  :key="`severance-${item.employeeId}`"
-                  :class="{ selected: selectedSeveranceEmployee?.employeeId === item.employeeId }"
-                >
-                  <td>{{ item.employeeNum }}</td>
-                  <td>{{ item.employeeName }}</td>
-                  <td>{{ item.departmentName || '-' }}</td>
-                  <td>{{ item.positionName || '-' }}</td>
-                  <td>
-                    <button class="btn-tiny primary" @click="selectSeveranceEmployee(item)">선택</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-else class="severance-list">
+            <button
+              v-for="item in severanceSearchResults"
+              :key="`severance-${item.employeeId}`"
+              type="button"
+              class="severance-list-item"
+              :class="{ selected: selectedSeveranceEmployee?.employeeId === item.employeeId }"
+              @click="selectSeveranceEmployee(item)"
+            >
+              <div class="severance-list-main">
+                <div class="severance-list-title">
+                  <strong>{{ item.employeeName }}</strong>
+                  <span>{{ item.employeeNum }}</span>
+                </div>
+                <div class="severance-list-meta">
+                  <span>{{ item.departmentName || '부서 미등록' }}</span>
+                  <span>{{ item.positionName || '직급 미등록' }}</span>
+                  <span>{{ item.employState || '상태 미등록' }}</span>
+                </div>
+              </div>
+              <span class="severance-list-action">
+                {{ selectedSeveranceEmployee?.employeeId === item.employeeId ? '선택됨' : '선택' }}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -384,8 +456,35 @@
           <div class="card-header">
             <h3>퇴직금 예상 결과</h3>
           </div>
-          <div v-if="!severancePreview" class="empty-state">
+          <div v-if="!severancePreview && !selectedSeveranceEmployee" class="empty-state">
             사원을 선택하고 퇴직일을 입력한 뒤 계산을 실행하세요.
+          </div>
+          <div v-else-if="!severancePreview" class="severance-preview pending-preview">
+            <div class="summary-boxes">
+              <div class="summary-box">
+                <span class="label">선택 사원</span>
+                <strong>{{ selectedSeveranceEmployee.employeeName }}</strong>
+              </div>
+              <div class="summary-box">
+                <span class="label">사번</span>
+                <strong>{{ selectedSeveranceEmployee.employeeNum }}</strong>
+              </div>
+              <div class="summary-box">
+                <span class="label">상태</span>
+                <strong>{{ selectedSeveranceEmployee.employState || '-' }}</strong>
+              </div>
+            </div>
+
+            <div class="detail-grid">
+              <div><span class="detail-label">부서</span><strong>{{ selectedSeveranceEmployee.departmentName || '-' }}</strong></div>
+              <div><span class="detail-label">직급</span><strong>{{ selectedSeveranceEmployee.positionName || '-' }}</strong></div>
+              <div><span class="detail-label">퇴직일</span><strong>{{ retirementDate || '선택 필요' }}</strong></div>
+              <div><span class="detail-label">계산 상태</span><strong>{{ retirementDate ? '계산 버튼을 누르면 예상 퇴직금을 조회합니다.' : '퇴직일을 먼저 선택하세요.' }}</strong></div>
+            </div>
+
+            <p class="helper-text">
+              {{ retirementDate ? '퇴직일이 입력되어 있습니다. 계산 버튼을 누르면 예상 퇴직금이 표시됩니다.' : '사원 선택은 완료되었습니다. 퇴직일을 입력하면 계산 버튼을 사용할 수 있습니다.' }}
+            </p>
           </div>
           <div v-else class="severance-preview">
             <div class="summary-boxes">
@@ -403,6 +502,19 @@
               </div>
             </div>
 
+            <div class="severance-action-bar">
+              <div class="severance-status-badge" :class="severancePreview.paid ? 'paid' : 'pending'">
+                {{ severancePreview.paid ? `지급 완료 (${severancePreview.paymentDate})` : '미지급' }}
+              </div>
+              <button
+                class="btn-save"
+                :disabled="payingSeverance || !severancePreview.eligible || severancePreview.paid"
+                @click="paySeveranceAmount"
+              >
+                {{ payingSeverance ? '지급 처리 중...' : '퇴직금 지급' }}
+              </button>
+            </div>
+
             <div class="detail-grid">
               <div><span class="detail-label">사원</span><strong>{{ severancePreview.employeeName }} ({{ severancePreview.employeeNum }})</strong></div>
               <div><span class="detail-label">부서/직급</span><strong>{{ severancePreview.departmentName || '-' }} / {{ severancePreview.positionName || '-' }}</strong></div>
@@ -412,6 +524,8 @@
               <div><span class="detail-label">참조월</span><strong>{{ severancePreview.referenceStartMonth }} ~ {{ severancePreview.referenceEndMonth }}</strong></div>
               <div><span class="detail-label">급여계좌</span><strong>{{ severancePreview.bankName || '-' }} / {{ severancePreview.maskedAccountNumber || '-' }}</strong></div>
               <div><span class="detail-label">지급대상</span><strong>{{ severancePreview.eligible ? '예' : '아니오' }}</strong></div>
+              <div><span class="detail-label">지급금액</span><strong>{{ severancePreview.paidAmount ? `${formatNumber(severancePreview.paidAmount)}원` : '-' }}</strong></div>
+              <div><span class="detail-label">지급일</span><strong>{{ severancePreview.paymentDate || '-' }}</strong></div>
             </div>
 
             <p class="helper-text">{{ severancePreview.note }}</p>
@@ -423,8 +537,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { usePayrollStore } from '@/store/payroll'
+import BaseModal from '@/components/common/BaseModal.vue'
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
 const payrollStore = usePayrollStore()
 
@@ -449,11 +565,20 @@ const employeeIdInput = ref('')
 const employeeKeyword = ref('')
 const severanceKeyword = ref('')
 const severanceLoading = ref(false)
+const payingSeverance = ref(false)
 const retirementDate = ref('')
 const selectedEmployee = ref(null)
 const selectedSeveranceEmployee = ref(null)
 const employeeSearchResults = ref([])
 const severanceSearchResults = ref([])
+const showSalaryFormModal = ref(false)
+const salaryFormError = ref('')
+const salaryFormNotice = ref('')
+const saveToastMessage = ref('')
+const recentSavedSettingId = ref(null)
+const showFinalizeModal = ref(false)
+let saveToastTimer = null
+let highlightTimer = null
 
 const salaryForm = reactive({
   settingId: null,
@@ -478,6 +603,9 @@ const ledgerRows = computed(() => payrollStore.adminLedgerPage.content || [])
 const ledgerSummary = computed(() => payrollStore.adminLedgerSummary)
 const insuranceRates = computed(() => payrollStore.insuranceRates)
 const salarySettings = computed(() => payrollStore.salarySettingHistory)
+const activeSalarySetting = computed(() =>
+  salarySettings.value.find((item) => Number(item.id) === Number(salaryForm.settingId)) || null,
+)
 const severancePreview = computed(() => {
   const preview = payrollStore.severancePreview
   if (!preview) return null
@@ -554,6 +682,41 @@ const downloadBlob = (blobData, filename, type) => {
   window.URL.revokeObjectURL(url)
 }
 
+const showSaveToast = (message) => {
+  saveToastMessage.value = message
+  if (saveToastTimer) {
+    window.clearTimeout(saveToastTimer)
+  }
+  saveToastTimer = window.setTimeout(() => {
+    saveToastMessage.value = ''
+    saveToastTimer = null
+  }, 2600)
+}
+
+const highlightSavedSetting = (settingId) => {
+  recentSavedSettingId.value = settingId
+  if (highlightTimer) {
+    window.clearTimeout(highlightTimer)
+  }
+  highlightTimer = window.setTimeout(() => {
+    if (Number(recentSavedSettingId.value) === Number(settingId)) {
+      recentSavedSettingId.value = null
+    }
+    highlightTimer = null
+  }, 3200)
+}
+
+onUnmounted(() => {
+  if (saveToastTimer) {
+    window.clearTimeout(saveToastTimer)
+    saveToastTimer = null
+  }
+  if (highlightTimer) {
+    window.clearTimeout(highlightTimer)
+    highlightTimer = null
+  }
+})
+
 const reloadMonthlyData = async () => {
   ledgerLoading.value = true
   pageError.value = ''
@@ -588,6 +751,10 @@ const runCalculation = async () => {
   }
 }
 
+const openFinalizeModal = () => {
+  showFinalizeModal.value = true
+}
+
 const finalizeSalary = async () => {
   actionLoading.value = true
   pageError.value = ''
@@ -597,6 +764,7 @@ const finalizeSalary = async () => {
     const { year, month } = getYearMonth()
     const result = await payrollStore.runMonthlyFinalize(year, month)
     await reloadMonthlyData()
+    showFinalizeModal.value = false
     pageNotice.value = `${result.finalizedCount}건 급여가 마감됐습니다.`
   } catch (error) {
     pageError.value = getErrorMessage(error, '급여 마감에 실패했습니다.')
@@ -663,6 +831,18 @@ const resetSalaryForm = () => {
   salaryForm.mealAllowance = ''
   salaryForm.applyStartDate = ''
   salaryForm.applyEndDate = ''
+  salaryFormError.value = ''
+  salaryFormNotice.value = ''
+}
+
+const openSalaryCreateModal = () => {
+  resetSalaryForm()
+  showSalaryFormModal.value = true
+}
+
+const closeSalaryFormModal = () => {
+  showSalaryFormModal.value = false
+  resetSalaryForm()
 }
 
 const searchEmployees = async () => {
@@ -709,18 +889,23 @@ const selectEmployee = async (item) => {
 }
 
 const editSalarySetting = (item) => {
+  salaryFormError.value = ''
+  salaryFormNotice.value = ''
   salaryForm.settingId = item.id
   salaryForm.employeeId = item.employeeId
   salaryForm.baseSalary = item.baseSalary
   salaryForm.mealAllowance = item.mealAllowance
   salaryForm.applyStartDate = item.applyStartDate
   salaryForm.applyEndDate = item.applyEndDate || ''
+  showSalaryFormModal.value = true
 }
 
 const saveEmployeeSalary = async () => {
   savingEmployeeSetting.value = true
   pageError.value = ''
   pageNotice.value = ''
+  salaryFormError.value = ''
+  salaryFormNotice.value = ''
 
   try {
     const payload = {
@@ -731,12 +916,22 @@ const saveEmployeeSalary = async () => {
       applyStartDate: salaryForm.applyStartDate,
       applyEndDate: salaryForm.applyEndDate || null,
     }
-    await payrollStore.saveSalarySetting(payload)
+    const savedSetting = await payrollStore.saveSalarySetting(payload)
     employeeIdInput.value = String(payload.employeeId)
+    await payrollStore.fetchSalarySettings(payload.employeeId)
+    const savedSettingId = savedSetting?.id || payload.settingId
+    salaryFormNotice.value = '급여 설정을 저장했습니다.'
+    if (savedSettingId) {
+      highlightSavedSetting(savedSettingId)
+    }
+    showSaveToast('급여 설정이 저장되었습니다.')
+    showSalaryFormModal.value = false
     resetSalaryForm()
     pageNotice.value = '급여 설정을 저장했습니다.'
   } catch (error) {
-    pageError.value = getErrorMessage(error, '급여 설정 저장에 실패했습니다.')
+    const message = getErrorMessage(error, '급여 설정 저장에 실패했습니다.')
+    salaryFormError.value = message
+    pageError.value = message
   } finally {
     savingEmployeeSetting.value = false
   }
@@ -828,6 +1023,12 @@ const searchSeveranceEmployees = async () => {
 const selectSeveranceEmployee = (item) => {
   selectedSeveranceEmployee.value = item
   payrollStore.clearSeverancePreview()
+  pageError.value = ''
+  pageNotice.value = `${item.employeeName} 사원을 선택했습니다.`
+
+  if (retirementDate.value) {
+    void calculateSeverance()
+  }
 }
 
 const calculateSeverance = async () => {
@@ -847,6 +1048,26 @@ const calculateSeverance = async () => {
     pageError.value = getErrorMessage(error, '퇴직금 계산에 실패했습니다.')
   } finally {
     severanceLoading.value = false
+  }
+}
+
+const paySeveranceAmount = async () => {
+  if (!selectedSeveranceEmployee.value?.employeeId || !retirementDate.value || !severancePreview.value) return
+
+  payingSeverance.value = true
+  pageError.value = ''
+  pageNotice.value = ''
+
+  try {
+    const result = await payrollStore.runSeverancePayment(
+      selectedSeveranceEmployee.value.employeeId,
+      retirementDate.value,
+    )
+    pageNotice.value = result.message || `${selectedSeveranceEmployee.value.employeeName}의 퇴직금 지급 처리를 완료했습니다.`
+  } catch (error) {
+    pageError.value = getErrorMessage(error, '퇴직금 지급 처리에 실패했습니다.')
+  } finally {
+    payingSeverance.value = false
   }
 }
 
@@ -937,12 +1158,36 @@ onMounted(async () => {
   border: 1px solid #a5f3fc;
 }
 
+.save-toast {
+  position: fixed;
+  top: 28px;
+  right: 32px;
+  z-index: 1200;
+  min-width: 260px;
+  max-width: 360px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #99f6e4;
+  background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
+  color: #115e59;
+  font-weight: 700;
+  box-shadow: 0 18px 40px rgba(15, 118, 110, 0.16);
+}
+
 .control-bar,
 .result-summary {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+.employee-search-card {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
@@ -954,6 +1199,7 @@ onMounted(async () => {
 
 .search-group {
   flex: 1;
+  min-width: 320px;
 }
 
 .control-group label,
@@ -1087,6 +1333,12 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.card-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .table-responsive {
   overflow: auto;
 }
@@ -1160,11 +1412,48 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-.employee-grid,
+.card-subtitle {
+  margin: 6px 0 0;
+  color: var(--gray500);
+  font-size: 0.9rem;
+}
+
+.employee-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
 .settings-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  align-items: stretch;
+}
+
+.settings-grid > .card {
+  height: 100%;
+}
+
+.salary-form-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .form-grid {
@@ -1183,10 +1472,267 @@ button:disabled {
   background: #eef6ff;
 }
 
+.data-table tbody tr.recent-saved {
+  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.data-table tbody tr.recent-saved td {
+  border-bottom-color: #bbf7d0;
+}
+
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mode-badge.edit {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.mode-badge.create {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.modal-feedback {
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.modal-feedback.error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.modal-feedback.success {
+  color: #0f766e;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+}
+
+.selection-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #dbe7f3;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f6fb 100%);
+}
+
+.selection-banner strong {
+  font-size: 1rem;
+  color: var(--gray900);
+}
+
+.selection-banner span {
+  color: var(--gray600);
+}
+
+.selection-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.selection-meta span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #ffffff;
+  border: 1px solid #d7e3ef;
+  font-size: 0.82rem;
+}
+
+.setting-focus-panel {
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #d7e3ef;
+  background: #f8fbff;
+}
+
+.setting-focus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--gray900);
+}
+
+.setting-focus-header span {
+  font-size: 0.82rem;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.setting-focus-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+.setting-focus-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.focus-label {
+  color: var(--gray500);
+  font-size: 0.82rem;
+}
+
+.setting-focus-grid strong {
+  color: var(--gray900);
+  font-size: 0.94rem;
+  line-height: 1.4;
+}
+
 .severance-preview {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.pending-preview {
+  min-height: 240px;
+  justify-content: center;
+}
+
+.severance-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.severance-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.severance-status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.severance-status-badge.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.severance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.severance-list-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid #d9e4ef;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  text-align: left;
+  transition: all 0.18s ease;
+}
+
+.severance-list-item:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.08);
+  transform: translateY(-1px);
+}
+
+.severance-list-item.selected {
+  border-color: #38bdf8;
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.14);
+}
+
+.severance-list-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.severance-list-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.severance-list-title strong {
+  font-size: 1rem;
+  color: var(--gray900);
+}
+
+.severance-list-title span {
+  color: var(--gray500);
+  font-size: 0.88rem;
+}
+
+.severance-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.severance-list-meta span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #d7e3ef;
+  color: var(--gray600);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.severance-list-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.severance-list-item.selected .severance-list-action {
+  background: #1d4ed8;
 }
 
 .summary-boxes {
@@ -1212,6 +1758,17 @@ button:disabled {
   font-size: 0.86rem;
 }
 
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.22s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
 @media (max-width: 1200px) {
   .employee-grid,
   .settings-grid {
@@ -1224,13 +1781,53 @@ button:disabled {
     padding: 20px;
   }
 
+  .employee-search-card {
+    align-items: stretch;
+  }
+
+  .save-toast {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    min-width: 0;
+    max-width: none;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
 
+  .modal-topbar {
+    flex-direction: column;
+  }
+
+  .modal-topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .detail-grid,
-  .summary-boxes {
+  .summary-boxes,
+  .setting-focus-grid {
     grid-template-columns: 1fr;
+  }
+
+  .severance-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .severance-list-action {
+    width: 100%;
+  }
+
+  .selection-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .selection-meta {
+    justify-content: flex-start;
   }
 }
 </style>
