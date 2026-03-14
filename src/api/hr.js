@@ -16,6 +16,19 @@ export const getMyPage = () => unwrap(api.get('/mypage'))
 export const getMyPageHeader = () => unwrap(api.get('/mypage/header'))
 export const getMyHrEvents = () => unwrap(api.get('/mypage/hr-events'))
 export const getMyHrEventDetail = (hrEventId) => unwrap(api.get(`/mypage/hr-events/${hrEventId}`))
+export const getRecentNotices = (size = 8) =>
+  unwrap(
+    api.get('/notices/recent', {
+      params: { size },
+    }),
+  )
+export const getNotices = (params = {}) =>
+  unwrap(
+    api.get('/notices', {
+      params,
+    }),
+  )
+export const getNoticeDetail = (noticeId) => unwrap(api.get(`/notices/${noticeId}`))
 export const getOrganizationTree = () => unwrap(api.get('/org/tree'))
 export const getOrganizationMembers = (orgId) => unwrap(api.get(`/org/${orgId}/members`))
 export const getCertificateRequestHistories = () => unwrap(api.get('/mypage/certificates/requests'))

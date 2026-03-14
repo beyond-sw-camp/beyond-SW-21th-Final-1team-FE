@@ -25,16 +25,22 @@
         <div>공지사항 유형</div>
       </div>
 
-      <div v-if="notices.length === 0" class="empty">검색 결과가 없습니다.</div>
+      <div v-if="loading" class="empty">공지사항을 불러오는 중입니다.</div>
+      <div v-else-if="filteredNotices.length === 0" class="empty">검색 결과가 없습니다.</div>
 
       <div v-for="notice in pagedNotices" :key="notice.id" class="list-row">
-        <button class="title-btn" type="button" @click="openDetailModal(notice)">{{ notice.title }}</button>
+        <button class="title-btn" type="button" @click="openDetailModal(notice)">
+          <span v-if="notice.isPinned" class="pin-badge" aria-label="고정">
+            <span class="pin-icon" aria-hidden="true"></span>
+          </span>
+          {{ notice.title }}
+        </button>
         <div class="font-num">{{ notice.createdAt }}</div>
         <div>{{ notice.department }} ({{ notice.author }})</div>
         <div><span class="type-chip">{{ notice.typeLabel }}</span></div>
       </div>
 
-      <div v-if="notices.length > 0" class="pagination">
+      <div v-if="filteredNotices.length > 0" class="pagination">
         <button type="button" class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
         <span class="page-info font-num">{{ currentPage }} / {{ totalPages }}</span>
         <button type="button" class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
@@ -46,9 +52,10 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import NoticeDetailModal from '@/components/notices/NoticeDetailModal.vue'
-import { NOTICE_TYPE_OPTIONS, searchNotices } from '@/mocks/notices'
+import { getNotices } from '@/api/hr'
+import { NOTICE_TYPE_OPTIONS, normalizeNotice, sortNoticesByDateDesc } from '@/utils/notice'
 
 const PAGE_SIZE = 10
 const keyword = ref('')
@@ -56,20 +63,53 @@ const selectedType = ref('ALL')
 const currentPage = ref(1)
 const showDetailModal = ref(false)
 const selectedNotice = ref(null)
+const allNotices = ref([])
+const loading = ref(false)
 
-const notices = computed(() => searchNotices({ keyword: keyword.value, type: selectedType.value }))
-const totalPages = computed(() => Math.max(1, Math.ceil(notices.value.length / PAGE_SIZE)))
+const resolvePositive = (value, fallback = 1) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const fetchAllNotices = async () => {
+  loading.value = true
+  try {
+    const firstPage = await getNotices({ page: 1 })
+    const firstContent = Array.isArray(firstPage?.content) ? firstPage.content : []
+    const total = resolvePositive(firstPage?.totalPages, 1)
+    const merged = [...firstContent]
+
+    if (total > 1) {
+      for (let page = 2; page <= total; page += 1) {
+        const pageData = await getNotices({ page })
+        const content = Array.isArray(pageData?.content) ? pageData.content : []
+        merged.push(...content)
+      }
+    }
+
+    allNotices.value = sortNoticesByDateDesc(merged.map((row) => normalizeNotice(row)))
+  } catch (error) {
+    allNotices.value = []
+    alert(error?.response?.data?.error?.message || '공지사항 조회에 실패했습니다.')
+  } finally {
+    loading.value = false
+  }
+}
+
+const filteredNotices = computed(() => {
+  const q = keyword.value.trim().toLowerCase()
+  return allNotices.value.filter((notice) => {
+    const typeMatched = selectedType.value === 'ALL' ? true : notice.noticeType === selectedType.value
+    const keywordMatched = q ? String(notice.title || '').toLowerCase().includes(q) : true
+    return typeMatched && keywordMatched
+  })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredNotices.value.length / PAGE_SIZE)))
+
 const pagedNotices = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
-  return notices.value.slice(start, start + PAGE_SIZE)
-})
-
-watch([keyword, selectedType], () => {
-  currentPage.value = 1
-})
-
-watch(totalPages, (next) => {
-  if (currentPage.value > next) currentPage.value = next
+  return filteredNotices.value.slice(start, start + PAGE_SIZE)
 })
 
 const openDetailModal = (notice) => {
@@ -81,6 +121,20 @@ const closeDetailModal = () => {
   showDetailModal.value = false
   selectedNotice.value = null
 }
+
+watch([keyword, selectedType], async () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, (nextPageCount) => {
+  if (currentPage.value > nextPageCount) {
+    currentPage.value = nextPageCount
+  }
+})
+
+onMounted(async () => {
+  await fetchAllNotices()
+})
 </script>
 
 <style scoped>
@@ -104,9 +158,30 @@ const closeDetailModal = () => {
 .list-row:last-child{border-bottom:none}
 .title-btn{
   border:none;background:transparent;text-align:left;font-size:.9rem;color:var(--gray700);font-weight:600;
+  display:flex;align-items:center;gap:8px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .title-btn:hover{color:var(--primary-dark);text-decoration:underline}
+.pin-badge{
+  flex-shrink:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:20px;
+  padding:0 7px;
+  border-radius:999px;
+  background:#fff7ed;
+  color:#9a3412;
+  border:1px solid #fdba74;
+  font-size:0.72rem;
+  font-weight:700;
+}
+.pin-icon{
+  width:10px;
+  height:10px;
+  background:currentColor;
+  clip-path:polygon(50% 0, 86% 14%, 86% 44%, 58% 44%, 58% 100%, 42% 100%, 42% 44%, 14% 44%, 14% 14%);
+}
 .type-chip{
   display:inline-flex;align-items:center;justify-content:center;height:24px;padding:0 10px;
   border-radius:999px;background:#E0F2FE;color:#075985;font-size:.76rem;font-weight:700;

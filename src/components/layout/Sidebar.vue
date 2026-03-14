@@ -507,14 +507,7 @@ const adminMenus = [
   { label: '인사 정보 조회', icon: DashboardIcon, route: '/admin/main', viewCodes: ['ADMIN_MAIN'] },
   { label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees', viewCodes: ['ADMIN_EMPLOYEES'] },
   { label: '인사 정보 변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change', viewCodes: ['ADMIN_HR_CHANGE'] },
-  {
-    label: 'KMS 권한 변경 이력',
-    icon: ClockIcon,
-    route: '/admin/kms-permissions-history',
-    viewCodes: ['ADMIN_KMS_PERMISSION_HISTORY'],
-  },
   { label: '근태 관리', icon: ClockIcon, route: '/admin/attendance', viewCodes: ['ADMIN_ATTENDANCE'] },
-  { label: '정책 관리', icon: ShieldIcon, route: '/admin/policies', viewCodes: ['ADMIN_POLICIES'] },
   { label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
   { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
 ]
