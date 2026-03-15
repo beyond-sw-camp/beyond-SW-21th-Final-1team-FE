@@ -360,21 +360,25 @@ const getMonday = (value) => {
 
 const formatWeekValue = (value) => {
   const monday = getMonday(value)
-  const firstDayOfYear = new Date(monday.getFullYear(), 0, 1)
-  const firstMonday = getMonday(firstDayOfYear)
-  const diffDays = Math.round((monday - firstMonday) / 86400000)
+  const thursday = new Date(monday)
+  thursday.setDate(monday.getDate() + 3)
+  const isoYear = thursday.getFullYear()
+  const firstThursday = new Date(isoYear, 0, 4)
+  const firstIsoMonday = getMonday(firstThursday)
+  const diffDays = Math.round((monday - firstIsoMonday) / 86400000)
   const weekNumber = Math.floor(diffDays / 7) + 1
-  return `${monday.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`
+  return `${isoYear}-W${String(weekNumber).padStart(2, '0')}`
 }
 
 const weekValueToMonday = (value) => {
   const [yearPart, weekPart] = String(value).split('-W')
   const year = Number(yearPart)
   const week = Number(weekPart)
-  const firstDayOfYear = new Date(year, 0, 1)
-  const firstMonday = getMonday(firstDayOfYear)
-  firstMonday.setDate(firstMonday.getDate() + (week - 1) * 7)
-  return firstMonday
+  const firstThursday = new Date(year, 0, 4)
+  const firstIsoMonday = getMonday(firstThursday)
+  const monday = new Date(firstIsoMonday)
+  monday.setDate(firstIsoMonday.getDate() + (week - 1) * 7)
+  return monday
 }
 
 const mapPlanType = (plan) => {
@@ -384,10 +388,16 @@ const mapPlanType = (plan) => {
   return 'flex'
 }
 
+const selectedWeekMonday = computed(() =>
+  weekValueToMonday(selectedWeek.value || formatWeekValue(new Date())),
+)
+
 const days = computed(() =>
   Array.from({ length: 5 }, (_, idx) => {
     const planDate = overviewDays.value[idx]?.planDate
-    const date = planDate ? parseIsoDate(planDate) : new Date()
+    const date = planDate
+      ? parseIsoDate(planDate)
+      : new Date(selectedWeekMonday.value.getFullYear(), selectedWeekMonday.value.getMonth(), selectedWeekMonday.value.getDate() + idx)
     return {
       label: ['월', '화', '수', '목', '금'][idx],
       date: formatDateNumber(date),
@@ -427,11 +437,10 @@ const hasStaffShortage = computed(() => Boolean(overviewDays.value[selectedDayIn
 const weekTitle = computed(() => {
   const start = overviewDays.value[0]?.planDate
     ? parseIsoDate(overviewDays.value[0].planDate)
-    : weekValueToMonday(selectedWeek.value || formatWeekValue(new Date()))
-  const end = overviewDays.value[4]?.planDate ? parseIsoDate(overviewDays.value[4].planDate) : new Date(start)
-  if (!overviewDays.value[4]?.planDate) {
-    end.setDate(start.getDate() + 4)
-  }
+    : new Date(selectedWeekMonday.value)
+  const end = overviewDays.value[4]?.planDate
+    ? parseIsoDate(overviewDays.value[4].planDate)
+    : new Date(selectedWeekMonday.value.getFullYear(), selectedWeekMonday.value.getMonth(), selectedWeekMonday.value.getDate() + 4)
   return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${formatDateNumber(start)} - ${formatDateNumber(end)}`
 })
 

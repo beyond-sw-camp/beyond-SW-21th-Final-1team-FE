@@ -376,7 +376,7 @@ const fallbackWeeklySummary = computed(() => {
 
 const effectiveWeeklySummary = computed(() => {
   const apiSummary = weeklySummary.value
-  if (apiSummary && Number(apiSummary.totalWorkedMinutes || 0) > 0) {
+  if (apiSummary?.weekStartDate && apiSummary?.weekEndDate) {
     return apiSummary
   }
   return fallbackWeeklySummary.value

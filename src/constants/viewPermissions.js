@@ -65,6 +65,10 @@ export const VIEW_CATALOG = [
   { viewCode: 'ATTENDANCE_TEAM', routeName: 'attendance-flexible', viewName: '유연근무', viewDesc: '유연근무 화면' },
 ]
 
+const VIEW_DEFAULT_ROUTE_MAP = {
+  ATTENDANCE_TEAM: 'attendance-team',
+}
+
 export const getRequiredRoleCodesByRouteName = (routeName) => {
   if (!routeName) return []
   return VIEW_PERMISSION_MAP[String(routeName)] || []
@@ -84,6 +88,13 @@ export const getViewCodeByRouteName = (routeName) => {
 
 export const getFirstAllowedRouteName = (allowedViewCodes = []) => {
   const allowedSet = new Set(Array.isArray(allowedViewCodes) ? allowedViewCodes : [])
+  const firstPreferredViewCode = Array.from(allowedSet).find(
+    (viewCode) => viewCode !== 'LOGIN' && VIEW_DEFAULT_ROUTE_MAP[viewCode]
+  )
+  if (firstPreferredViewCode) {
+    return VIEW_DEFAULT_ROUTE_MAP[firstPreferredViewCode] || ''
+  }
+
   const first = VIEW_CATALOG.find(
     (item) => item?.routeName && item.viewCode !== 'LOGIN' && allowedSet.has(item.viewCode)
   )

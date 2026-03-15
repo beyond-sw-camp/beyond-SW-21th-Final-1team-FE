@@ -255,6 +255,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
   const checkInTime = ref(null)
   const checkOutTime = ref(null)
   const isLoading = ref(false)
+  let attendanceCalendarRequestSeq = 0
 
   const syncTodayRecord = () => {
     const today = toDateKey(new Date())
@@ -279,7 +280,11 @@ export const useAttendanceStore = defineStore('attendance', () => {
   }
 
   const fetchAttendanceCalendar = async (year, month, scope = 'SELF') => {
+    const requestSeq = ++attendanceCalendarRequestSeq
     const response = await getAttendanceCalendar({ year, month, scope })
+    if (requestSeq !== attendanceCalendarRequestSeq) {
+      return calendarEvents.value
+    }
     calendarEvents.value = (response.data?.events || []).map(mapCalendarEvent)
     return calendarEvents.value
   }
@@ -369,9 +374,28 @@ export const useAttendanceStore = defineStore('attendance', () => {
     return leaveGrantHistory.value
   }
 
-  const fetchMyLeaveRequests = async (page = 1, size = 20) => {
-    const response = await getMyLeaveRequests({ page, size })
-    myLeaveRequestsList.value = (response.data?.content || []).map(mapLeaveRequest)
+  const fetchMyLeaveRequests = async (page = 1, size = 100) => {
+    const firstResponse = await getMyLeaveRequests({ page, size })
+    const firstContent = firstResponse.data?.content || []
+    const totalPages = Number(firstResponse.data?.totalPages || 1)
+
+    if (totalPages <= 1) {
+      myLeaveRequestsList.value = firstContent.map(mapLeaveRequest)
+      return myLeaveRequestsList.value
+    }
+
+    const pageRequests = []
+    for (let currentPage = page + 1; currentPage <= totalPages; currentPage += 1) {
+      pageRequests.push(getMyLeaveRequests({ page: currentPage, size }))
+    }
+
+    const remainingResponses = await Promise.all(pageRequests)
+    const mergedContent = [
+      ...firstContent,
+      ...remainingResponses.flatMap((response) => response.data?.content || []),
+    ]
+
+    myLeaveRequestsList.value = mergedContent.map(mapLeaveRequest)
     return myLeaveRequestsList.value
   }
 
