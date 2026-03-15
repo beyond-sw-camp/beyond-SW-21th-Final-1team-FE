@@ -157,6 +157,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAttendanceStore } from '@/store/attendance'
@@ -291,11 +292,7 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
 const router = useRouter()
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 </script>
 

@@ -156,6 +156,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
@@ -322,11 +323,7 @@ onMounted(async () => {
 const router = useRouter()
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 </script>
 

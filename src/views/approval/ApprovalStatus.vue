@@ -9,6 +9,7 @@ import {
   searchApprovalProgress,
 } from '@/api/approval'
 import { mapApprovalDetailToItem, mapProgressItem } from '@/utils/approvalMapper'
+import { safeBack } from '@/utils/navigation'
 
 const router = useRouter()
 const searchQuery = ref('')
@@ -111,11 +112,7 @@ const handleRedraft = (item) => {
 }
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 
 onMounted(loadStatusOverview)
@@ -526,6 +523,12 @@ watch([activeTab, searchQuery], loadStatusSearch)
   border: 1px solid #eef2f7;
   border-radius: 18px;
   padding: 18px;
+}
+
+.mobile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .mobile-head h1 {

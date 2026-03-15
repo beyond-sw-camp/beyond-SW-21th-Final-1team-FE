@@ -102,6 +102,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import ReviewModal from './components/ReviewModal.vue'
 import {
   getApprovalDetail,
@@ -157,11 +158,7 @@ const handleReviewAction = async (data) => {
 }
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 
 onMounted(loadReviewList)
@@ -354,6 +351,12 @@ onMounted(loadReviewList)
   border: 1px solid #eef2f7;
   border-radius: 18px;
   padding: 18px;
+}
+
+.mobile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .mobile-head h1 {

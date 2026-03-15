@@ -251,6 +251,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import { storeToRefs } from 'pinia'
@@ -566,11 +567,7 @@ onUnmounted(() => {
 })
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 </script>
 

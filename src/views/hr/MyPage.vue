@@ -101,6 +101,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import TabInfo from './tabs/TabInfo.vue'
 import TabHistory from './tabs/TabHistory.vue'
 import TabCertificate from './tabs/TabCertificate.vue'
@@ -234,11 +235,7 @@ const loadMyPageData = async () => {
 }
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 
 onMounted(() => {

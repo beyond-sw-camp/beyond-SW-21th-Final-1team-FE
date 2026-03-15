@@ -104,6 +104,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import NoticeDetailModal from '@/components/notices/NoticeDetailModal.vue'
 import { getNotices } from '@/api/hr'
 import { NOTICE_TYPE_OPTIONS, normalizeNotice, sortNoticesByDateDesc } from '@/utils/notice'
@@ -174,13 +175,6 @@ const closeDetailModal = () => {
   selectedNotice.value = null
 }
 
-const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
-}
 watch([keyword, selectedType], async () => {
   currentPage.value = 1
 })
@@ -265,6 +259,7 @@ onMounted(async () => {
   border-radius:18px;
   padding:18px;
 }
+.mobile-head{display:flex;align-items:center;gap:12px}
 .mobile-head h1{margin:0;font-size:1.3rem;color:var(--gray800)}
 .mobile-head p{margin:6px 0 0;font-size:.86rem;color:var(--gray500)}
 .mobile-back{

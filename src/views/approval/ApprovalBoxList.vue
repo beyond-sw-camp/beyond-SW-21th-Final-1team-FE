@@ -129,6 +129,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
 import { deleteApproval, getApprovalBoxes, getApprovalDetail, markApprovalAsRead } from '@/api/approval'
 import { mapApprovalDetailToItem, mapBoxItem } from '@/utils/approvalMapper'
@@ -258,11 +259,7 @@ const handleModalAction = async (action) => {
 }
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 
 watch(() => route.params.type, (newType) => {
@@ -485,6 +482,12 @@ onMounted(loadBoxList)
   border: 1px solid #eef2f7;
   border-radius: 18px;
   padding: 18px;
+}
+
+.mobile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .mobile-head h1 {

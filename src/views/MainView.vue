@@ -64,7 +64,9 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { getActivePinia } from 'pinia'
 import { clearLoginSession } from '@/utils/auth'
+import { logout } from '@/api/auth'
 import CardProfile from '@/components/dashboard/CardProfile.vue'
 import CardApprovals from '@/components/dashboard/CardApprovals.vue'
 import CardNotices from '@/components/dashboard/CardNotices.vue'
@@ -110,9 +112,18 @@ const mobileActions = [
   },
 ]
 
-const handleLogout = () => {
-  clearLoginSession()
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await logout()
+  } catch (_error) {
+  } finally {
+    clearLoginSession()
+    const pinia = getActivePinia()
+    if (pinia) {
+      pinia.state.value = {}
+    }
+    router.push('/login')
+  }
 }
 </script>
 

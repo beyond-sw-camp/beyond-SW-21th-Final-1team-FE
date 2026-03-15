@@ -159,6 +159,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import ReviewModal from './components/ReviewModal.vue'
 import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
 import {
@@ -263,11 +264,7 @@ const handleGoReview = () => {
 }
 
 const handleBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/')
+  safeBack(router, '/')
 }
 
 onMounted(loadDashboard)
