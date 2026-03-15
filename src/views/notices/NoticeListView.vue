@@ -103,6 +103,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import NoticeDetailModal from '@/components/notices/NoticeDetailModal.vue'
 import { getNotices } from '@/api/hr'
 import { NOTICE_TYPE_OPTIONS, normalizeNotice, sortNoticesByDateDesc } from '@/utils/notice'
