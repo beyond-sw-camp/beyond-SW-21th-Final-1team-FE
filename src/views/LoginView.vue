@@ -40,10 +40,13 @@
           <p v-if="loginError" class="login-error">{{ loginError }}</p>
 
           <p class="test-account-info">
-            관리자 데모: 사번 <strong>2402040001</strong> / 비밀번호 <strong>admin1234!</strong>
+            총괄 데모: 사번 <strong>2502120001</strong> / 비밀번호 <strong>test1</strong>
           </p>
           <p class="test-account-info">
-            사용자 데모: 사번 <strong>2402040002</strong> / 비밀번호 <strong>test1234!</strong>
+            급여 데모: 사번 <strong>2502120002</strong> / 비밀번호 <strong>test1</strong>
+          </p>
+          <p class="test-account-info">
+            관리기본 데모: 사번 <strong>2502120003</strong> / 비밀번호 <strong>test1</strong>
           </p>
 
         </div>
@@ -513,5 +516,42 @@ const submitResetPassword = async () => {
   width: auto;
   display: block;
   object-fit: contain;
+}
+
+@media (max-width: 768px) {
+  .login-page {
+    flex-direction: column;
+  }
+
+  .login-right {
+    display: none;
+  }
+
+  .login-left {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 100vh;
+    padding: 28px 20px 40px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-form-wrap {
+    max-width: 360px;
+    margin: 0 auto;
+  }
+
+  .login-logo {
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+
+  .reset-link {
+    text-align: center;
+  }
+
+  .login-footer {
+    text-align: center;
+  }
 }
 </style>

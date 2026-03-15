@@ -1,5 +1,19 @@
 <template>
   <div class="attendance-record">
+    <div class="mobile-record">
+      <header class="mobile-head">
+        <button class="mobile-back" type="button" aria-label="뒤로가기" @click="handleBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div>
+          <h1>근태 기록</h1>
+          <p>이번 달 근태 현황을 확인합니다.</p>
+        </div>
+      </header>
+    </div>
+
     <!-- Header: Monthly Stats -->
     <div class="record-header-card">
       <div class="header-top">
@@ -142,6 +156,8 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAttendanceStore } from '@/store/attendance'
@@ -273,6 +289,11 @@ const fetchDetails = async () => {
 onMounted(fetchDetails)
 
 watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDetails)
+const router = useRouter()
+
+const handleBack = () => {
+  safeBack(router, '/')
+}
 </script>
 
 <style scoped>
@@ -282,6 +303,38 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
   gap: 16px;
   height: calc(100vh - var(--header-h) - 48px);
   overflow: hidden; /* Prevent page scroll */
+}
+
+.mobile-record {
+  display: none;
+  background: #f5f8fc;
+  border: 1px solid #eef2f7;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.mobile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-head h1 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--gray800);
+}
+
+.mobile-head p {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--gray500);
+}
+
+.mobile-back{
+  width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
+  display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
+  flex-shrink: 0;
 }
 
 /* Common Card Style */
@@ -328,6 +381,19 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
 .stat-text {
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 768px){
+  .attendance-record {
+    height: auto;
+    overflow: visible;
+  }
+  .record-header-card,
+  .action-bar-card,
+  .list-section-card {
+    display: none;
+  }
+  .mobile-record { display: block; }
 }
 .stat-text .num {
   font-size: 1.5rem;

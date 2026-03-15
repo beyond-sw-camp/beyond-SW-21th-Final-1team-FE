@@ -1,5 +1,53 @@
 <template>
   <div class="notice-page">
+    <section class="mobile-notice">
+      <div class="mobile-head">
+        <button class="mobile-back" type="button" aria-label="뒤로가기" @click="handleBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div>
+          <h1>공지사항</h1>
+          <p>회사 공지와 알림을 확인합니다.</p>
+        </div>
+      </div>
+
+      <div class="mobile-search">
+        <select v-model="selectedType" class="type-select">
+          <option v-for="type in NOTICE_TYPE_OPTIONS" :key="type.value" :value="type.value">
+            {{ type.label }}
+          </option>
+        </select>
+        <input v-model="keyword" type="text" class="keyword-input" placeholder="공지사항 제목 검색" />
+      </div>
+
+      <div class="mobile-list">
+        <button
+          v-for="notice in pagedNotices"
+          :key="notice.id"
+          type="button"
+          class="mobile-card"
+          @click="openDetailModal(notice)"
+        >
+          <div class="mobile-card-title">{{ notice.title }}</div>
+          <div class="mobile-card-meta">
+            <span class="font-num">{{ notice.createdAt }}</span>
+            <span>{{ notice.department }} · {{ notice.author }}</span>
+          </div>
+          <span class="type-chip">{{ notice.typeLabel }}</span>
+        </button>
+
+        <div v-if="notices.length === 0" class="empty">검색 결과가 없습니다.</div>
+      </div>
+
+      <div v-if="notices.length > 0" class="pagination">
+        <button type="button" class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
+        <span class="page-info font-num">{{ currentPage }} / {{ totalPages }}</span>
+        <button type="button" class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
+      </div>
+    </section>
+
     <div class="breadcrumb">메인 / 공지사항</div>
 
     <section class="card page-head fade-up">
@@ -52,11 +100,16 @@
 </template>
 
 <script setup>
+import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import NoticeDetailModal from '@/components/notices/NoticeDetailModal.vue'
 import { getNotices } from '@/api/hr'
 import { NOTICE_TYPE_OPTIONS, normalizeNotice, sortNoticesByDateDesc } from '@/utils/notice'
 
+const router = useRouter()
 const PAGE_SIZE = 10
 const keyword = ref('')
 const selectedType = ref('ALL')
@@ -198,4 +251,33 @@ onMounted(async () => {
 .page-btn:hover:not(:disabled){background:var(--gray50)}
 .page-btn:disabled{opacity:.45;cursor:default}
 .page-info{font-size:.82rem;color:var(--gray500)}
+
+.mobile-notice{
+  display:none;
+  background:#f5f8fc;
+  border:1px solid #eef2f7;
+  border-radius:18px;
+  padding:18px;
+}
+.mobile-head{display:flex;align-items:center;gap:12px}
+.mobile-head h1{margin:0;font-size:1.3rem;color:var(--gray800)}
+.mobile-head p{margin:6px 0 0;font-size:.86rem;color:var(--gray500)}
+.mobile-back{
+  width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
+  display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
+}
+.mobile-search{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.mobile-list{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.mobile-card{
+  border:1px solid #dbe4f3;border-radius:14px;background:#fff;
+  padding:14px 16px;text-align:left;box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+.mobile-card-title{font-size:.98rem;font-weight:700;color:var(--gray800);margin-bottom:6px}
+.mobile-card-meta{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--gray500);margin-bottom:8px}
+
+@media (max-width: 768px){
+  .notice-page{max-width:none}
+  .breadcrumb,.page-head,.list-card{display:none}
+  .mobile-notice{display:block}
+}
 </style>

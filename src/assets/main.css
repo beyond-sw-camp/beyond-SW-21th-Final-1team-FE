@@ -77,6 +77,24 @@ input{font-family:var(--font);outline:none}
   flex:1;
 }
 
+@media (max-width: 768px) {
+  #app.mobile-simple .header {
+    display: none;
+  }
+
+  #app.mobile-simple .sidebar {
+    display: none;
+  }
+
+  #app.mobile-simple .app-body {
+    display: block;
+  }
+
+  #app.mobile-simple .main-content {
+    padding: 16px;
+  }
+}
+
 /* ── Glass Card ── */
 .card{
   background:var(--glass);

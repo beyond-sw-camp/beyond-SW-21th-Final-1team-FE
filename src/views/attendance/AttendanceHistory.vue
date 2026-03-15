@@ -1,5 +1,19 @@
 <template>
   <div class="attendance-history">
+    <div class="mobile-history">
+      <header class="mobile-head">
+        <button class="mobile-back" type="button" aria-label="뒤로가기" @click="handleBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div>
+          <h1>신청 내역</h1>
+          <p>신청 내역을 확인합니다.</p>
+        </div>
+      </header>
+    </div>
+
     <!-- Header Card -->
     <div class="header-card">
       <div class="icon-file-text">
@@ -141,7 +155,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
 
@@ -304,6 +320,11 @@ onMounted(async () => {
     store.refreshRequestCounts(),
   ])
 })
+const router = useRouter()
+
+const handleBack = () => {
+  safeBack(router, '/')
+}
 </script>
 
 <style scoped>
@@ -334,6 +355,38 @@ onMounted(async () => {
 }
 .page-title { font-size: 1.2rem; font-weight: 700; color: var(--gray900); margin-bottom: 4px; }
 .page-desc { font-size: 0.9rem; color: var(--gray500); }
+
+.mobile-history {
+  display: none;
+  background: #f5f8fc;
+  border: 1px solid #eef2f7;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.mobile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-head h1 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--gray800);
+}
+
+.mobile-head p {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--gray500);
+}
+
+.mobile-back{
+  width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
+  display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
+  flex-shrink: 0;
+}
 
 /* Summary Cards */
 .summary-row {
@@ -367,6 +420,19 @@ onMounted(async () => {
 .orange-bg { background: #FEF3C7; }
 .green-bg { background: #D1FAE5; }
 .red-bg { background: #FEE2E2; }
+
+@media (max-width: 768px){
+  .attendance-history {
+    height: auto;
+    overflow: visible;
+  }
+  .header-card,
+  .summary-row,
+  .list-section-card {
+    display: none;
+  }
+  .mobile-history { display: block; }
+}
 
 
 /* List Section */
