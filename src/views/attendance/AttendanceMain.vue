@@ -6,7 +6,6 @@
       <div class="card clock-card">
         <div class="card-header-row">
           <div class="date-info">
-            <span class="icon-calendar">📅</span>
             <span>{{ currentDate }}</span>
           </div>
           <span class="status-badge" :class="workStatusClass">{{ workStatusLabel }}</span>
@@ -20,12 +19,12 @@
         <div class="clock-actions">
           <div class="time-row">
             <div class="time-item">
-              <span class="label">☀️ 출근 시간</span>
+              <span class="label">출근 시간</span>
               <span class="value">{{ checkInTime }}</span>
             </div>
             <div class="divider"></div>
             <div class="time-item">
-              <span class="label">🌙 퇴근 시간</span>
+              <span class="label">퇴근 시간</span>
               <span class="value">{{ checkOutTime }}</span>
             </div>
           </div>
@@ -275,7 +274,7 @@ const showActionModal = ref(false)
 const actionReason = ref('')
 const actionType = ref('')
 const actionLoading = ref(false)
-const { checkInTime, checkOutTime, monthlySummary, weeklySummary, calendarEvents } = storeToRefs(store)
+const { checkInTime, checkOutTime, monthlySummary, weeklySummary, calendarEvents, dailyAttendance } = storeToRefs(store)
 
 const isCheckedIn = computed(() => {
   return !!checkInTime.value && !checkOutTime.value
@@ -324,22 +323,74 @@ const toDateKey = (value) => {
   return `${year}-${month}-${day}`
 }
 
+const toMinutesFromClock = (checkIn, checkOut) => {
+  if (!checkIn || !checkOut) return 0
+  const [checkInHour, checkInMinute] = String(checkIn).slice(0, 5).split(':').map(Number)
+  const [checkOutHour, checkOutMinute] = String(checkOut).slice(0, 5).split(':').map(Number)
+  if ([checkInHour, checkInMinute, checkOutHour, checkOutMinute].some(Number.isNaN)) {
+    return 0
+  }
+
+  let diff = (checkOutHour * 60 + checkOutMinute) - (checkInHour * 60 + checkInMinute)
+  if (diff < 0) {
+    diff += 24 * 60
+  }
+  return Math.max(diff, 0)
+}
+
 const weeklyPeriodLabel = computed(() => {
-  if (!weeklySummary.value?.weekStartDate || !weeklySummary.value?.weekEndDate) return '-'
-  const weekStart = new Date(`${weeklySummary.value.weekStartDate}T00:00:00`)
-  const weekEnd = new Date(`${weeklySummary.value.weekEndDate}T00:00:00`)
+  if (!effectiveWeeklySummary.value?.weekStartDate || !effectiveWeeklySummary.value?.weekEndDate) return '-'
+  const weekStart = new Date(`${effectiveWeeklySummary.value.weekStartDate}T00:00:00`)
+  const weekEnd = new Date(`${effectiveWeeklySummary.value.weekEndDate}T00:00:00`)
   return `${formatMonthDate(weekStart)} - ${formatMonthDate(weekEnd)}`
 })
 
-const weeklyHoursDisplay = computed(() => formatHours(weeklySummary.value?.totalWorkedMinutes || 0))
-const regularHoursDisplay = computed(() => formatHours(weeklySummary.value?.regularWorkedMinutes || 0))
-const overtimeHoursDisplay = computed(() => formatHours(weeklySummary.value?.overtimeWorkedMinutes || 0))
-const weeklyProgressPercent = computed(() => weeklySummary.value?.progressPercent || 0)
+const fallbackWeeklySummary = computed(() => {
+  const now = new Date()
+  const weekStart = getWeekStart(now)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekStart.getDate() + 6)
+
+  const totalWorkedMinutes = (dailyAttendance.value || [])
+    .filter((record) => {
+      if (!record?.date) return false
+      const recordDate = new Date(`${record.date}T00:00:00`)
+      return recordDate >= weekStart && recordDate <= weekEnd
+    })
+    .reduce(
+      (sum, record) => sum + toMinutesFromClock(record.checkIn, record.checkOut),
+      0,
+    )
+
+  const standardWeeklyMinutes = 40 * 60
+  return {
+    weekStartDate: toDateKey(weekStart),
+    weekEndDate: toDateKey(weekEnd),
+    totalWorkedMinutes,
+    regularWorkedMinutes: Math.min(totalWorkedMinutes, standardWeeklyMinutes),
+    overtimeWorkedMinutes: Math.max(totalWorkedMinutes - standardWeeklyMinutes, 0),
+    progressPercent:
+      standardWeeklyMinutes === 0 ? 0 : Math.round((totalWorkedMinutes / standardWeeklyMinutes) * 100),
+  }
+})
+
+const effectiveWeeklySummary = computed(() => {
+  const apiSummary = weeklySummary.value
+  if (apiSummary?.weekStartDate && apiSummary?.weekEndDate) {
+    return apiSummary
+  }
+  return fallbackWeeklySummary.value
+})
+
+const weeklyHoursDisplay = computed(() => formatHours(effectiveWeeklySummary.value?.totalWorkedMinutes || 0))
+const regularHoursDisplay = computed(() => formatHours(effectiveWeeklySummary.value?.regularWorkedMinutes || 0))
+const overtimeHoursDisplay = computed(() => formatHours(effectiveWeeklySummary.value?.overtimeWorkedMinutes || 0))
+const weeklyProgressPercent = computed(() => effectiveWeeklySummary.value?.progressPercent || 0)
 const weeklyProgressBarWidth = computed(() => Math.min(100, weeklyProgressPercent.value))
 const weeklyProgressLabel = computed(() =>
-  (weeklySummary.value?.totalWorkedMinutes || 0) >= 40 * 60
+  (effectiveWeeklySummary.value?.totalWorkedMinutes || 0) >= 40 * 60
     ? '표준 40h 달성'
-    : `표준 40h까지 ${formatHours(40 * 60 - (weeklySummary.value?.totalWorkedMinutes || 0))}h 남음`,
+    : `표준 40h까지 ${formatHours(40 * 60 - (effectiveWeeklySummary.value?.totalWorkedMinutes || 0))}h 남음`,
 )
 
 const displayMonth = computed(() => {

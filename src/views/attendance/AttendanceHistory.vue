@@ -75,7 +75,7 @@
       </div>
 
       <div class="table-wrapper">
-        <table class="history-table">
+        <table v-if="paginatedHistoryList.length" class="history-table">
           <thead>
             <tr>
               <th width="15%">신청일</th>
@@ -87,7 +87,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, idx) in filteredHistoryList" :key="idx">
+            <tr v-for="item in paginatedHistoryList" :key="item.id">
               <td class="date">{{ item.date }}</td>
               <td><span class="type-badge" :class="getTypeColor(item.type)">{{ item.type }}</span></td>
               <td class="title">{{ item.title }}</td>
@@ -100,18 +100,30 @@
                   @click="handleStatusClick(item)"
                 >
                   {{ item.status }}
+                  <span v-if="item.status === '반려'" class="status-hint">사유 보기</span>
                 </span>
               </td>
             </tr>
           </tbody>
         </table>
+        <div v-else class="empty-state">
+          조회된 신청 내역이 없습니다.
+        </div>
       </div>
 
       <!-- Pagination -->
-      <div class="pagination">
-        <button class="page-arrow" disabled>&lt;</button>
-        <button class="page-num active">1</button>
-        <button class="page-arrow">&gt;</button>
+      <div class="pagination" v-if="totalPages > 1">
+        <button class="page-arrow" :disabled="currentPage === 1" @click="goPrevPage">&lt;</button>
+        <button
+          v-for="page in pageNumbers"
+          :key="page"
+          class="page-num"
+          :class="{ active: currentPage === page }"
+          @click="setPage(page)"
+        >
+          {{ page }}
+        </button>
+        <button class="page-arrow" :disabled="currentPage === totalPages" @click="goNextPage">&gt;</button>
       </div>
     </div>
 
@@ -129,28 +141,58 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
 
 const store = useAttendanceStore()
 
+const formatDateTime = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return String(value).replace('T', ' ').slice(0, 16).replace(/-/g, '.')
+  }
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}.${month}.${day} ${hours}:${minutes}`
+}
+
+const formatDate = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return String(value).slice(0, 10).replace(/-/g, '.')
+  }
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}.${month}.${day}`
+}
+
 const historyList = computed(() => {
-  return store.requestHistory.map(item => ({
+  return [...store.requestHistory]
+    .map(item => ({
     id: item.id,
-    date: String(item.appliedAt || '').replace(/-/g, '.').replace('T', ' '),
+    rawAppliedAt: item.appliedAt,
+    date: formatDateTime(item.appliedAt),
     type: item.type,
     title: item.title || `${item.type} 신청`,
-    targetDate: item.targetDate ? String(item.targetDate).replace(/-/g, '.') : item.period,
+    targetDate: item.targetDate ? formatDate(item.targetDate) : item.period,
     approver: item.approver || '-',
     status: mapStatus(item.status),
     rejectReason: item.rejectReason || item.rejectionReason || '',
   }))
+    .sort((a, b) => new Date(b.rawAppliedAt).getTime() - new Date(a.rawAppliedAt).getTime())
 })
 
-const tabs = ['전체', '휴가', '근무']
+const tabs = ['전체', '휴가', '연장', '외근/출장', '재택']
 const activeTab = ref('전체')
 const searchQuery = ref('')
+const currentPage = ref(1)
 
 const filteredHistoryList = computed(() => {
   let list = historyList.value
@@ -158,8 +200,12 @@ const filteredHistoryList = computed(() => {
   // 1. Filter by Tab
   if (activeTab.value === '휴가') {
     list = list.filter(item => item.type === '휴가' || item.type.includes('휴가'))
-  } else if (activeTab.value === '근무') {
-    list = list.filter(item => item.type !== '휴가' && !item.type.includes('휴가'))
+  } else if (activeTab.value === '연장') {
+    list = list.filter(item => item.type.includes('연장'))
+  } else if (activeTab.value === '외근/출장') {
+    list = list.filter(item => item.type.includes('외근') || item.type.includes('출장'))
+  } else if (activeTab.value === '재택') {
+    list = list.filter(item => item.type.includes('재택'))
   }
 
   // 2. Filter by Search
@@ -168,11 +214,25 @@ const filteredHistoryList = computed(() => {
     list = list.filter(item => 
       item.title.toLowerCase().includes(query) || 
       (item.approver && item.approver.toLowerCase().includes(query)) ||
-      (item.type && item.type.toLowerCase().includes(query))
+      (item.type && item.type.toLowerCase().includes(query)) ||
+      (item.status && item.status.toLowerCase().includes(query)) ||
+      (item.targetDate && item.targetDate.toLowerCase().includes(query)) ||
+      (item.date && item.date.toLowerCase().includes(query))
     )
   }
   
   return list
+})
+
+const pageSize = 8
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredHistoryList.value.length / pageSize)))
+
+const pageNumbers = computed(() => Array.from({ length: totalPages.value }, (_, idx) => idx + 1))
+
+const paginatedHistoryList = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredHistoryList.value.slice(start, start + pageSize)
 })
 
 const mapStatus = (status) => {
@@ -212,6 +272,31 @@ const handleStatusClick = (item) => {
     showReasonModal.value = true
   }
 }
+
+const setPage = (page) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+}
+
+const goPrevPage = () => {
+  if (currentPage.value > 1) currentPage.value -= 1
+}
+
+const goNextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value += 1
+}
+
+const resetToFirstPage = () => {
+  currentPage.value = 1
+}
+
+watch([activeTab, searchQuery], resetToFirstPage)
+
+watch(totalPages, (nextTotalPages) => {
+  if (currentPage.value > nextTotalPages) {
+    currentPage.value = nextTotalPages
+  }
+})
 
 onMounted(async () => {
   await Promise.all([
@@ -316,6 +401,14 @@ onMounted(async () => {
 .table-wrapper {
   flex: 1;
   overflow-y: auto;
+}
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  color: var(--gray500);
+  font-size: 0.95rem;
 }
 .history-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .history-table th {
