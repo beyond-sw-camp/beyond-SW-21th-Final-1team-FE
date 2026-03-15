@@ -47,11 +47,10 @@ export const getOrganizationTree = () => unwrap(api.get('/org/tree'))
 export const getOrganizationMembers = (orgId) => unwrap(api.get(`/org/${orgId}/members`))
 export const getCertificateRequestHistories = () => unwrap(api.get('/mypage/certificates/requests'))
 export const createCertificateRequest = (payload) => unwrap(api.post('/mypage/certificates/requests', payload))
-export const getMyOrganizationMembers = (page = 1, orgId) =>
+export const getMyOrganizationMembers = (orgId) =>
   unwrap(
     api.get('/org/my/members', {
       params: {
-        page,
         ...(orgId ? { orgId } : {}),
       },
     }),
