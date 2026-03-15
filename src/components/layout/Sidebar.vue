@@ -507,14 +507,7 @@ const adminMenus = [
   { label: '인사 정보 조회', icon: DashboardIcon, route: '/admin/main', viewCodes: ['ADMIN_MAIN'] },
   { label: '사원 등록', icon: UserPlusIcon, route: '/admin/employees', viewCodes: ['ADMIN_EMPLOYEES'] },
   { label: '인사 정보 변경 관리', icon: RefreshCwIcon, route: '/admin/hr-change', viewCodes: ['ADMIN_HR_CHANGE'] },
-  {
-    label: 'KMS 권한 변경 이력',
-    icon: ClockIcon,
-    route: '/admin/kms-permissions-history',
-    viewCodes: ['ADMIN_KMS_PERMISSION_HISTORY'],
-  },
   { label: '근태 관리', icon: ClockIcon, route: '/admin/attendance', viewCodes: ['ADMIN_ATTENDANCE'] },
-  { label: '정책 관리', icon: ShieldIcon, route: '/admin/policies', viewCodes: ['ADMIN_POLICIES'] },
   { label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
   { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
 ]
@@ -630,11 +623,7 @@ const shortcutOptionsByUser = computed(() =>
   ),
 )
 
-const defaultShortcutKeysByUser = computed(() =>
-  isAdminUser.value
-    ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
-    : ['hr-my', 'hr-org', 'attendance-my'],
-)
+const defaultShortcutKeysByUser = computed(() => [])
 
 const shortcuts = computed(() => {
   const selectedKeySet = new Set(selectedShortcutKeys.value)
@@ -657,7 +646,7 @@ function loadShortcutKeys(userId) {
     const validated = Array.isArray(parsed)
       ? parsed.filter((key) => optionKeys.has(key))
       : fallback
-    selectedShortcutKeys.value = validated.length ? validated : fallback
+    selectedShortcutKeys.value = validated
   } catch (error) {
     selectedShortcutKeys.value = fallback
   }
@@ -675,7 +664,7 @@ const openShortcutModal = () => {
 const saveShortcutSelection = () => {
   const optionKeys = new Set(shortcutOptionsByUser.value.map((item) => item.key))
   const validated = draftShortcutKeys.value.filter((key) => optionKeys.has(key))
-  selectedShortcutKeys.value = validated.length ? validated : [...defaultShortcutKeysByUser.value]
+  selectedShortcutKeys.value = validated
   saveShortcutKeys(currentUserId.value, selectedShortcutKeys.value)
   showShortcutModal.value = false
 }

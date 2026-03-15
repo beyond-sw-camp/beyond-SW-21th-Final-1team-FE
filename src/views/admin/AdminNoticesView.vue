@@ -39,14 +39,27 @@
         <div>생성일자</div>
       </div>
 
-      <div v-if="filteredNoticeList.length === 0" class="empty">등록된 공지사항이 없습니다.</div>
+      <div v-if="noticeList.length === 0" class="empty">등록된 공지사항이 없습니다.</div>
 
-      <div v-for="notice in pagedNoticeList" :key="notice.id" class="list-row">
+      <div v-for="notice in noticeList" :key="notice.id" class="list-row">
         <div>
           <span class="type-chip">{{ notice.typeLabel }}</span>
         </div>
         <div class="title-cell">
+          <button
+            type="button"
+            class="pin-toggle-btn"
+            :class="{ active: notice.isPinned }"
+            :disabled="pinUpdatingId === notice.id"
+            :title="notice.isPinned ? '고정 해제' : '상단 고정'"
+            @click.stop="togglePin(notice)"
+          >
+            <span class="pin-icon" aria-hidden="true"></span>
+          </button>
           <button type="button" class="title-btn" @click="openDetailModal(notice)">
+            <span v-if="notice.isPinned" class="pin-badge" aria-label="고정">
+              <span class="pin-icon" aria-hidden="true"></span>
+            </span>
             {{ notice.title }}
           </button>
         </div>
@@ -54,7 +67,7 @@
         <div class="font-num">{{ notice.createdAt }}</div>
       </div>
 
-      <div v-if="filteredNoticeList.length > 0" class="pagination">
+      <div v-if="totalElements > 0" class="pagination">
         <button type="button" class="page-btn" :disabled="currentPage === 1" @click="currentPage--">
           이전
         </button>
@@ -62,7 +75,7 @@
         <button
           type="button"
           class="page-btn"
-          :disabled="currentPage === totalPages"
+          :disabled="currentPage >= totalPages"
           @click="currentPage++"
         >
           다음
@@ -105,7 +118,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-ghost" @click="closeCreateModal">취소</button>
-          <button type="button" class="btn-primary" :disabled="!canSubmit" @click="submitCreate">
+          <button type="button" class="btn-primary" :disabled="isSubmitting || !canSubmit" @click="submitCreate">
             등록
           </button>
         </div>
@@ -124,12 +137,11 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import NoticeDetailModal from '@/components/notices/NoticeDetailModal.vue'
-import { AUTH_KEYS } from '@/utils/auth'
-import { NOTICE_TYPE_OPTIONS, createNotice, searchNotices } from '@/mocks/notices'
+import { createAdminNotice, getAdminMyNotices, getNotices, updateAdminNoticePin } from '@/api/hr'
+import { NOTICE_TYPE_OPTIONS, normalizeNotice } from '@/utils/notice'
 
-const PAGE_SIZE = 10
 const showCreateModal = ref(false)
 const showDetailModal = ref(false)
 const toastMessage = ref('')
@@ -137,27 +149,21 @@ const selectedType = ref('ALL')
 const viewMode = ref('ALL')
 const currentPage = ref(1)
 const selectedNotice = ref(null)
+const noticeList = ref([])
+const totalPages = ref(1)
+const totalElements = ref(0)
+const loading = ref(false)
+const isSubmitting = ref(false)
+const pinUpdatingId = ref(null)
 let toastTimer = null
-
-const sessionUserName = computed(() => sessionStorage.getItem(AUTH_KEYS.userName) || '관리자')
 
 const form = reactive({
   title: '',
-  type: NOTICE_TYPE_OPTIONS[1]?.value || 'SYSTEM_NOTICE',
+  type: NOTICE_TYPE_OPTIONS[1]?.value || 'SYSTEM',
   content: ''
 })
 
 const formTypeOptions = NOTICE_TYPE_OPTIONS.filter((item) => item.value !== 'ALL')
-const filteredNoticeList = computed(() => {
-  const rows = searchNotices({ type: selectedType.value })
-  if (viewMode.value !== 'MINE') return rows
-  return rows.filter((item) => item.author === sessionUserName.value)
-})
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredNoticeList.value.length / PAGE_SIZE)))
-const pagedNoticeList = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return filteredNoticeList.value.slice(start, start + PAGE_SIZE)
-})
 
 const canSubmit = computed(
   () => form.title.trim().length > 0 && form.content.trim().length > 0 && !!form.type
@@ -165,7 +171,7 @@ const canSubmit = computed(
 
 const resetForm = () => {
   form.title = ''
-  form.type = formTypeOptions[0]?.value || 'SYSTEM_NOTICE'
+  form.type = formTypeOptions[0]?.value || 'SYSTEM'
   form.content = ''
 }
 
@@ -200,27 +206,82 @@ onBeforeUnmount(() => {
   if (toastTimer) clearTimeout(toastTimer)
 })
 
-watch([selectedType, viewMode], () => {
-  currentPage.value = 1
+const fetchNoticePage = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: currentPage.value,
+      ...(selectedType.value !== 'ALL' ? { noticeType: selectedType.value } : {}),
+    }
+    const pageData =
+      viewMode.value === 'MINE' ? await getAdminMyNotices(params) : await getNotices(params)
+    const content = Array.isArray(pageData?.content) ? pageData.content : []
+    noticeList.value = content.map((row) => normalizeNotice(row))
+    totalPages.value = Math.max(1, Number(pageData?.totalPages || 1))
+    totalElements.value = Number(pageData?.totalElements || 0)
+  } catch (error) {
+    noticeList.value = []
+    totalPages.value = 1
+    totalElements.value = 0
+    alert(error?.response?.data?.error?.message || '공지사항 조회에 실패했습니다.')
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(currentPage, async () => {
+  await fetchNoticePage()
 })
 
 watch(totalPages, (nextPage) => {
   if (currentPage.value > nextPage) currentPage.value = nextPage
 })
 
-const submitCreate = () => {
-  if (!canSubmit.value) return
+watch([selectedType, viewMode], async () => {
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+    return
+  }
+  await fetchNoticePage()
+})
 
-  createNotice({
-    title: form.title,
-    type: form.type,
-    content: form.content,
-    author: sessionUserName.value
-  })
-
-  closeCreateModal()
-  showToast('공지사항이 등록되었습니다.')
+const submitCreate = async () => {
+  if (isSubmitting.value || !canSubmit.value) return
+  isSubmitting.value = true
+  try {
+    await createAdminNotice({
+      title: form.title.trim(),
+      content: form.content.trim(),
+      noticeType: form.type,
+    })
+    closeCreateModal()
+    currentPage.value = 1
+    await fetchNoticePage()
+    showToast('공지사항이 등록되었습니다.')
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '공지사항 등록에 실패했습니다.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
+
+const togglePin = async (notice) => {
+  if (pinUpdatingId.value) return
+  pinUpdatingId.value = notice.id
+  try {
+    await updateAdminNoticePin(notice.id, !notice.isPinned)
+    await fetchNoticePage()
+    showToast(notice.isPinned ? '고정을 해제했습니다.' : '상단에 고정했습니다.')
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '공지사항 고정 변경에 실패했습니다.')
+  } finally {
+    pinUpdatingId.value = null
+  }
+}
+
+onMounted(async () => {
+  await fetchNoticePage()
+})
 </script>
 
 <style scoped>
@@ -291,7 +352,41 @@ const submitCreate = () => {
   font-weight: 700;
 }
 .list-row { border-bottom: 1px solid var(--gray100); color: var(--gray700); font-size: .88rem; }
-.title-cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pin-toggle-btn{
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--gray200);
+  background: #fff;
+  color: var(--gray400);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.pin-toggle-btn:hover{
+  border-color: #fdba74;
+  color: #c2410c;
+  background: #fff7ed;
+}
+.pin-toggle-btn.active{
+  border-color: #fdba74;
+  color: #9a3412;
+  background: #fff7ed;
+}
+.pin-toggle-btn:disabled{
+  opacity: .5;
+  cursor: default;
+}
 .title-btn {
   border: none;
   background: transparent;
@@ -304,8 +399,29 @@ const submitCreate = () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .title-btn:hover { color: var(--primary-dark); text-decoration: underline; }
+.pin-badge{
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+.pin-icon{
+  width: 9px;
+  height: 9px;
+  background: currentColor;
+  clip-path: polygon(50% 0, 86% 14%, 86% 44%, 58% 44%, 58% 100%, 42% 100%, 42% 44%, 14% 44%, 14% 14%);
+}
 .type-chip {
   display: inline-flex;
   align-items: center;
