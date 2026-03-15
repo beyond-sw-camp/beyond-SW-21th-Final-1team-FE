@@ -623,11 +623,7 @@ const shortcutOptionsByUser = computed(() =>
   ),
 )
 
-const defaultShortcutKeysByUser = computed(() =>
-  isAdminUser.value
-    ? ['admin-main', 'admin-employees', 'hr-my', 'attendance-my']
-    : ['hr-my', 'hr-org', 'attendance-my'],
-)
+const defaultShortcutKeysByUser = computed(() => [])
 
 const shortcuts = computed(() => {
   const selectedKeySet = new Set(selectedShortcutKeys.value)
@@ -650,7 +646,7 @@ function loadShortcutKeys(userId) {
     const validated = Array.isArray(parsed)
       ? parsed.filter((key) => optionKeys.has(key))
       : fallback
-    selectedShortcutKeys.value = validated.length ? validated : fallback
+    selectedShortcutKeys.value = validated
   } catch (error) {
     selectedShortcutKeys.value = fallback
   }
@@ -668,7 +664,7 @@ const openShortcutModal = () => {
 const saveShortcutSelection = () => {
   const optionKeys = new Set(shortcutOptionsByUser.value.map((item) => item.key))
   const validated = draftShortcutKeys.value.filter((key) => optionKeys.has(key))
-  selectedShortcutKeys.value = validated.length ? validated : [...defaultShortcutKeysByUser.value]
+  selectedShortcutKeys.value = validated
   saveShortcutKeys(currentUserId.value, selectedShortcutKeys.value)
   showShortcutModal.value = false
 }

@@ -4,7 +4,7 @@
       <h3>팀 기념일</h3>
     </div>
     <div class="card-body" style="padding:8px 18px">
-      <div v-for="(item, i) in items" :key="i" class="bday-item">
+      <div v-for="item in items" :key="item.employeeId" class="bday-item">
         <div class="bday-icon">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/>
@@ -22,17 +22,40 @@
           <div class="bday-dday">{{ item.dday }}</div>
         </div>
       </div>
-      <div class="bday-empty">예정된 기념일이 없습니다</div>
+      <div v-if="!items.length" class="bday-empty">예정된 기념일이 없습니다</div>
     </div>
   </div>
 </template>
 
 <script setup>
-const items = [
-  { name: '이승주', type: '생일', date: '03.24', dday: 'D-5' },
-  { name: '김서연', type: '생일', date: '03.28', dday: 'D-5' },
-  { name: '팀 설립일', type: '기념일', date: '04.01', dday: 'D-5' },
-]
+import { onMounted, ref } from 'vue'
+import { getTeamBirthdays } from '@/api/hr'
+
+const items = ref([])
+
+const formatDday = (daysRemaining) => {
+  if (daysRemaining === 0) return 'D-DAY'
+  return `D-${daysRemaining}`
+}
+
+const loadTeamBirthdays = async () => {
+  try {
+    const data = await getTeamBirthdays()
+    const rows = Array.isArray(data) ? data : []
+    items.value = rows.map((row) => ({
+      employeeId: row.employeeId,
+      name: row.employeeName,
+      type: '생일',
+      date: row.birthday,
+      dday: formatDday(Number(row.daysRemaining ?? 0)),
+    }))
+  } catch (error) {
+    items.value = []
+    console.error('팀 기념일 조회 실패:', error)
+  }
+}
+
+onMounted(loadTeamBirthdays)
 </script>
 
 <style scoped>
