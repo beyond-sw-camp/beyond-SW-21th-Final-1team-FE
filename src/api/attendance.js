@@ -11,6 +11,7 @@ export const getAdminDailyAttendanceRecords = (params) =>
   api.get('/attendance/admin/daily-records', { params })
 
 export const getLeaveBalance = () => api.get('/leaves/balance')
+export const getLeaveGrantHistory = (params) => api.get('/leaves/grants', { params })
 export const getMyLeaveRequests = (params) => api.get('/leaves/my-requests', { params })
 export const getLeaveStatusCounts = () => api.get('/leaves/status-counts')
 export const applyLeave = (payload) => api.post('/leaves/apply', payload)

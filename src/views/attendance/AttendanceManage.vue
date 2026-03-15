@@ -15,14 +15,14 @@
         :class="{ active: currentTab === 'daily' }"
         @click="currentTab = 'daily'"
       >
-        📅 일별 근태 현황
+        일별 근태 현황
       </button>
       <button 
         class="tab-btn" 
         :class="{ active: currentTab === 'approval' }"
         @click="currentTab = 'approval'"
       >
-        ✅ 휴가 승인 관리
+        휴가 승인 관리
       </button>
     </div>
 
@@ -33,12 +33,8 @@
         <div class="filter-row">
 
           <div class="filter-group">
-            <label>기간</label>
-            <div class="date-range-row">
-              <input type="date" v-model="filters.startDate" class="date-input" />
-              <span class="tilde">~</span>
-              <input type="date" v-model="filters.endDate" class="date-input" />
-            </div>
+            <label>날짜</label>
+            <input type="date" v-model="filters.date" class="date-input" />
           </div>
           <div class="filter-group">
             <label>근태 상태</label>
@@ -59,9 +55,6 @@
       <div class="data-card">
         <div class="card-header">
           <span class="total-count">총 <strong>{{ filteredList.length }}</strong>건</span>
-          <div class="actions">
-            <button class="btn-excel">엑셀 다운로드</button>
-          </div>
         </div>
         
         <div class="table-container">
@@ -185,6 +178,9 @@
                 </td>
                 <td>{{ leave.appliedAt }}</td>
               </tr>
+              <tr v-if="sortedLeaveList.length === 0">
+                <td colspan="9" class="empty-cell">현재 같은 부서 팀원의 휴가 신청 내역이 없습니다.</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -287,14 +283,12 @@ const currentTab = ref('daily')
 // --- State (Daily) ---
 const filters = ref({
   dept: '',
-  startDate: '',
-  endDate: '',
+  date: '',
   status: ''
 })
 
 const appliedFilters = ref({
-  startDate: '',
-  endDate: '',
+  date: '',
   status: ''
 })
 
@@ -322,9 +316,7 @@ const filteredList = computed(() => {
     // Status Filter
     if (appliedFilters.value.status && item.status !== appliedFilters.value.status) return false
     
-    // Date Range Filter
-    if (appliedFilters.value.startDate && item.date < appliedFilters.value.startDate) return false
-    if (appliedFilters.value.endDate && item.date > appliedFilters.value.endDate) return false
+    if (appliedFilters.value.date && item.date !== appliedFilters.value.date) return false
     
     return true
   })
@@ -361,21 +353,19 @@ const isAllLeaveSelected = computed(() => {
 })
 
 const today = new Date()
-const currentMonthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
-const currentMonthEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
-  new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(),
+const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+  today.getDate(),
 ).padStart(2, '0')}`
 
-filters.value.startDate = currentMonthStart
-filters.value.endDate = currentMonthEnd
+filters.value.date = currentDate
 appliedFilters.value = { ...filters.value }
 
 // --- Methods (Daily) ---
 const fetchData = async () => {
   appliedFilters.value = { ...filters.value }
   await store.fetchAdminDailyAttendanceList({
-    startDate: appliedFilters.value.startDate || null,
-    endDate: appliedFilters.value.endDate || null,
+    startDate: appliedFilters.value.date || null,
+    endDate: appliedFilters.value.date || null,
     status: appliedFilters.value.status || null,
   })
 }
@@ -549,12 +539,6 @@ onMounted(async () => {
   font-size: 0.85rem; font-weight: 700; color: var(--gray700);
   text-transform: uppercase; letter-spacing: 0.03em;
 }
-.date-range-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
 .select-input, .date-input {
   padding: 10px 14px;
   border: 1px solid var(--gray300);
@@ -571,7 +555,6 @@ onMounted(async () => {
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
 }
 
-.tilde { margin: 0 4px; padding-top: 10px; color: var(--gray400); font-weight: 700; }
 .btn-search {
   padding: 10px 24px;
   background: var(--primary);
@@ -693,6 +676,7 @@ onMounted(async () => {
 .row-alert { background: #FEF2F2 !important; }
 .row-alert td { border-bottom-color: #FECACA; }
 .row-alert:hover td { background: #FEE2E2 !important; }
+.empty-cell { text-align: center; color: var(--gray500); padding: 36px 24px; }
 
 .btn-edit {
   border: 1px solid var(--gray300); background: #fff;

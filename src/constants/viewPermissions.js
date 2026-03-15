@@ -61,8 +61,8 @@ export const VIEW_CATALOG = [
   { viewCode: 'ATTENDANCE_SCHEDULE', routeName: 'attendance-schedule', viewName: '근무 일정', viewDesc: '근무 일정 화면' },
   { viewCode: 'ATTENDANCE_VACATION', routeName: 'attendance-vacation', viewName: '휴가 관리', viewDesc: '휴가 관리 화면' },
   { viewCode: 'ATTENDANCE_TEAM', routeName: 'attendance-team', viewName: '팀 근태', viewDesc: '팀 근태 화면' },
-  { viewCode: 'ATTENDANCE_MANAGE', routeName: 'attendance-manage', viewName: '근태 승인/관리', viewDesc: '근태 승인/관리 화면' },
-  { viewCode: 'ATTENDANCE_FLEXIBLE', routeName: 'attendance-flexible', viewName: '유연근무', viewDesc: '유연근무 화면' },
+  { viewCode: 'ATTENDANCE_TEAM', routeName: 'attendance-manage', viewName: '근태 승인/관리', viewDesc: '근태 승인/관리 화면' },
+  { viewCode: 'ATTENDANCE_TEAM', routeName: 'attendance-flexible', viewName: '유연근무', viewDesc: '유연근무 화면' },
 ]
 
 export const getRequiredRoleCodesByRouteName = (routeName) => {

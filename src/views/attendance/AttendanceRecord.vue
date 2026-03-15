@@ -34,7 +34,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </div>
           <div class="stat-text">
-            <span class="num">{{ monthlyStats.remoteCount }}</span>
+            <span class="num">{{ monthlyStats.absentCount }}</span>
             <span class="label">결근</span>
           </div>
         </div>
@@ -65,13 +65,14 @@
       <div class="action-right">
         <div class="month-selector">
           <button class="btn-icon" @click="goPrevMonth" aria-label="이전 달">&lt;</button>
-          <span class="current-month">{{ selectorMonthLabel }}</span>
+          <input
+            v-model="selectedMonthValue"
+            class="month-input"
+            type="month"
+            aria-label="조회 월 선택"
+          />
           <button class="btn-icon" @click="goNextMonth" aria-label="다음 달">&gt;</button>
         </div>
-        <button class="btn-download">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          엑셀 다운로드
-        </button>
       </div>
     </div>
 
@@ -96,15 +97,14 @@
       </div>
 
       <div class="table-wrapper">
-        <table class="record-table">
+        <table v-if="paginatedRecords.length" class="record-table">
           <thead>
             <tr>
               <th>날짜</th>
               <th>출근 시간</th>
               <th>퇴근 시간</th>
               <th>상태</th>
-              <th>메모</th>
-              <th class="text-right">총 근무시간</th>
+              <th class="text-right col-work-hours">총 근무시간</th>
             </tr>
           </thead>
           <tbody>
@@ -113,11 +113,13 @@
               <td>{{ row.checkIn || '-' }}</td>
               <td>{{ row.checkOut || '-' }}</td>
               <td><span class="status-tag" :class="row.status">{{ row.statusDescription }}</span></td>
-              <td class="memo">{{ row.memo }}</td>
-              <td class="text-right font-bold">{{ row.workHours }}</td>
+              <td class="text-right font-bold col-work-hours">{{ row.workHours }}</td>
             </tr>
           </tbody>
         </table>
+        <div v-else class="empty-state">
+          조회된 근태 기록이 없습니다.
+        </div>
       </div>
 
       <!-- Pagination -->
@@ -155,6 +157,7 @@ const tabs = [
   { value: 'normal', label: '정상' },
   { value: 'tardy', label: '지각' },
   { value: 'early_leave', label: '조퇴' },
+  { value: 'absent', label: '결근' },
   { value: 'vacation', label: '휴가' }
 ]
 const selectedMonth = ref({ year: new Date().getFullYear(), month: new Date().getMonth() + 1 })
@@ -167,13 +170,23 @@ const selectorMonthLabel = computed(() => {
   return `${selectedMonth.value.year}.${month}`
 })
 
+const selectedMonthValue = computed({
+  get: () => `${selectedMonth.value.year}-${String(selectedMonth.value.month).padStart(2, '0')}`,
+  set: (value) => {
+    if (!value) return
+    const [year, month] = value.split('-').map(Number)
+    if (!year || !month) return
+    selectedMonth.value = { year, month }
+  },
+})
+
 const headerMonthLabel = computed(() => `${selectedMonth.value.year}년 ${selectedMonth.value.month}월`)
 
 const monthlyStats = computed(() => {
   return {
     normalCount: monthlySummary.value.normalCount,
     lateCount: monthlySummary.value.tardyCount + monthlySummary.value.earlyLeaveCount,
-    remoteCount: monthlySummary.value.absentCount,
+    absentCount: monthlySummary.value.absentCount,
     leaveDays: monthlySummary.value.vacationCount,
   }
 })
@@ -379,6 +392,14 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
   padding: 4px;
   gap: 8px;
 }
+.month-input {
+  border: 1px solid var(--gray200);
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  color: var(--gray700);
+}
 .btn-icon {
   width: 24px; height: 24px;
   border: none; background: #fff;
@@ -440,6 +461,14 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
   overflow-y: auto;
   min-height: 0;
 }
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  color: var(--gray500);
+  font-size: 0.95rem;
+}
 .record-table {
   width: 100%;
   border-collapse: collapse;
@@ -459,6 +488,13 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
 }
 .text-right { text-align: right; }
 .font-bold { font-weight: 700; }
+.record-table th.col-work-hours,
+.record-table td.col-work-hours {
+  width: 140px;
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 16px !important;
+}
 .weekday { color: var(--gray500); font-size: 0.85rem; margin-left: 2px; }
 
 .status-tag {
@@ -470,9 +506,6 @@ watch([() => selectedMonth.value.year, () => selectedMonth.value.month], fetchDe
 .status-tag.early_leave { background: #FFF3E0; color: #FB8C00; }
 .status-tag.absent { background: #F3F4F6; color: #4B5563; }
 .status-tag.vacation { background: #FEE2E2; color: #DC2626; }
-.memo {
-  color: var(--gray500); font-size: 0.85rem;
-}
 
 /* Pagination */
 .pagination {

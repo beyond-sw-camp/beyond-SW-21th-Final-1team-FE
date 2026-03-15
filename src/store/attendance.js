@@ -9,6 +9,7 @@ import {
   getAttendanceSummary,
   getAdminDailyAttendanceRecords,
   getLeaveBalance,
+  getLeaveGrantHistory,
   getMyLeaveRequests,
   getLeaveStatusCounts,
   getMyOvertimeRequests,
@@ -123,6 +124,16 @@ const mapLeaveRequest = (item) => ({
   category: 'leave',
 })
 
+const mapLeaveGrantHistory = (item) => ({
+  id: item.grantHistoryId,
+  grantHistoryId: item.grantHistoryId,
+  baseYear: Number(item.baseYear || 0),
+  date: formatDate(item.grantDate).replaceAll('-', '.'),
+  days: Number(item.grantDays || 0).toFixed(1),
+  grantType: item.grantType || 'ANNUAL_BASE',
+  reason: item.reason || '연차 부여',
+})
+
 const mapOvertimeRequest = (item) => ({
   id: item.overtimeId,
   overtimeId: item.overtimeId,
@@ -232,6 +243,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     pendingAnnualLeave: 0,
     remainingAnnualLeave: 0,
   })
+  const leaveGrantHistory = ref([])
   const leaveRequests = ref([])
   const flexibleWorkPlans = ref([])
   const weeklySummary = ref(null)
@@ -266,8 +278,8 @@ export const useAttendanceStore = defineStore('attendance', () => {
     return weeklySummary.value
   }
 
-  const fetchAttendanceCalendar = async (year, month) => {
-    const response = await getAttendanceCalendar({ year, month })
+  const fetchAttendanceCalendar = async (year, month, scope = 'SELF') => {
+    const response = await getAttendanceCalendar({ year, month, scope })
     calendarEvents.value = (response.data?.events || []).map(mapCalendarEvent)
     return calendarEvents.value
   }
@@ -345,6 +357,16 @@ export const useAttendanceStore = defineStore('attendance', () => {
   const fetchLeaveBalance = async () => {
     const response = await getLeaveBalance()
     leaveBalance.value = response.data
+  }
+
+  const fetchLeaveGrantHistory = async (year = null) => {
+    const params = {}
+    if (year) {
+      params.year = year
+    }
+    const response = await getLeaveGrantHistory(params)
+    leaveGrantHistory.value = (response.data || []).map(mapLeaveGrantHistory)
+    return leaveGrantHistory.value
   }
 
   const fetchMyLeaveRequests = async (page = 1, size = 20) => {
@@ -496,6 +518,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     teamWeeklyOverview,
     isLoading,
     leaveBalance,
+    leaveGrantHistory,
     leaveRequests,
     monthlySummary,
     myLeaveRequests: computed(() => requestHistory.value),
@@ -510,6 +533,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     fetchAdminDailyAttendanceList,
     fetchAttendanceCalendar,
     fetchLeaveBalance,
+    fetchLeaveGrantHistory,
     fetchMonthlyRecords,
     fetchMonthlySummary,
     fetchMyLeaveRequests,

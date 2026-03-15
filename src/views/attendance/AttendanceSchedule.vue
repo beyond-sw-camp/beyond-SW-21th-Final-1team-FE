@@ -17,10 +17,6 @@
           <button class="toggle-btn" :class="{ active: currentView === 'week' }" @click="currentView = 'week'">주간</button>
           <button class="toggle-btn" :class="{ active: currentView === 'list' }" @click="currentView = 'list'">목록</button>
         </div>
-        <button class="btn-add" disabled>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          일정 등록 준비중
-        </button>
       </div>
     </div>
 
@@ -46,8 +42,10 @@
                 :key="day.fullDate"
                 :class="{ 
                   'prev-month': day.isPrevMonth || day.isNextMonth,
-                  'today-circle': day.isToday 
+                  'today-circle': day.isToday,
+                  'selected-circle': day.fullDate === selectedDateKey
                 }"
+                @click="selectDate(day.fullDate)"
               >
                 {{ day.day }}
               </span>
@@ -68,8 +66,15 @@
               :class="{ active: selectedFilter === 'ALL' }"
               @click="selectedFilter = 'ALL'"
             >
-              <span class="avatar-circle blue">ALL</span>
-              <span class="filter-name">전체 보기</span>
+              <span class="avatar-icon team">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="8.5" cy="7" r="4"/>
+                  <path d="M20 8v6"/>
+                  <path d="M23 11h-6"/>
+                </svg>
+              </span>
+              <span class="filter-name">팀원 근태</span>
             </div>
             <div 
               class="filter-item" 
@@ -80,7 +85,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </span>
               <div class="filter-info">
-                <span class="filter-name bold">근태 기록</span>
+                <span class="filter-name bold">내 근태</span>
                 <span class="filter-sub">출퇴근 중심 보기</span>
               </div>
             </div>
@@ -89,8 +94,14 @@
               :class="{ active: selectedFilter === 'REQUEST' }"
               @click="selectedFilter = 'REQUEST'"
             >
-              <span class="avatar-circle pink">S</span>
-              <span class="filter-name">신청 일정</span>
+              <span class="avatar-icon request">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 9v4"/>
+                  <path d="M12 17h.01"/>
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                </svg>
+              </span>
+              <span class="filter-name">특이사항</span>
             </div>
           </div>
         </div>
@@ -141,21 +152,31 @@
                   sun: day.dayOfWeek === 0, 
                   sat: day.dayOfWeek === 6,
                   today: day.isToday,
-                  'prev-month': day.isPrevMonth || day.isNextMonth
+                  'prev-month': day.isPrevMonth || day.isNextMonth,
+                  selected: day.fullDate === selectedDateKey
                 }"
+                @click="selectDate(day.fullDate)"
               >
                 <span class="day-num" :class="{ prev: day.isPrevMonth || day.isNextMonth }">{{ day.day }}</span>
                 <span v-if="day.isToday" class="badge-today">Today</span>
                 
                 <!-- Events -->
-                <div 
-                  v-for="event in getEventsForDate(day.fullDate)" 
+                <div
+                  v-for="event in getVisibleEventsForDate(day.fullDate)"
                   :key="event.id"
-                  class="event-bar" 
+                  class="event-bar"
                   :class="getEventColor(event.type)"
                 >
                   {{ getEventLabel(event) }}
                 </div>
+                <button
+                  v-if="getHiddenEventCount(day.fullDate) > 0"
+                  type="button"
+                  class="event-more-btn"
+                  @click.stop="openDayList(day.fullDate)"
+                >
+                  +{{ getHiddenEventCount(day.fullDate) }}개 더
+                </button>
               </div>
             </div>
           </div>
@@ -181,22 +202,39 @@
                 :class="{ 
                   sun: day.dayOfWeek === 0, 
                   sat: day.dayOfWeek === 6,
-                  today: day.isToday 
+                  today: day.isToday,
+                  selected: day.fullDate === selectedDateKey
                 }"
+                @click="selectDate(day.fullDate)"
               >
                 <span class="day-num">{{ day.day }}</span>
                 <span v-if="day.isToday" class="badge-today">Today</span>
                 
-                <div 
-                  v-for="event in getEventsForDate(day.fullDate)" 
+                <div
+                  v-for="event in getVisibleEventsForDate(day.fullDate)"
                   :key="event.id"
-                  class="event-bar" 
+                  class="event-bar"
                   :class="getEventColor(event.type)"
                 >
                   {{ getEventLabel(event) }}
                 </div>
+                <button
+                  v-if="getHiddenEventCount(day.fullDate) > 0"
+                  type="button"
+                  class="event-more-btn"
+                  @click.stop="openDayList(day.fullDate)"
+                >
+                  +{{ getHiddenEventCount(day.fullDate) }}개 더
+                </button>
               </div>
             </div>
+          </div>
+
+          <div
+            v-if="(currentView === 'month' || currentView === 'week') && !hasVisibleEvents"
+            class="calendar-empty-state"
+          >
+            표시할 일정이 없습니다.
           </div>
 
           <!-- List View (Special Events Only) -->
@@ -326,15 +364,19 @@ const miniCalendarGrid = computed(() => {
   return generateCalendar(currentDate.value.year, currentDate.value.month)
 })
 
+const selectedDateKey = computed(() => {
+  const month = String(currentDate.value.month).padStart(2, '0')
+  const day = String(currentDate.value.day).padStart(2, '0')
+  return `${currentDate.value.year}-${month}-${day}`
+})
+
 const currentWeekGrid = computed(() => {
-  // Find the week containing today, or the first week of the month
-  const todayStr = toDateKey(new Date())
   for (const week of calendarGrid.value) {
-    if (week.find(d => d.fullDate === todayStr)) {
+    if (week.find(d => d.fullDate === selectedDateKey.value)) {
       return week
     }
   }
-  return calendarGrid.value[0] // Fallback to first week if today not in view (e.g. browsing other months)
+  return calendarGrid.value[0]
 })
 
 const prevMonth = () => {
@@ -353,6 +395,19 @@ const nextMonth = () => {
   } else {
     currentDate.value.month++
   }
+}
+
+const syncSelectedDayToMonth = () => {
+  const lastDay = new Date(currentDate.value.year, currentDate.value.month, 0).getDate()
+  if (currentDate.value.day > lastDay) {
+    currentDate.value.day = lastDay
+  }
+}
+
+const selectDate = (dateText) => {
+  const [year, month, day] = String(dateText).split('-').map(Number)
+  if (!year || !month || !day) return
+  currentDate.value = { year, month, day }
 }
 
 const mapEventType = (event) => {
@@ -379,21 +434,30 @@ const getEventsForDate = (date) => {
   })
 }
 
+const getCellEventLimit = () => (currentView.value === 'week' ? Number.MAX_SAFE_INTEGER : 4)
+
+const getVisibleEventsForDate = (date) => getEventsForDate(date).slice(0, getCellEventLimit())
+
+const getHiddenEventCount = (date) => {
+  const hiddenCount = getEventsForDate(date).length - getCellEventLimit()
+  return hiddenCount > 0 ? hiddenCount : 0
+}
+
+const openDayList = (dateText) => {
+  selectDate(dateText)
+  currentView.value = 'week'
+}
+
 const getEventColor = (type) => {
   if (type === 'work') return 'blue'
   if (type === 'vacation') return 'pink'
   if (type === 'work_home' || type === 'remote') return 'purple'
-  if (type === 'trip') return 'green'
+  if (type === 'trip') return 'red'
   return 'blue'
 }
 
 const getEventLabel = (event) => {
-  let label = event.title
-  if (event.type === 'work') label = `🕒 ${event.title}`
-  else if (event.type === 'vacation') label = `🏖️ ${event.title}`
-  else if (event.type === 'work_home') label = `🏠 ${event.title}`
-  else if (event.type === 'trip') label = `🚗 ${event.title}`
-  return label
+  return event.title
 }
 
 const getTypeLabel = (type) => {
@@ -413,12 +477,34 @@ const specialEvents = computed(() => {
     .sort((a, b) => String(a.targetDate).localeCompare(String(b.targetDate)))
 })
 
+const visibleDateKeys = computed(() => {
+  if (currentView.value === 'week') {
+    return new Set(currentWeekGrid.value.map((day) => day.fullDate))
+  }
+  return new Set(calendarGrid.value.flat().map((day) => day.fullDate))
+})
+
+const hasVisibleEvents = computed(() => {
+  for (const event of normalizedEvents.value) {
+    if (!visibleDateKeys.value.has(event.targetDate)) continue
+    if (selectedFilter.value === 'ATTENDANCE' && event.category !== 'ATTENDANCE') continue
+    if (selectedFilter.value === 'REQUEST' && event.category === 'ATTENDANCE') continue
+    return true
+  }
+  return false
+})
+
 const fetchCalendar = async () => {
-  await store.fetchAttendanceCalendar(currentDate.value.year, currentDate.value.month)
+  const scope = selectedFilter.value === 'ALL' ? 'TEAM' : 'SELF'
+  await store.fetchAttendanceCalendar(currentDate.value.year, currentDate.value.month, scope)
 }
 
 onMounted(fetchCalendar)
-watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
+watch(() => [currentDate.value.year, currentDate.value.month], async () => {
+  syncSelectedDayToMonth()
+  await fetchCalendar()
+})
+watch(selectedFilter, fetchCalendar)
 </script>
 
 <style scoped>
@@ -465,15 +551,6 @@ watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
 }
 .toggle-btn.active { background: #fff; color: var(--gray900); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-.btn-add {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--primary); color: #fff;
-  border: none; padding: 8px 16px; border-radius: 8px;
-  font-size: 0.9rem; font-weight: 600; cursor: pointer;
-}
-.btn-add:hover { opacity: 0.9; }
-
-
 /* Content Row */
 .content-row {
   display: flex; gap: 16px;
@@ -509,6 +586,10 @@ watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
 }
 .prev-month { color: var(--gray300) !important; }
 .today-circle { background: var(--primary); color: #fff !important; font-weight: 700; }
+.selected-circle {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
 
 /* 2. Team Filter */
 .filter-card { position: relative; }
@@ -520,16 +601,17 @@ watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
 .filter-list { display: flex; flex-direction: column; gap: 12px; }
 .filter-item { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; cursor: pointer; }
 .filter-item.active { background: var(--gray50); }
-.avatar-circle {
-  width: 36px; height: 36px; border-radius: 50%; 
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.8rem; color: #fff; font-weight: 600;
-}
-.avatar-circle.blue { background: #3B82F6; }
-.avatar-circle.pink { background: #EC4899; }
 .avatar-icon {
   width: 36px; height: 36px; border-radius: 50%; background: #E5E7EB;
   display: flex; align-items: center; justify-content: center; color: var(--gray600);
+}
+.avatar-icon.team {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+.avatar-icon.request {
+  background: #FCE7F3;
+  color: #BE185D;
 }
 .filter-info { display: flex; flex-direction: column; }
 .filter-name { font-size: 0.9rem; color: var(--gray700); }
@@ -589,6 +671,11 @@ watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
   flex: 1; border-right: 1px solid var(--gray100);
   padding: 8px;
   display: flex; flex-direction: column; gap: 4px;
+  cursor: pointer;
+}
+.cal-cell.selected {
+  background: #f8fbff;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.22);
 }
 .cal-cell.sun .day-num { color: var(--red); }
 .cal-cell.sat .day-num { color: #3B82F6; }
@@ -609,7 +696,20 @@ watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
 .event-bar.blue { background: #EFF6FF; color: #1E40AF; border: 1px solid #DBEAFE; }
 .event-bar.pink { background: #FDF2F8; color: #BE185D; border: 1px solid #FCE7F3; }
 .event-bar.purple { background: #FAF5FF; color: #7E22CE; border: 1px solid #F3E8FF; }
-.event-bar.green { background: #ECFDF5; color: #047857; border: 1px solid #D1FAE5; }
+.event-bar.red { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+.event-more-btn {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 0 0;
+  cursor: pointer;
+}
+.event-more-btn:hover {
+  text-decoration: underline;
+}
 
 
 .main-cal-content {
@@ -617,6 +717,18 @@ watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.calendar-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 24px 24px;
+  min-height: 56px;
+  border: 1px dashed var(--gray200);
+  border-radius: 12px;
+  color: var(--gray500);
+  font-size: 0.95rem;
+  background: var(--gray50);
 }
 
 /* View Placeholders */
@@ -687,7 +799,7 @@ watch(() => [currentDate.value.year, currentDate.value.month], fetchCalendar)
 }
 .type-badge.pink { background: #FCE7F3; color: #BE185D; }
 .type-badge.purple { background: #F3E8FF; color: #7E22CE; }
-.type-badge.green { background: #D1FAE5; color: #047857; }
+.type-badge.red { background: #FEE2E2; color: #B91C1C; }
 .type-badge.blue { background: #DBEAFE; color: #1E40AF; }
 
 .no-data {
