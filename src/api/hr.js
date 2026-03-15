@@ -16,15 +16,41 @@ export const getMyPage = () => unwrap(api.get('/mypage'))
 export const getMyPageHeader = () => unwrap(api.get('/mypage/header'))
 export const getMyHrEvents = () => unwrap(api.get('/mypage/hr-events'))
 export const getMyHrEventDetail = (hrEventId) => unwrap(api.get(`/mypage/hr-events/${hrEventId}`))
+export const getTeamBirthdays = () => unwrap(api.get('/mypage/team-birthdays'))
+export const getRecentNotices = (size = 8) =>
+  unwrap(
+    api.get('/notices/recent', {
+      params: { size },
+    }),
+  )
+export const getNotices = (params = {}) =>
+  unwrap(
+    api.get('/notices', {
+      params,
+    }),
+  )
+export const getNoticeDetail = (noticeId) => unwrap(api.get(`/notices/${noticeId}`))
+export const createAdminNotice = (payload) => unwrap(api.post('/notices/admin', payload))
+export const updateAdminNoticePin = (noticeId, pinned) =>
+  unwrap(
+    api.patch(`/notices/admin/${noticeId}/pin`, null, {
+      params: { pinned },
+    }),
+  )
+export const getAdminMyNotices = (params = {}) =>
+  unwrap(
+    api.get('/notices/admin/mine', {
+      params,
+    }),
+  )
 export const getOrganizationTree = () => unwrap(api.get('/org/tree'))
 export const getOrganizationMembers = (orgId) => unwrap(api.get(`/org/${orgId}/members`))
 export const getCertificateRequestHistories = () => unwrap(api.get('/mypage/certificates/requests'))
 export const createCertificateRequest = (payload) => unwrap(api.post('/mypage/certificates/requests', payload))
-export const getMyOrganizationMembers = (page = 1, orgId) =>
+export const getMyOrganizationMembers = (orgId) =>
   unwrap(
     api.get('/org/my/members', {
       params: {
-        page,
         ...(orgId ? { orgId } : {}),
       },
     }),

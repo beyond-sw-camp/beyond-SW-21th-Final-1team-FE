@@ -36,6 +36,19 @@
         </div>
       </div>
 
+      <div class="card summary-card pending">
+        <div class="card-icon amber-bg">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="card-info">
+          <span class="label">결재중 연차</span>
+          <span class="value">{{ leaveBalance.pendingAnnualLeave.toFixed(1) }}</span>
+        </div>
+      </div>
+
       <div class="card summary-card remaining">
         <div class="card-icon green-bg">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -47,7 +60,6 @@
           <span class="label">잔여 연차</span>
           <span class="value highlight">{{ leaveBalance.remainingAnnualLeave.toFixed(1) }}</span>
         </div>
-        <div class="expiry-info">사용 기한: 2026.12.31</div>
       </div>
     </div>
 
@@ -57,7 +69,20 @@
       <div class="card history-section">
         <div class="section-header">
           <h3>연차 사용 내역</h3>
-          <span class="badge">2026년</span>
+          <span class="badge">{{ currentYear }}년</span>
+        </div>
+        <div class="history-filters">
+          <select v-model="selectedStatus" class="filter-select">
+            <option value="all">전체 상태</option>
+            <option value="approved">승인완료</option>
+            <option value="pending">결재중</option>
+            <option value="rejected">반려</option>
+            <option value="cancelled">취소</option>
+          </select>
+          <select v-model="selectedType" class="filter-select">
+            <option value="all">전체 종류</option>
+            <option v-for="type in availableLeaveTypes" :key="type" :value="type">{{ type }}</option>
+          </select>
         </div>
         <div class="table-container">
           <table class="history-table">
@@ -71,17 +96,16 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in myLeaveRequestsList" :key="item.id">
+              <tr v-for="item in filteredLeaveRequests" :key="item.id">
                 <td class="col-date">{{ item.applyDate }}</td>
                 <td><span class="type-badge">{{ item.leaveType }}</span></td>
                 <td>{{ item.startDate }} ~ {{ item.endDate }}</td>
-                <td class="col-days">-{{ item.usedDays }}</td>
+                <td class="col-days">-{{ formatUsedDays(item) }}</td>
                 <td>
-                  <span class="status-dot" :class="item.status"></span>
-                  {{ getStatusLabel(item.status) }}
+                  <span class="status-badge" :class="item.status">{{ getStatusLabel(item.status) }}</span>
                 </td>
               </tr>
-              <tr v-if="myLeaveRequestsList.length === 0">
+              <tr v-if="filteredLeaveRequests.length === 0">
                 <td colspan="5" class="empty-row">휴가 신청 내역이 없습니다.</td>
               </tr>
             </tbody>
@@ -91,14 +115,28 @@
 
       <!-- Right: Grant History / Upcoming -->
       <div class="right-col">
-        <!-- Upcoming Leave -->
-        <div class="card upcoming-card">
+        <!-- Leave Status Summary -->
+        <div class="card status-summary-card">
           <div class="section-header">
-            <h3>다음 휴가 일정</h3>
+            <h3>휴가 사용 요약</h3>
           </div>
-          <div class="empty-state" v-if="!upcomingLeave">
-            <p>예정된 휴가가 없습니다.</p>
-            <button class="btn-text" @click="$router.push('/approval/draft')">휴가 계획하기 &gt;</button>
+          <div class="status-summary-grid">
+            <div class="status-summary-item approved">
+              <span class="status-summary-label">승인완료</span>
+              <strong>{{ leaveStatusSummary.approved }}</strong>
+            </div>
+            <div class="status-summary-item pending">
+              <span class="status-summary-label">결재중</span>
+              <strong>{{ leaveStatusSummary.pending }}</strong>
+            </div>
+            <div class="status-summary-item rejected">
+              <span class="status-summary-label">반려</span>
+              <strong>{{ leaveStatusSummary.rejected }}</strong>
+            </div>
+            <div class="status-summary-item cancelled">
+              <span class="status-summary-label">취소</span>
+              <strong>{{ leaveStatusSummary.cancelled }}</strong>
+            </div>
           </div>
         </div>
 
@@ -107,8 +145,8 @@
           <div class="section-header">
             <h3>연차 부여 내역</h3>
           </div>
-          <ul class="grant-list">
-            <li v-for="grant in grantHistory" :key="grant.id">
+          <ul v-if="leaveGrantHistory.length" class="grant-list">
+            <li v-for="grant in leaveGrantHistory" :key="grant.id">
               <div class="grant-info">
                 <span class="grant-title">{{ grant.reason }}</span>
                 <span class="grant-date">{{ grant.date }}</span>
@@ -116,6 +154,10 @@
               <span class="grant-days">+{{ grant.days }}</span>
             </li>
           </ul>
+          <div v-else class="empty-state grant-empty-state">
+            <p>연차 부여 이력이 없습니다.</p>
+            <span class="empty-sub">현재 화면에는 불러온 연차 부여 데이터가 없어 부여 내역을 표시하지 않습니다.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -123,27 +165,63 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAttendanceStore } from '@/store/attendance'
 
 const store = useAttendanceStore()
-const { leaveBalance, myLeaveRequestsList } = storeToRefs(store)
-const upcomingLeave = ref(null)
-
-const grantHistory = ref([
-  { id: 1, reason: '2026년 정기 부여', date: '2026.01.01', days: 15.0 },
-  { id: 2, reason: '2025년 이월 연차', date: '2026.01.01', days: 0.0 },
-])
+const { leaveBalance, leaveGrantHistory, myLeaveRequestsList } = storeToRefs(store)
+const currentYear = new Date().getFullYear()
+const selectedStatus = ref('all')
+const selectedType = ref('all')
+const availableLeaveTypes = computed(() =>
+  [...new Set(myLeaveRequestsList.value.map((item) => item.leaveType).filter(Boolean))].sort(),
+)
+const filteredLeaveRequests = computed(() =>
+  myLeaveRequestsList.value.filter((item) => {
+    const statusMatch = selectedStatus.value === 'all' || item.status === selectedStatus.value
+    const typeMatch = selectedType.value === 'all' || item.leaveType === selectedType.value
+    return statusMatch && typeMatch
+  }),
+)
+const leaveStatusSummary = computed(() =>
+  myLeaveRequestsList.value.reduce(
+    (acc, item) => {
+      if (acc[item.status] !== undefined) {
+        acc[item.status] += 1
+      }
+      return acc
+    },
+    {
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+      cancelled: 0,
+    },
+  ),
+)
 
 const getStatusLabel = (status) => {
   const map = { approved: '승인완료', pending: '결재중', rejected: '반려', cancelled: '취소' }
   return map[status] || status
 }
 
+const formatUsedDays = (item) => {
+  const usedDays = Number(item?.usedDays || 0)
+  const leaveType = String(item?.leaveType || '')
+  if (usedDays === 0.5 || leaveType.includes('반차')) {
+    return '반차'
+  }
+  if (!Number.isInteger(usedDays)) {
+    return `${usedDays.toFixed(1)}일`
+  }
+  return `${usedDays}일`
+}
+
 onMounted(async () => {
   await Promise.all([
     store.fetchLeaveBalance(),
+    store.fetchLeaveGrantHistory(currentYear),
     store.fetchMyLeaveRequests(),
   ])
 })
@@ -186,7 +264,7 @@ onMounted(async () => {
 /* Summary Cards */
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
@@ -213,6 +291,7 @@ onMounted(async () => {
 .blue-bg { background: #E3F2FD; color: #1976D2; }
 .red-bg { background: #FFEBEE; color: #D32F2F; }
 .green-bg { background: #E8F5E9; color: #388E3C; }
+.amber-bg { background: #FFF8E1; color: #F59E0B; }
 
 .card-info {
   display: flex;
@@ -233,17 +312,6 @@ onMounted(async () => {
 
 .value.highlight {
   color: var(--primary);
-}
-
-.expiry-info {
-  position: absolute;
-  top: 24px;
-  right: 24px;
-  font-size: 0.8rem;
-  color: var(--gray400);
-  background: var(--gray50);
-  padding: 4px 8px;
-  border-radius: 4px;
 }
 
 /* Content Grid */
@@ -282,6 +350,22 @@ onMounted(async () => {
   border-radius: 4px;
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+.history-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.filter-select {
+  min-width: 132px;
+  padding: 8px 10px;
+  border: 1px solid var(--gray200);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--gray700);
+  font-size: 0.85rem;
 }
 
 /* Table */
@@ -328,17 +412,20 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.status-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-right: 6px;
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
-
-.status-dot.approved { background: #4CAF50; }
-.status-dot.pending { background: #FFC107; }
-.status-dot.rejected { background: #F44336; }
+.status-badge.approved { background: #E8F5E9; color: #2E7D32; }
+.status-badge.pending { background: #FFF8E1; color: #B45309; }
+.status-badge.rejected { background: #FEE2E2; color: #B91C1C; }
+.status-badge.cancelled { background: #F3F4F6; color: #6B7280; }
 
 /* Right Column */
 .right-col {
@@ -347,8 +434,57 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.upcoming-card {
-  min-height: 140px;
+.status-summary-card {
+  min-height: 180px;
+}
+
+.status-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.status-summary-item {
+  padding: 16px 14px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid transparent;
+}
+
+.status-summary-item strong {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.status-summary-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.status-summary-item.approved {
+  background: #E8F5E9;
+  border-color: #C8E6C9;
+  color: #2E7D32;
+}
+
+.status-summary-item.pending {
+  background: #FFF8E1;
+  border-color: #FDE68A;
+  color: #B45309;
+}
+
+.status-summary-item.rejected {
+  background: #FEE2E2;
+  border-color: #FECACA;
+  color: #B91C1C;
+}
+
+.status-summary-item.cancelled {
+  background: #F3F4F6;
+  border-color: #E5E7EB;
+  color: #6B7280;
 }
 
 .empty-state {
@@ -361,6 +497,13 @@ onMounted(async () => {
   color: var(--gray400);
   font-size: 0.9rem;
   padding: 20px 0;
+}
+
+.empty-sub {
+  color: var(--gray400);
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .btn-text {
@@ -413,5 +556,15 @@ onMounted(async () => {
   font-size: 1rem;
   font-weight: 700;
   color: var(--primary);
+}
+
+.grant-empty-state {
+  min-height: 160px;
+}
+
+@media (max-width: 1200px) {
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

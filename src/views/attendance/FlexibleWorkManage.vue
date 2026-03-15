@@ -15,14 +15,14 @@
         :class="{ active: currentTab === 'list' }"
         @click="currentTab = 'list'"
       >
-        📑 신청 목록
+        신청 목록
       </button>
       <button 
         class="tab-btn" 
         :class="{ active: currentTab === 'schedule' }"
         @click="currentTab = 'schedule'"
       >
-        📊 스케줄 뷰
+        스케줄 뷰
       </button>
     </div>
 
@@ -39,14 +39,14 @@
               :disabled="selectedIds.length === 0"
               @click="handleBulkApprove"
             >
-              ✓ 승인
+              승인
             </button>
             <button 
               class="btn-reject" 
               :disabled="selectedIds.length === 0"
               @click="handleBulkReject"
             >
-              ✕ 반려
+              반려
             </button>
           </div>
           <div class="right-actions">
@@ -103,6 +103,9 @@
                 <button class="btn-detail" @click="handleViewDetail(item)">보기</button>
               </td>
             </tr>
+            <tr v-if="sortedPlanList.length === 0">
+              <td colspan="7" class="empty-cell">현재 같은 부서 팀원의 유연근무 신청 내역이 없습니다.</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -112,7 +115,7 @@
     <div v-if="currentTab === 'schedule'" class="tab-content">
       <!-- Alerts -->
       <div class="alert-box warning" v-if="hasStaffShortage">
-        <div class="alert-icon">⚠️</div>
+        <div class="alert-icon">!</div>
         <div class="alert-text">
           <strong>코어타임 인원 부족 경고 ({{ selectedDayLabel }})</strong>
           <p>{{ selectedDayDateLabel }} 14:00 - 16:00 구간에 근무 인원이 부족합니다.</p>
@@ -122,7 +125,21 @@
       <div class="content-card">
         <!-- Day Navigation -->
         <div class="day-nav-wrapper">
-           <div class="week-title">{{ weekTitle }}</div>
+           <div class="week-header">
+             <div class="week-navigation">
+               <div class="week-title">{{ weekTitle }}</div>
+             </div>
+             <div class="week-picker">
+               <label for="weekPicker">주차 선택</label>
+               <input
+                 id="weekPicker"
+                 v-model="selectedWeek"
+                 type="week"
+                 class="week-input"
+                 @change="handleWeekChange"
+               />
+             </div>
+           </div>
            <div class="day-tabs">
              <button 
                 v-for="(day, idx) in days" 
@@ -174,7 +191,9 @@
                     <div v-else class="empty-bar">신청 없음</div>
                  </div>
               </div>
-              <div v-if="scheduleData.length === 0" class="timeline-empty">해당 주차의 유연근무 신청이 없습니다.</div>
+              <div v-if="scheduleData.length === 0" class="timeline-empty">
+                현재 선택한 주차에 같은 부서 팀원의 유연근무 신청이 없습니다.
+              </div>
            </div>
 
            <!-- Legend -->
@@ -264,6 +283,7 @@ const currentTab = ref('list')
 const selectedIds = ref([])
 const selectedDayIndex = ref(0) // 0: Mon, 1: Tue ...
 const selectedFilter = ref('all') // 'all' or 'pending'
+const selectedWeek = ref('')
 
 // Detail Modal State
 const showDetailModal = ref(false)
@@ -338,6 +358,29 @@ const getMonday = (value) => {
   return date
 }
 
+const formatWeekValue = (value) => {
+  const monday = getMonday(value)
+  const thursday = new Date(monday)
+  thursday.setDate(monday.getDate() + 3)
+  const isoYear = thursday.getFullYear()
+  const firstThursday = new Date(isoYear, 0, 4)
+  const firstIsoMonday = getMonday(firstThursday)
+  const diffDays = Math.round((monday - firstIsoMonday) / 86400000)
+  const weekNumber = Math.floor(diffDays / 7) + 1
+  return `${isoYear}-W${String(weekNumber).padStart(2, '0')}`
+}
+
+const weekValueToMonday = (value) => {
+  const [yearPart, weekPart] = String(value).split('-W')
+  const year = Number(yearPart)
+  const week = Number(weekPart)
+  const firstThursday = new Date(year, 0, 4)
+  const firstIsoMonday = getMonday(firstThursday)
+  const monday = new Date(firstIsoMonday)
+  monday.setDate(firstIsoMonday.getDate() + (week - 1) * 7)
+  return monday
+}
+
 const mapPlanType = (plan) => {
   const workForm = String(plan.type || '').toUpperCase()
   if (workForm.includes('OFFICE')) return 'normal'
@@ -345,10 +388,16 @@ const mapPlanType = (plan) => {
   return 'flex'
 }
 
+const selectedWeekMonday = computed(() =>
+  weekValueToMonday(selectedWeek.value || formatWeekValue(new Date())),
+)
+
 const days = computed(() =>
   Array.from({ length: 5 }, (_, idx) => {
     const planDate = overviewDays.value[idx]?.planDate
-    const date = planDate ? parseIsoDate(planDate) : new Date()
+    const date = planDate
+      ? parseIsoDate(planDate)
+      : new Date(selectedWeekMonday.value.getFullYear(), selectedWeekMonday.value.getMonth(), selectedWeekMonday.value.getDate() + idx)
     return {
       label: ['월', '화', '수', '목', '금'][idx],
       date: formatDateNumber(date),
@@ -386,11 +435,12 @@ const scheduleData = computed(() => {
 const hasStaffShortage = computed(() => Boolean(overviewDays.value[selectedDayIndex.value]?.coreTimeShortageRisk))
 
 const weekTitle = computed(() => {
-  const start = overviewDays.value[0]?.planDate ? parseIsoDate(overviewDays.value[0].planDate) : getMonday(new Date())
-  const end = overviewDays.value[4]?.planDate ? parseIsoDate(overviewDays.value[4].planDate) : new Date(start)
-  if (!overviewDays.value[4]?.planDate) {
-    end.setDate(start.getDate() + 4)
-  }
+  const start = overviewDays.value[0]?.planDate
+    ? parseIsoDate(overviewDays.value[0].planDate)
+    : new Date(selectedWeekMonday.value)
+  const end = overviewDays.value[4]?.planDate
+    ? parseIsoDate(overviewDays.value[4].planDate)
+    : new Date(selectedWeekMonday.value.getFullYear(), selectedWeekMonday.value.getMonth(), selectedWeekMonday.value.getDate() + 4)
   return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${formatDateNumber(start)} - ${formatDateNumber(end)}`
 })
 
@@ -462,9 +512,20 @@ const submitAction = async () => {
   }
 }
 
+const refreshWeekOverview = async () => {
+  const monday = weekValueToMonday(selectedWeek.value || formatWeekValue(new Date()))
+  selectedDayIndex.value = 0
+  await store.fetchTeamWeeklyOverview(toDateKey(monday))
+}
+
+const handleWeekChange = async () => {
+  await refreshWeekOverview()
+}
+
 onMounted(async () => {
-  const today = toDateKey(new Date())
-  await Promise.all([store.fetchTeamFlexibleWorkPlans(), store.fetchTeamWeeklyOverview(today)])
+  const today = new Date()
+  selectedWeek.value = formatWeekValue(today)
+  await Promise.all([store.fetchTeamFlexibleWorkPlans(), refreshWeekOverview()])
 })
 
 // --- Timeline Helpers ---
@@ -568,6 +629,7 @@ const getBarStyle = (day) => {
 }
 .list-table tr:hover td { background: var(--gray50); }
 .list-table tr:last-child td { border-bottom: none; }
+.empty-cell { text-align: center; color: var(--gray500); padding: 36px 24px; }
 
 .user-info { display: flex; flex-direction: column; gap: 2px; }
 .name { font-weight: 600; color: var(--gray900); }
@@ -609,7 +671,12 @@ const getBarStyle = (day) => {
 .day-nav-wrapper {
   padding: 24px 32px 0 32px; border-bottom: 1px solid var(--gray200); background: #fff;
 }
-.week-title { font-size: 1rem; font-weight: 700; color: var(--gray800); margin-bottom: 16px; }
+.week-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+.week-navigation { display: flex; align-items: center; gap: 12px; }
+.week-title { font-size: 1rem; font-weight: 700; color: var(--gray800); }
+.week-picker { display: flex; align-items: center; gap: 10px; }
+.week-picker label { font-size: 0.9rem; color: var(--gray600); font-weight: 600; white-space: nowrap; }
+.week-input { padding: 8px 12px; border: 1px solid var(--gray300); border-radius: 8px; font-size: 0.9rem; color: var(--gray700); }
 .day-tabs { display: flex; gap: 8px; }
 .day-tab { 
   flex: 1; border: none; background: none; padding: 12px; 

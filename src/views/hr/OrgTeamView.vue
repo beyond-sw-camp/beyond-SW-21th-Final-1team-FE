@@ -287,19 +287,8 @@ const buildTeamOptions = (members) => {
 
 const loadMembers = async () => {
   try {
-    let page = 1
-    let totalPages = 1
-    const all = []
-
-    while (page <= totalPages) {
-      const pageData = await getMyOrganizationMembers(page)
-      const content = Array.isArray(pageData?.content) ? pageData.content : []
-      all.push(...content)
-      totalPages = Math.max(1, Number(pageData?.totalPages || 1))
-      page += 1
-    }
-
-    const mapped = all.map(mapMember)
+    const rows = await getMyOrganizationMembers()
+    const mapped = (Array.isArray(rows) ? rows : []).map(mapMember)
     teamMembers.value = mapped
     memberTotal.value = mapped.length
     teamOptions.value = buildTeamOptions(mapped)

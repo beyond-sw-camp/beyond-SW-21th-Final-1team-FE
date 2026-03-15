@@ -352,7 +352,6 @@ const pagedEmployees = computed(() =>
 const kpiCards = computed(() => [
   { label: '전체 인원', value: `${totalEmployeeCount.value}명`, note: '전 사원 목록 기준' },
   { label: '신규 입사 예정', value: `${upcomingHireCount.value}명`, note: '입사일 기준' },
-  { label: '최근 인사 변경', value: '-', note: '백엔드 미제공' },
 ])
 
 const flattenOrgs = (node, bucket = []) => {
@@ -572,7 +571,7 @@ onMounted(async () => {
 .kpi-grid {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
