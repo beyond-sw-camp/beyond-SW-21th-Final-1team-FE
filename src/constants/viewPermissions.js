@@ -29,7 +29,7 @@ export const VIEW_CATALOG = [
   { viewCode: 'APPROVAL_STATUS', routeName: 'approval-status', viewName: '결재 상태', viewDesc: '전자결재 상태 화면' },
   { viewCode: 'APPROVAL_BOX', routeName: 'approval-box', viewName: '결재함', viewDesc: '전자결재 결재함 화면' },
   { viewCode: 'APPROVAL_BOX_LIST', routeName: 'approval-box-list', viewName: '결재함 목록', viewDesc: '전자결재 결재함 상세 목록 화면' },
-  { viewCode: 'APPROVAL_REVIEW', routeName: 'approval-review', viewName: '결재 검토', viewDesc: '전자결재 검토 화면' },
+  { viewCode: null, routeName: 'approval-review', viewName: '결재 검토', viewDesc: '전자결재 검토 화면' },
   { viewCode: 'HR_MYPAGE', routeName: 'mypage', viewName: '인사 마이페이지', viewDesc: '인사 개인 정보 화면' },
   { viewCode: 'HR_ORG', routeName: 'hr-org', viewName: '조직/팀 조회', viewDesc: '인사 조직/팀 화면' },
   { viewCode: 'HR_ORGCHART', routeName: 'hr-orgchart', viewName: '조직도', viewDesc: '인사 조직도 화면' },

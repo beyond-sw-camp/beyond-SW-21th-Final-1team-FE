@@ -1,5 +1,39 @@
 <template>
   <div class="review-container">
+    <section class="mobile-review">
+      <header class="mobile-head">
+        <button class="mobile-back" type="button" aria-label="뒤로가기" @click="handleBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div>
+          <h1>전자 결재 검토</h1>
+          <p>결재 대기 문서를 확인합니다.</p>
+        </div>
+      </header>
+
+      <div class="mobile-list">
+        <button
+          v-for="item in reviewList"
+          :key="item.id"
+          type="button"
+          class="mobile-card"
+          @click="openModal(item)"
+        >
+          <div class="mobile-title-row">
+            <span class="title">{{ item.title }}</span>
+            <span class="status-dot" :class="{ unread: !item.isRead }"></span>
+          </div>
+          <div class="mobile-meta">{{ item.category }}</div>
+          <div class="mobile-meta">{{ item.drafter }} · {{ item.department }}</div>
+          <div class="mobile-meta">{{ item.date }}</div>
+        </button>
+
+        <div v-if="reviewList.length === 0" class="empty-state">검토할 대기 문서가 없습니다.</div>
+      </div>
+    </section>
+
     <div class="page-header">
       <h2>전자 결재 검토</h2>
       <p class="subtitle">나에게 배정된 결재 대기 문서를 검토하고 승인/반려를 처리합니다.</p>
@@ -67,6 +101,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import ReviewModal from './components/ReviewModal.vue'
 import {
   getApprovalDetail,
@@ -79,6 +114,7 @@ import { mapApprovalDetailToItem, mapReviewItem } from '@/utils/approvalMapper'
 const reviewList = ref([])
 const isModalOpen = ref(false)
 const selectedItem = ref({})
+const router = useRouter()
 
 async function loadReviewList() {
   try {
@@ -118,6 +154,14 @@ const handleReviewAction = async (data) => {
   } catch (error) {
     alert(error?.response?.data?.error?.message || '결재 처리에 실패했습니다.')
   }
+}
+
+const handleBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+    return
+  }
+  router.push('/')
 }
 
 onMounted(loadReviewList)
@@ -303,4 +347,81 @@ onMounted(loadReviewList)
   color: #adb5bd;
   font-size: 1rem;
 }
+
+.mobile-review {
+  display: none;
+  background: #f5f8fc;
+  border: 1px solid #eef2f7;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.mobile-head h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #212529;
+}
+
+.mobile-head p {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  color: #868e96;
+}
+
+.mobile-back{
+  width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
+  display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
+}
+
+.mobile-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-card {
+  text-align: left;
+  border: 1px solid #dbe4f3;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.mobile-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mobile-title-row .title {
+  font-weight: 700;
+  color: #212529;
+  font-size: 0.95rem;
+}
+
+.mobile-meta {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+  .review-container {
+    padding: 0;
+  }
+
+  .page-header,
+  .list-card {
+    display: none;
+  }
+
+  .mobile-review {
+    display: block;
+  }
+}
+
 </style>

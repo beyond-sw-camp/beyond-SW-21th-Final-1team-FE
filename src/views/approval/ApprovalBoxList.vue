@@ -1,5 +1,43 @@
 <template>
   <div class="list-container">
+    <section class="mobile-box">
+      <header class="mobile-head">
+        <button class="mobile-back" type="button" aria-label="뒤로가기" @click="handleBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div>
+          <h1>{{ pageTitle }}</h1>
+          <p>{{ pageSubtitle }}</p>
+        </div>
+      </header>
+
+      <div class="mobile-search">
+        <input type="text" v-model="searchQuery" placeholder="문서 제목, 기안자 검색..." class="search-input" />
+      </div>
+
+      <div class="mobile-list">
+        <button
+          v-for="item in filteredList"
+          :key="item.id"
+          type="button"
+          class="mobile-card"
+          @click="openDetail(item)"
+        >
+          <div class="mobile-title-row">
+            <span :class="item.isRead ? 'read-style' : 'unread-style'">{{ item.title }}</span>
+            <span class="status-chip" :class="getStatusClass(item.status)">{{ item.status }}</span>
+          </div>
+          <div class="mobile-meta">{{ item.category }}</div>
+          <div class="mobile-meta">{{ item.drafter }} · {{ item.department }}</div>
+          <div class="mobile-meta">{{ item.date }}</div>
+        </button>
+
+        <div v-if="filteredList.length === 0" class="empty-state">조회된 내역이 없습니다.</div>
+      </div>
+    </section>
+
     <div class="page-header">
       <div class="header-left">
         <button class="back-btn" @click="router.go(-1)">
@@ -219,6 +257,14 @@ const handleModalAction = async (action) => {
   isDetailOpen.value = false
 }
 
+const handleBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+    return
+  }
+  router.push('/')
+}
+
 watch(() => route.params.type, (newType) => {
   currentType.value = newType || 'all'
   loadBoxList()
@@ -432,4 +478,75 @@ onMounted(loadBoxList)
 .date-text { color: #868e96; font-size: 0.85rem; }
 
 .empty-state { padding: 100px !important; text-align: center; color: #adb5bd; font-size: 1.05rem; }
+
+.mobile-box {
+  display: none;
+  background: #f5f8fc;
+  border: 1px solid #eef2f7;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.mobile-head h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #212529;
+}
+
+.mobile-head p {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  color: #868e96;
+}
+
+.mobile-back{
+  width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
+  display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
+}
+
+.mobile-search {
+  margin-top: 12px;
+}
+
+.mobile-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-card {
+  text-align: left;
+  border: 1px solid #dbe4f3;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.mobile-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mobile-meta {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+  .page-header,
+  .filter-section,
+  .table-card {
+    display: none;
+  }
+
+  .mobile-box {
+    display: block;
+  }
+}
 </style>

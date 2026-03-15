@@ -1,5 +1,47 @@
 <template>
   <div class="mypage">
+    <section class="mobile-mypage">
+      <div class="mobile-head">
+        <button class="mobile-back" type="button" aria-label="뒤로가기" @click="handleBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div class="mobile-avatar">
+          <img
+            v-if="user.profileImage"
+            :src="user.profileImage"
+            alt="프로필 이미지"
+          />
+          <span v-else>{{ user.name.slice(-2) }}</span>
+        </div>
+        <div class="mobile-info">
+          <div class="mobile-name">{{ user.name }}</div>
+          <div class="mobile-dept">{{ user.team }} · {{ user.position }}</div>
+          <span class="status-badge" :class="statusBadgeClass">{{ user.status || '-' }}</span>
+        </div>
+      </div>
+
+      <div class="mobile-rows">
+        <div class="mobile-row">
+          <span class="label">이메일</span>
+          <span class="value">{{ user.email }}</span>
+        </div>
+        <div class="mobile-row">
+          <span class="label">연락처</span>
+          <span class="value">{{ user.phone }}</span>
+        </div>
+        <div class="mobile-row">
+          <span class="label">내선</span>
+          <span class="value">{{ user.extension }}</span>
+        </div>
+        <div class="mobile-row">
+          <span class="label">근무지</span>
+          <span class="value">{{ user.workLocation }}</span>
+        </div>
+      </div>
+    </section>
+
     <!-- 브레드크럼 -->
     <div class="breadcrumb">인사 / 마이페이지</div>
 
@@ -35,27 +77,30 @@
       </div>
     </div>
 
-    <!-- 탭 메뉴 -->
-    <div class="tab-menu">
-      <div
-          v-for="tab in tabs" :key="tab.key"
-          class="tab-item"
-          :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
-      >{{ tab.label }}</div>
-    </div>
+    <div class="desktop-tabs">
+      <!-- 탭 메뉴 -->
+      <div class="tab-menu">
+        <div
+            v-for="tab in tabs" :key="tab.key"
+            class="tab-item"
+            :class="{ active: activeTab === tab.key }"
+            @click="activeTab = tab.key"
+        >{{ tab.label }}</div>
+      </div>
 
-    <!-- 탭 컨텐츠 -->
-    <TabInfo v-if="activeTab === 'info'" :user="user" @refresh="loadMyPageData" />
-    <TabHistory v-else-if="activeTab === 'history'" />
-    <TabCertificate v-else-if="activeTab === 'certificate'" />
-    <!-- 추후 탭 추가 -->
-    <div v-else class="tab-placeholder">{{ activeTabLabel }} 탭은 준비 중입니다.</div>
+      <!-- 탭 컨텐츠 -->
+      <TabInfo v-if="activeTab === 'info'" :user="user" @refresh="loadMyPageData" />
+      <TabHistory v-else-if="activeTab === 'history'" />
+      <TabCertificate v-else-if="activeTab === 'certificate'" />
+      <!-- 추후 탭 추가 -->
+      <div v-else class="tab-placeholder">{{ activeTabLabel }} 탭은 준비 중입니다.</div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import TabInfo from './tabs/TabInfo.vue'
 import TabHistory from './tabs/TabHistory.vue'
 import TabCertificate from './tabs/TabCertificate.vue'
@@ -130,6 +175,8 @@ const user = ref({
   careers: [],
 })
 
+const router = useRouter()
+
 const loadMyPageData = async () => {
   try {
     const [header, page] = await Promise.all([getMyPageHeader(), getMyPage()])
@@ -186,6 +233,14 @@ const loadMyPageData = async () => {
   }
 }
 
+const handleBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+    return
+  }
+  router.push('/')
+}
+
 onMounted(() => {
   loadMyPageData()
 })
@@ -218,6 +273,26 @@ onMounted(() => {
 .profile-contacts span{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--gray500)}
 .profile-contacts svg{color:var(--gray400)}
 .profile-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.mobile-mypage{display:none;background:#f5f8fc;border:1px solid #eef2f7;border-radius:18px;padding:18px}
+.mobile-head{display:flex;gap:14px;align-items:center}
+.mobile-back{
+  width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
+  display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
+}
+.mobile-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#99F6E4,#0891B2);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;overflow:hidden}
+.mobile-avatar img{width:100%;height:100%;object-fit:cover}
+.mobile-info{display:flex;flex-direction:column;gap:4px}
+.mobile-name{font-size:1.05rem;font-weight:700;color:var(--gray800)}
+.mobile-dept{font-size:.82rem;color:var(--gray500)}
+.mobile-rows{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.mobile-row{display:flex;justify-content:space-between;gap:12px;background:#fff;border:1px solid #dbe4f3;border-radius:12px;padding:10px 12px;font-size:.85rem}
+.mobile-row .label{color:var(--gray500);font-weight:600}
+.mobile-row .value{color:var(--gray800);text-align:right}
+
+@media (max-width: 768px){
+  .breadcrumb,.profile-header,.desktop-tabs{display:none}
+  .mobile-mypage{display:block}
+}
 .last-login{font-size:.75rem;color:var(--gray400)}
 
 /* 탭 메뉴 */
