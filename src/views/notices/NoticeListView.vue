@@ -38,10 +38,10 @@
           <span class="type-chip">{{ notice.typeLabel }}</span>
         </button>
 
-        <div v-if="notices.length === 0" class="empty">검색 결과가 없습니다.</div>
+        <div v-if="filteredNotices.length === 0" class="empty">검색 결과가 없습니다.</div>
       </div>
 
-      <div v-if="notices.length > 0" class="pagination">
+      <div v-if="filteredNotices.length > 0" class="pagination">
         <button type="button" class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
         <span class="page-info font-num">{{ currentPage }} / {{ totalPages }}</span>
         <button type="button" class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
