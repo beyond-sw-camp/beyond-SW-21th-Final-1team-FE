@@ -702,10 +702,11 @@ onMounted(loadDashboard)
   font-size: 0.87rem;
   font-weight: 600;
   color: #212529;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 280px;
+  max-width: 100%;
 }
 
 .new-dot {
