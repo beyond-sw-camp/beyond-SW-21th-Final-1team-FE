@@ -6,11 +6,13 @@ import {
   getAttendanceRecords,
   getAttendanceWeeklySummary,
   getAttendanceCalendar,
+  getRequestHistory,
+  getRequestHistoryCounts,
+  getVacationHistory,
   getAttendanceSummary,
   getAdminDailyAttendanceRecords,
   getLeaveBalance,
   getLeaveGrantHistory,
-  getMyLeaveRequests,
   getLeaveStatusCounts,
   getMyOvertimeRequests,
   getOvertimeStatusCounts,
@@ -18,13 +20,13 @@ import {
   getBusinessTripStatusCounts,
   getMyWeeklyWorkSchedules,
   getWeeklyWorkScheduleStatusCounts,
-  getAdminLeaveRequests,
   processLeave,
   getTeamWeeklyWorkSchedules,
   getTeamWeeklyOverview,
   processWeeklyWorkSchedule,
   modifyAttendanceByAdmin,
 } from '@/api/attendance'
+import { getAdminVacationList, processApproval } from '@/api/approval'
 
 const CURRENT_USER_ID = 'me'
 
@@ -121,6 +123,57 @@ const mapLeaveRequest = (item) => ({
   endDate: formatDate(item.endDate),
   applyDate: formatDate(item.startDate),
   rejectReason: item.rejectReason || '',
+  category: 'leave',
+})
+
+const mapVacationHistoryItem = (item) => ({
+  id: item.id,
+  leaveRequestId: null,
+  type: '휴가',
+  title: `${item.leaveType || '휴가'} 신청`,
+  period: `${item.startDate} ~ ${item.endDate}`,
+  days: Number(item.usedDays || 0),
+  usedDays: Number(item.usedDays || 0),
+  reason: '',
+  status: item.status || 'pending',
+  appliedAt: item.applyDate,
+  targetDate: item.startDate,
+  approver: '-',
+  leaveType: item.leaveType,
+  startDate: item.startDate,
+  endDate: item.endDate,
+  applyDate: item.applyDate,
+  rejectReason: item.rejectReason || '',
+  category: 'leave',
+})
+
+const mapAdminApprovalVacation = (item) => ({
+  id: item.approvalId,
+  approvalId: item.approvalId,
+  leaveRequestId: null,
+  userId: item.drafterId,
+  name: item.drafterName || `사원 #${item.drafterId}`,
+  position: '직원',
+  deptName: item.departmentName || '-',
+  dept: item.departmentName || '-',
+  type: item.vacationType || '휴가',
+  title: `${item.vacationType || '휴가'} 신청`,
+  period:
+    item.startDate && item.endDate && formatDate(item.startDate) !== formatDate(item.endDate)
+      ? `${formatDate(item.startDate)} ~ ${formatDate(item.endDate)}`
+      : formatDate(item.startDate),
+  days: Number(item.days || 0),
+  usedDays: Number(item.days || 0),
+  reason: item.reason || '',
+  status: mapRequestStatus(item.approvalStatus),
+  appliedAt: formatDate(item.draftDate),
+  targetDate: formatDate(item.startDate),
+  approver: '-',
+  leaveType: item.vacationType || '휴가',
+  startDate: formatDate(item.startDate),
+  endDate: formatDate(item.endDate),
+  applyDate: formatDate(item.draftDate),
+  rejectReason: '',
   category: 'leave',
 })
 
@@ -374,71 +427,23 @@ export const useAttendanceStore = defineStore('attendance', () => {
     return leaveGrantHistory.value
   }
 
-  const fetchMyLeaveRequests = async (page = 1, size = 100) => {
-    const firstResponse = await getMyLeaveRequests({ page, size })
-    const firstContent = firstResponse.data?.content || []
-    const totalPages = Number(firstResponse.data?.totalPages || 1)
-
-    if (totalPages <= 1) {
-      myLeaveRequestsList.value = firstContent.map(mapLeaveRequest)
-      return myLeaveRequestsList.value
-    }
-
-    const pageRequests = []
-    for (let currentPage = page + 1; currentPage <= totalPages; currentPage += 1) {
-      pageRequests.push(getMyLeaveRequests({ page: currentPage, size }))
-    }
-
-    const remainingResponses = await Promise.all(pageRequests)
-    const mergedContent = [
-      ...firstContent,
-      ...remainingResponses.flatMap((response) => response.data?.content || []),
-    ]
-
-    myLeaveRequestsList.value = mergedContent.map(mapLeaveRequest)
+  const fetchMyLeaveRequests = async () => {
+    const response = await getVacationHistory()
+    myLeaveRequestsList.value = (response.data || []).map(mapVacationHistoryItem)
     return myLeaveRequestsList.value
   }
 
   const refreshRequestHistory = async () => {
-    const [leaveRes, overtimeRes, tripRes, weeklyRes] = await Promise.all([
-      getMyLeaveRequests({ page: 1, size: 100 }),
-      getMyOvertimeRequests({ page: 1, size: 100 }),
-      getMyBusinessTripRequests({ page: 1, size: 100 }),
-      getMyWeeklyWorkSchedules({ page: 1, size: 100 }),
-    ])
-
-    requestHistory.value = [
-      ...(leaveRes.data?.content || []).map(mapLeaveRequest),
-      ...(overtimeRes.data?.content || []).map(mapOvertimeRequest),
-      ...(tripRes.data?.content || []).map(mapBusinessTripRequest),
-      ...(weeklyRes.data?.content || []).map(mapWeeklySchedule),
-    ].sort((a, b) => String(b.appliedAt || '').localeCompare(String(a.appliedAt || '')))
+    const response = await getRequestHistory()
+    requestHistory.value = response.data || []
   }
 
   const refreshRequestCounts = async () => {
-    const [leaveRes, overtimeRes, tripRes, weeklyRes] = await Promise.all([
-      getLeaveStatusCounts(),
-      getOvertimeStatusCounts(),
-      getBusinessTripStatusCounts(),
-      getWeeklyWorkScheduleStatusCounts(),
-    ])
-
+    const response = await getRequestHistoryCounts()
     requestCounts.value = {
-      pending:
-        (leaveRes.data?.pendingCount || 0) +
-        (overtimeRes.data?.pendingCount || 0) +
-        (tripRes.data?.pendingCount || 0) +
-        (weeklyRes.data?.pendingCount || 0),
-      approved:
-        (leaveRes.data?.approvedCount || 0) +
-        (overtimeRes.data?.approvedCount || 0) +
-        (tripRes.data?.approvedCount || 0) +
-        (weeklyRes.data?.approvedCount || 0),
-      rejected:
-        (leaveRes.data?.rejectedCount || 0) +
-        (overtimeRes.data?.rejectedCount || 0) +
-        (tripRes.data?.rejectedCount || 0) +
-        (weeklyRes.data?.rejectedCount || 0),
+      pending: response.data?.pendingCount || 0,
+      approved: response.data?.approvedCount || 0,
+      rejected: response.data?.rejectedCount || 0,
     }
   }
 
@@ -447,8 +452,8 @@ export const useAttendanceStore = defineStore('attendance', () => {
     if (status) {
       params.status = status.toUpperCase()
     }
-    const response = await getAdminLeaveRequests(params)
-    leaveRequests.value = (response.data?.content || []).map(mapLeaveRequest)
+    const response = await getAdminVacationList(params)
+    leaveRequests.value = (response?.content || []).map(mapAdminApprovalVacation)
     return leaveRequests.value
   }
 
@@ -473,6 +478,35 @@ export const useAttendanceStore = defineStore('attendance', () => {
         failures,
       )
     }
+  }
+
+  const processApprovalVacationRequests = async (ids, approve, rejectReason = '') => {
+    const results = await Promise.allSettled(
+      ids.map((approvalId) =>
+        processApproval(approvalId, {
+          approve,
+          reason: approve ? null : rejectReason,
+        }),
+      ),
+    )
+    await fetchAdminLeaveRequestsList()
+
+    const successIds = results.flatMap((result, index) =>
+      result.status === 'fulfilled' ? [ids[index]] : [],
+    )
+    const failures = results.filter((result) => result.status === 'rejected')
+    if (failures.length > 0) {
+      const error = createBatchProcessError(
+        failures.length === ids.length
+          ? '휴가 일괄 처리에 실패했습니다.'
+          : `휴가 ${ids.length}건 중 ${failures.length}건 처리에 실패했습니다.`,
+        failures,
+      )
+      error.successIds = successIds
+      throw error
+    }
+
+    return { successIds }
   }
 
   const fetchTeamFlexibleWorkPlans = async (page = 1, size = 100, status = null) => {
@@ -501,9 +535,9 @@ export const useAttendanceStore = defineStore('attendance', () => {
 
   const processFlexiblePlans = async (ids, approve, rejectReason = '') => {
     const results = await Promise.allSettled(
-      ids.map((weeklyId) =>
+      ids.map((approvalId) =>
         processWeeklyWorkSchedule({
-          weeklyId,
+          approvalId,
           approve,
           rejectReason: approve ? null : rejectReason,
         }),
@@ -565,6 +599,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     fetchTeamFlexibleWorkPlans,
     fetchWeeklySummary,
     processFlexiblePlans,
+    processApprovalVacationRequests,
     processLeaveRequests,
     refreshRequestCounts,
     refreshRequestHistory,

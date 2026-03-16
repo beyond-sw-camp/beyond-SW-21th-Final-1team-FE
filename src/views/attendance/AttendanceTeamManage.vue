@@ -9,10 +9,6 @@
       </div>
     </div>
 
-    <div class="inline-alert team-scope">
-      현재 로그인한 사용자의 같은 부서 팀원만 조회됩니다. 다른 부서 구성원은 표시되지 않습니다.
-    </div>
-
     <div v-if="pageError" class="inline-alert error">
       {{ pageError }}
     </div>
