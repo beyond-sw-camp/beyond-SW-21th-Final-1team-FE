@@ -157,6 +157,16 @@ export const isEvaluatorRole = (roleCodes = sessionRoleCodesRef.value) =>
 export const isAppraiseeRole = (roleCodes = sessionRoleCodesRef.value) =>
   hasAnyRoleCode(roleCodes, APPRAISEE_ROLE_CODES)
 export const getAccessToken = () => readSessionItem(AUTH_KEYS.accessToken)
+export const getAccessTokenPayload = () => {
+  const token = getAccessToken()
+  if (!token || typeof window === 'undefined') return null
+  return decodeJwtPayload(token)
+}
+export const getAccessTokenRemainingSeconds = () => {
+  const payload = getAccessTokenPayload()
+  if (!payload?.exp) return 0
+  return Math.max(0, payload.exp - Math.floor(Date.now() / 1000))
+}
 export const getLoginSession = () => ({
   loggedIn: sessionStorage.getItem(AUTH_KEYS.loggedIn) === 'true',
   userId: sessionStorage.getItem(AUTH_KEYS.userId) || '',
@@ -206,6 +216,12 @@ export const setLoginSession = ({
   sessionStorage.setItem(AUTH_KEYS.accessToken, accessToken || '')
   sessionStorage.setItem(AUTH_KEYS.lastLoginAt, lastLoginAt || '')
   syncSessionAuthState()
+  dispatchSessionStorageChanged()
+}
+
+export const updateAccessToken = (accessToken) => {
+  if (typeof window === 'undefined') return
+  sessionStorage.setItem(AUTH_KEYS.accessToken, accessToken || '')
   dispatchSessionStorageChanged()
 }
 

@@ -78,11 +78,16 @@
         </svg>
       </button>
 
-      <div class="search-box">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input v-model="headerSearchKeyword" type="text" placeholder="검색어를 입력하세요" />
+      <div class="session-timer" :class="{ warning: remainingSeconds > 0 && remainingSeconds <= 300 }">
+        <strong class="session-timer__value">{{ formattedRemainingTime }}</strong>
+        <button
+          type="button"
+          class="session-extend-btn"
+          :disabled="isRefreshingSession || remainingSeconds <= 0"
+          @click="handleExtendSession"
+        >
+          {{ isRefreshingSession ? '연장 중' : '연장' }}
+        </button>
       </div>
 
       <div class="header-logout" @click="handleLogout">
@@ -95,16 +100,23 @@
     </div>
   </header>
 
-  <OrgSearchModal v-model="showOrgSearchModal" :initial-keyword="headerSearchKeyword" />
+  <OrgSearchModal v-model="showOrgSearchModal" />
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { getActivePinia } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import OrgSearchModal from '@/components/org/OrgSearchModal.vue'
-import { clearLoginSession, isAdminRole, sessionAllowedViewCodesRef } from '@/utils/auth'
-import { logout } from '@/api/auth'
+import {
+  clearLoginSession,
+  expireSessionAndRedirectToLogin,
+  getAccessTokenRemainingSeconds,
+  isAdminRole,
+  sessionAllowedViewCodesRef,
+  updateAccessToken,
+} from '@/utils/auth'
+import { logout, refreshSession } from '@/api/auth'
 import logo from '@/assets/logo-rhight.png'
 
 defineProps({
@@ -146,7 +158,6 @@ const NAV_CONFIG = [
   },
 ]
 const showOrgSearchModal = ref(false)
-const headerSearchKeyword = ref('')
 const isAdmin = computed(() => isAdminRole())
 const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 const allowedViewCodeSet = computed(() => new Set(sessionAllowedViewCodesRef.value || []))
@@ -156,6 +167,23 @@ const navItems = computed(() =>
   ),
 )
 const canViewNotices = computed(() => allowedViewCodeSet.value.has('NOTICE_LIST'))
+const remainingSeconds = ref(getAccessTokenRemainingSeconds())
+const isRefreshingSession = ref(false)
+let timerId = null
+
+const formattedRemainingTime = computed(() => {
+  const minutes = Math.floor(remainingSeconds.value / 60)
+  const seconds = remainingSeconds.value % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+})
+
+const syncRemainingSeconds = () => {
+  const nextSeconds = getAccessTokenRemainingSeconds()
+  remainingSeconds.value = nextSeconds
+  if (nextSeconds <= 0) {
+    expireSessionAndRedirectToLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+  }
+}
 
 const goAdminMode = () => {
   router.push('/admin/main')
@@ -163,6 +191,25 @@ const goAdminMode = () => {
 
 const goNotices = () => {
   router.push('/notices')
+}
+
+const handleExtendSession = async () => {
+  if (isRefreshingSession.value) return
+  if (remainingSeconds.value <= 0) {
+    expireSessionAndRedirectToLogin('세션이 만료되었습니다. 다시 로그인해주세요.')
+    return
+  }
+  isRefreshingSession.value = true
+  try {
+    const data = await refreshSession()
+    updateAccessToken(data?.accessToken || '')
+    syncRemainingSeconds()
+  } catch (error) {
+    if (error?.__authExpiredHandled) return
+    expireSessionAndRedirectToLogin('세션 연장에 실패했습니다. 다시 로그인해주세요.')
+  } finally {
+    isRefreshingSession.value = false
+  }
 }
 
 const handleLogout = async () => {
@@ -179,6 +226,20 @@ const handleLogout = async () => {
     router.push('/login')
   }
 }
+
+onMounted(() => {
+  syncRemainingSeconds()
+  timerId = window.setInterval(syncRemainingSeconds, 1000)
+  window.addEventListener('session-storage-changed', syncRemainingSeconds)
+})
+
+onUnmounted(() => {
+  if (timerId) {
+    window.clearInterval(timerId)
+    timerId = null
+  }
+  window.removeEventListener('session-storage-changed', syncRemainingSeconds)
+})
 </script>
 
 <style scoped>
@@ -202,16 +263,23 @@ const handleLogout = async () => {
 .nav-item:hover{color:var(--gray700)}
 .nav-item.active{color:var(--primary);font-weight:700;border-bottom-color:var(--primary)}
 .header-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.search-box{
-  display:flex;align-items:center;gap:7px;
-  background:var(--gray50);border:1px solid var(--gray200);border-radius:var(--radius-sm);
-  padding:7px 14px;width:220px;color:var(--gray400);transition:all var(--transition);
+.session-timer{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 10px;border:1px solid var(--gray200);
+  border-radius:var(--radius-sm);background:#fff;color:var(--gray600);
+  min-width:148px;
 }
-.search-box:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--accent)}
-.search-box input{
-  border:none;background:transparent;font-size:0.82rem;color:var(--gray700);width:100%;
+.session-timer.warning{
+  border-color:#FBBF24;
+  background:#FFFBEB;
+  color:#92400E;
 }
-.search-box input::placeholder{color:var(--gray400)}
+.session-timer__value{font-family:var(--font-num);font-size:0.82rem;color:inherit}
+.session-extend-btn{
+  margin-left:auto;border:none;background:transparent;color:var(--primary);
+  font-size:0.78rem;font-weight:700;cursor:pointer;padding:0;
+}
+.session-extend-btn:disabled{color:var(--gray400);cursor:default}
 .header-icon-btn{
   width:36px;height:36px;border-radius:var(--radius-sm);
   display:flex;align-items:center;justify-content:center;
