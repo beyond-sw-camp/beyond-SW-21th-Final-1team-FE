@@ -3,9 +3,6 @@
     <div class="page-header">
       <div class="header-content">
         <h1 class="page-title">팀 일일 근태 현황</h1>
-        <p class="page-description">
-          같은 부서 팀원의 일일 근태 현황을 확인하고 필요한 경우 출퇴근 시각을 수정할 수 있습니다.
-        </p>
       </div>
     </div>
 

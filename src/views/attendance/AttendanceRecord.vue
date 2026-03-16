@@ -24,42 +24,50 @@
       <div class="stats-row">
         <!-- Normal -->
         <div class="stat-item">
-          <div class="icon-box blue-bg">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <div class="stat-text">
-            <span class="num">{{ monthlyStats.normalCount }}</span>
-            <span class="label">정상 출근</span>
+          <div class="metric-col">
+            <div class="icon-box blue-bg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div class="stat-text">
+              <span class="num">{{ monthlyStats.normalCount }}</span>
+              <span class="label">정상 출근</span>
+            </div>
           </div>
         </div>
         <!-- Late/Early -->
         <div class="stat-item">
-          <div class="icon-box orange-bg">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          </div>
-          <div class="stat-text">
-            <span class="num">{{ monthlyStats.lateCount }}</span>
-            <span class="label">지각/조퇴</span>
+          <div class="metric-col">
+            <div class="icon-box orange-bg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div class="stat-text">
+              <span class="num">{{ monthlyStats.lateCount }}</span>
+              <span class="label">지각/조퇴</span>
+            </div>
           </div>
         </div>
         <!-- Remote/Work -->
         <div class="stat-item">
-          <div class="icon-box purple-bg">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </div>
-          <div class="stat-text">
-            <span class="num">{{ monthlyStats.absentCount }}</span>
-            <span class="label">결근</span>
+          <div class="metric-col">
+            <div class="icon-box purple-bg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div class="stat-text">
+              <span class="num">{{ monthlyStats.absentCount }}</span>
+              <span class="label">결근</span>
+            </div>
           </div>
         </div>
         <!-- Leave -->
         <div class="stat-item">
-          <div class="icon-box red-bg">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-          </div>
-          <div class="stat-text">
-            <span class="num">{{ monthlyStats.leaveDays }}</span>
-            <span class="label">휴가 사용</span>
+          <div class="metric-col">
+            <div class="icon-box red-bg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            </div>
+            <div class="stat-text">
+              <span class="num">{{ monthlyStats.leaveDays }}</span>
+              <span class="label">휴가 사용</span>
+            </div>
           </div>
         </div>
       </div>
@@ -73,7 +81,6 @@
         </div>
         <div class="action-text">
           <h3 class="action-title">출퇴근 기록 조회</h3>
-          <p class="action-desc">나의 근태 기록을 상세하게 확인하세요.</p>
         </div>
       </div>
       <div class="action-right">
@@ -373,14 +380,29 @@ const handleBack = () => {
   flex: 1;
   background: var(--gray50);
   border-radius: 12px;
-  padding: 16px;
+  padding: 18px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.metric-col {
+  width: 100%;
+  max-width: 112px;
+  display: grid;
+  grid-template-rows: 44px minmax(64px, auto);
   gap: 12px;
+  align-content: start;
+  justify-items: center;
 }
 .stat-text {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-height: 64px;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: center;
 }
 
 @media (max-width: 768px){
@@ -399,11 +421,14 @@ const handleBack = () => {
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--gray900);
-  line-height: 1.2;
+  line-height: 1;
+  min-height: 2rem;
 }
 .stat-text .label {
   font-size: 0.85rem;
   color: var(--gray500);
+  line-height: 1.25;
+  min-height: 1.25rem;
 }
 
 .icon-box {
@@ -413,6 +438,11 @@ const handleBack = () => {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+}
+.icon-box svg {
+  display: block;
+  width: 20px;
+  height: 20px;
 }
 .blue-bg { background: #E0F7FA; color: var(--primary); }
 .orange-bg { background: #FFF3E0; color: #F97316; }
