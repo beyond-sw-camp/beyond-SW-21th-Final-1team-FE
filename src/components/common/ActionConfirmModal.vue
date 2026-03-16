@@ -23,7 +23,12 @@
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" :disabled="loading" @click="emit('update:modelValue', false)">취소</button>
+      <button
+        v-if="!hideCancel"
+        class="btn-cancel"
+        :disabled="loading"
+        @click="emit('update:modelValue', false)"
+      >{{ cancelText }}</button>
       <button class="btn-confirm" :disabled="loading || confirmDisabled" @click="emit('confirm')">
         {{ loading ? '처리 중...' : confirmText }}
       </button>
@@ -39,6 +44,8 @@ defineProps({
   title: { type: String, default: '확인' },
   message: { type: String, default: '' },
   confirmText: { type: String, default: '확인' },
+  cancelText: { type: String, default: '취소' },
+  hideCancel: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
   confirmDisabled: { type: Boolean, default: false },
   requireReason: { type: Boolean, default: false },

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearLoginSession, getAccessToken } from '@/utils/auth'
+import { clearLoginSession, expireSessionAndRedirectToLogin, getAccessToken } from '@/utils/auth'
 
 const buildPayrollBaseUrl = () => {
   const fallback =
@@ -36,6 +36,8 @@ payrollApi.interceptors.response.use(
   (error) => {
     if (error?.response?.status === 401) {
       clearLoginSession()
+      error.__authExpiredHandled = true
+      expireSessionAndRedirectToLogin('인증이 필요합니다.')
     }
     return Promise.reject(error)
   },
