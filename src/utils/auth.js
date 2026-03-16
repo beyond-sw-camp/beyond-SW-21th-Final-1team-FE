@@ -36,6 +36,14 @@ export const ADMIN_ROLE_CODES = new Set([
   'ADMIN',
 ])
 
+const PERSONAL_ATTENDANCE_VIEW_CODES = [
+  'ATTENDANCE_MAIN',
+  'ATTENDANCE_RECORD',
+  'ATTENDANCE_HISTORY',
+  'ATTENDANCE_SCHEDULE',
+  'ATTENDANCE_VACATION',
+]
+
 const EVALUATOR_ROLE_CODES = new Set(['EVALUATOR', 'ROLE_EVALUATOR'])
 const APPRAISEE_ROLE_CODES = new Set(['EVALUATEE', 'ROLE_EVALUATEE'])
 
@@ -53,17 +61,28 @@ const readSessionRoleCodes = () => {
   }
 }
 
+const hasAnyRoleCode = (roleCodes = [], candidates = new Set()) =>
+  roleCodes.some((role) => candidates.has(role))
+
+const normalizeAllowedViewCodes = (allowedViewCodes = [], roleCodes = []) => {
+  const normalized = new Set(Array.isArray(allowedViewCodes) ? allowedViewCodes : [])
+  if (hasAnyRoleCode(roleCodes, ADMIN_ROLE_CODES)) {
+    PERSONAL_ATTENDANCE_VIEW_CODES.forEach((viewCode) => normalized.add(viewCode))
+  }
+  return Array.from(normalized)
+}
+
 const readSessionAllowedViewCodes = () => {
   if (typeof window === 'undefined') return []
   try {
-    return JSON.parse(sessionStorage.getItem(AUTH_KEYS.allowedViewCodes) || '[]')
+    return normalizeAllowedViewCodes(
+      JSON.parse(sessionStorage.getItem(AUTH_KEYS.allowedViewCodes) || '[]'),
+      readSessionRoleCodes(),
+    )
   } catch (_error) {
     return []
   }
 }
-
-const hasAnyRoleCode = (roleCodes = [], candidates = new Set()) =>
-  roleCodes.some((role) => candidates.has(role))
 
 export const sessionRoleRef = ref(readSessionItem(AUTH_KEYS.role, USER_ROLES.user))
 export const sessionRoleCodesRef = ref(readSessionRoleCodes())
@@ -168,6 +187,8 @@ export const setLoginSession = ({
   accessToken,
   lastLoginAt,
 }) => {
+  const normalizedRoleCodes = Array.isArray(roleCodes) ? roleCodes : []
+  const normalizedAllowedViewCodes = normalizeAllowedViewCodes(allowedViewCodes, normalizedRoleCodes)
   sessionStorage.setItem(AUTH_KEYS.loggedIn, 'true')
   sessionStorage.setItem(AUTH_KEYS.userId, userId || '')
   sessionStorage.setItem(AUTH_KEYS.employeeId, employeeId || '')
@@ -177,10 +198,10 @@ export const setLoginSession = ({
   sessionStorage.setItem(AUTH_KEYS.rankName, rankName || '')
   sessionStorage.setItem(AUTH_KEYS.jobName, jobName || '')
   sessionStorage.setItem(AUTH_KEYS.role, role || USER_ROLES.user)
-  sessionStorage.setItem(AUTH_KEYS.roleCodes, JSON.stringify(Array.isArray(roleCodes) ? roleCodes : []))
+  sessionStorage.setItem(AUTH_KEYS.roleCodes, JSON.stringify(normalizedRoleCodes))
   sessionStorage.setItem(
     AUTH_KEYS.allowedViewCodes,
-    JSON.stringify(Array.isArray(allowedViewCodes) ? allowedViewCodes : []),
+    JSON.stringify(normalizedAllowedViewCodes),
   )
   sessionStorage.setItem(AUTH_KEYS.accessToken, accessToken || '')
   sessionStorage.setItem(AUTH_KEYS.lastLoginAt, lastLoginAt || '')

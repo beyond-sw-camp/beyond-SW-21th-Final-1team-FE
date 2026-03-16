@@ -427,7 +427,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     return leaveGrantHistory.value
   }
 
-  const fetchMyLeaveRequests = async (page = 1, size = 100) => {
+  const fetchMyLeaveRequests = async () => {
     const response = await getVacationHistory()
     myLeaveRequestsList.value = (response.data || []).map(mapVacationHistoryItem)
     return myLeaveRequestsList.value
@@ -491,15 +491,22 @@ export const useAttendanceStore = defineStore('attendance', () => {
     )
     await fetchAdminLeaveRequestsList()
 
+    const successIds = results.flatMap((result, index) =>
+      result.status === 'fulfilled' ? [ids[index]] : [],
+    )
     const failures = results.filter((result) => result.status === 'rejected')
     if (failures.length > 0) {
-      throw createBatchProcessError(
+      const error = createBatchProcessError(
         failures.length === ids.length
           ? '휴가 일괄 처리에 실패했습니다.'
           : `휴가 ${ids.length}건 중 ${failures.length}건 처리에 실패했습니다.`,
         failures,
       )
+      error.successIds = successIds
+      throw error
     }
+
+    return { successIds }
   }
 
   const fetchTeamFlexibleWorkPlans = async (page = 1, size = 100, status = null) => {
@@ -528,9 +535,9 @@ export const useAttendanceStore = defineStore('attendance', () => {
 
   const processFlexiblePlans = async (ids, approve, rejectReason = '') => {
     const results = await Promise.allSettled(
-      ids.map((weeklyId) =>
+      ids.map((approvalId) =>
         processWeeklyWorkSchedule({
-          weeklyId,
+          approvalId,
           approve,
           rejectReason: approve ? null : rejectReason,
         }),

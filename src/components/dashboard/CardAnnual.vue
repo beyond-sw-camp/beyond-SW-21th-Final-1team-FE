@@ -34,8 +34,12 @@ const rows = computed(() => [
   { label: '잔여 연차', value: formatLeave(leaveBalance.value.remainingAnnualLeave), highlight: true },
 ])
 
-onMounted(() => {
-  store.fetchLeaveBalance()
+onMounted(async () => {
+  try {
+    await store.fetchLeaveBalance()
+  } catch (_error) {
+    // Keep the card rendered with existing fallback values when balance fetch fails.
+  }
 })
 </script>
 

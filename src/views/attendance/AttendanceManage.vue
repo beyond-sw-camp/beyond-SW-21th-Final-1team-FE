@@ -444,6 +444,11 @@ const submitApprove = async () => {
     selectedLeaveIds.value = []
     showApproveModal.value = false
   } catch (error) {
+    if (Array.isArray(error?.successIds) && error.successIds.length > 0) {
+      selectedLeaveIds.value = selectedLeaveIds.value.filter(
+        (id) => !error.successIds.includes(id),
+      )
+    }
     const message = error?.response?.data?.message || '승인 처리에 실패했습니다. 다시 시도해 주세요.'
     alert(message)
   } finally {
@@ -475,6 +480,11 @@ const submitReject = async () => {
     showRejectModal.value = false
     alert('반려 처리되었습니다.')
   } catch (error) {
+    if (Array.isArray(error?.successIds) && error.successIds.length > 0) {
+      selectedLeaveIds.value = selectedLeaveIds.value.filter(
+        (id) => !error.successIds.includes(id),
+      )
+    }
     const message = error?.response?.data?.message || '반려 처리에 실패했습니다. 다시 시도해 주세요.'
     alert(message)
   } finally {

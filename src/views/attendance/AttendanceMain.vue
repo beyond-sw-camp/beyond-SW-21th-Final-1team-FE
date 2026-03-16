@@ -59,14 +59,13 @@
 
         <div class="clock-actions">
           <div class="time-row">
-            <div class="time-item">
-              <span class="label">출근 시간</span>
-              <span class="value">{{ checkInTime }}</span>
+            <div class="time-item time-item--check-in">
+              <span class="time-item-caption">출근 시간</span>
+              <span class="time-item-value">{{ checkInTime }}</span>
             </div>
-            <div class="divider"></div>
-            <div class="time-item">
-              <span class="label">퇴근 시간</span>
-              <span class="value">{{ checkOutTime }}</span>
+            <div class="time-item time-item--check-out">
+              <span class="time-item-caption">퇴근 시간</span>
+              <span class="time-item-value">{{ checkOutTime }}</span>
             </div>
           </div>
           <button v-if="!isCheckedIn" class="btn-check-out btn-in" @click="handleCheckIn">출근하기</button>
@@ -218,20 +217,38 @@
         <!-- My Applications -->
         <div class="card history-card" @click="$router.push('/attendance/history')">
            <div class="card-header-row mb-2">
-            <span class="card-title">나의 신청 현황</span>
+            <div class="history-heading">
+              <span class="card-title">나의 신청 현황</span>
+            </div>
             <span class="more-link">더보기</span>
           </div>
           <div class="history-list">
-             <div class="history-item" v-for="app in recentApplications" :key="app.id">
-              <div class="h-top">
-                <span class="status-badge-sm" :class="getApprStatusClass(app.status)">{{ getApprStatusLabel(app.status) }}</span>
-                <span class="h-date">{{ formatHistoryDate(app.appliedAt) }}</span>
+            <div v-if="recentApplications.length" class="history-stack">
+              <div class="history-item" v-for="app in recentApplications" :key="app.id">
+                <div class="history-item-top">
+                  <span class="status-badge-sm" :class="getApprStatusClass(app.status)">{{ getApprStatusLabel(app.status) }}</span>
+                  <span class="history-date-chip">{{ formatHistoryDate(app.appliedAt) }}</span>
+                </div>
+                <div class="history-item-body">
+                  <div class="history-type-row">
+                    <span class="history-type-badge">{{ app.type || '신청' }}</span>
+                    <span v-if="app.period" class="history-period">{{ app.period }}</span>
+                  </div>
+                  <div class="h-title">{{ app.title }}</div>
+                  <div class="history-meta">
+                    <span class="history-meta-label">결재자</span>
+                    <span class="history-meta-value">{{ app.approver || '-' }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="h-title">{{ app.title }}</div>
             </div>
-             <div v-if="recentApplications.length === 0" class="no-data-text">
-                신청 내역이 없습니다.
-             </div>
+            <div v-else class="history-empty">
+              <div class="history-empty-icon">+</div>
+              <div class="history-empty-text">
+                <strong>신청 내역이 없습니다.</strong>
+                <span>휴가, 연장근무, 재택근무 신청이 여기 쌓입니다.</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -263,7 +280,7 @@ const store = useAttendanceStore()
 const recentApplications = computed(() => {
   return [...store.requestHistory]
     .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0))
-    .slice(0, 2)
+    .slice(0, 3)
 })
 
 const getApprStatusLabel = (s) => ({ pending: '결재 대기', approved: '승인됨', rejected: '반려됨' }[s])
@@ -657,13 +674,27 @@ const handleBack = () => {
   margin-top: auto;
 }
 .time-row {
-  background: var(--gray50);
-  border-radius: 10px;
-  padding: 8px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   margin-bottom: 12px;
+}
+.time-item {
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #dbe4f0;
+  background: linear-gradient(180deg, #fbfdff 0%, #f2f6fb 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.time-item--check-in {
+  border-color: #d8e7fb;
+}
+.time-item--check-out {
+  border-color: #dfe6ef;
 }
 
 .mobile-attendance {
@@ -782,20 +813,18 @@ const handleBack = () => {
     display: none;
   }
 }
-.time-item .label {
-  font-size: 0.82rem;
-  color: var(--gray500);
-  margin-bottom: 2px;
-}
-.time-item .value {
-  font-size: 1.1rem;
+.time-item-caption {
+  font-size: 0.75rem;
   font-weight: 700;
-  color: var(--gray800);
+  letter-spacing: 0.04em;
+  color: var(--gray500);
 }
-.divider {
-  width: 1px;
-  height: 20px;
-  background: var(--gray300);
+.time-item-value {
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--gray800);
 }
 .btn-check-out {
   width: 100%;
@@ -1076,6 +1105,9 @@ const handleBack = () => {
 .history-card {
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 .history-card:hover {
   transform: translateY(-2px);
@@ -1130,27 +1162,41 @@ const handleBack = () => {
   color: var(--gray500);
   cursor: pointer;
 }
-.history-item {
-  background: var(--gray50);
-  padding: 16px;
-  border-radius: 10px;
-  margin-bottom: 0px;
+.history-heading {
+  display: flex;
+  flex-direction: column;
 }
-.h-top {
+.history-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-item {
+  background: rgba(255,255,255,0.9);
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+.history-list {
+  justify-content: flex-start;
+  padding-top: 4px;
+}
+.history-item-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .status-badge-sm {
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 0.72rem;
+  padding: 5px 10px;
+  border-radius: 999px;
   font-weight: 700;
 }
 .status-badge-sm.warning {
   background: #FFF8E1;
-  color: #FBC02D;
+  color: #B7791F;
 }
 .status-badge-sm.success {
   background: #DCFCE7;
@@ -1160,15 +1206,97 @@ const handleBack = () => {
   background: #FEE2E2;
   color: #991B1B;
 }
-.no-data-text { font-size: 0.9rem; color: var(--gray500); text-align: center; padding: 12px; }
-.h-date {
-  font-size: 0.8rem;
-  color: var(--gray400);
+.history-date-chip {
+  font-size: 0.76rem;
+  color: var(--gray500);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+.history-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.history-type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.history-type-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #e8f1ff;
+  color: #2155a3;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.history-period {
+  font-size: 0.78rem;
+  color: var(--gray500);
+  line-height: 1.4;
 }
 .h-title {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.98rem;
+  font-weight: 700;
   color: var(--gray800);
+  line-height: 1.45;
+}
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--gray500);
+  font-size: 0.78rem;
+}
+.history-meta-label {
+  color: var(--gray400);
+}
+.history-meta-value {
+  color: var(--gray700);
+  font-weight: 600;
+}
+.history-empty {
+  flex: 1;
+  min-height: 220px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px;
+}
+.history-empty-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #eef6ff;
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.history-empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.history-empty-text strong {
+  color: var(--gray700);
+  font-size: 0.95rem;
+}
+.history-empty-text span {
+  color: var(--gray500);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .mb-4 { margin-bottom: 16px; }

@@ -157,7 +157,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { safeBack } from '@/utils/navigation'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
 
