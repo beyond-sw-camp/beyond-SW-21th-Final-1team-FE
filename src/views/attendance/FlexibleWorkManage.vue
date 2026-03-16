@@ -4,7 +4,6 @@
     <div class="page-header">
       <div class="header-content">
         <h2 class="page-title">유연근무 관리</h2>
-        <p class="page-desc">팀원들의 근무 계획을 승인하고 일정을 관리합니다.</p>
       </div>
     </div>
 
@@ -31,6 +30,12 @@
       <div class="content-card">
         <div class="action-bar">
           <div class="left-actions">
+            <select class="filter-select" v-model="selectedFilter">
+              <option value="all">전체 상태</option>
+              <option value="pending">승인 대기</option>
+            </select>
+          </div>
+          <div class="right-actions">
             <span class="selected-count" v-if="selectedIds.length > 0">
               {{ selectedIds.length }}개 선택됨
             </span>
@@ -48,12 +53,6 @@
             >
               반려
             </button>
-          </div>
-          <div class="right-actions">
-            <select class="filter-select" v-model="selectedFilter">
-              <option value="all">전체 상태</option>
-              <option value="pending">승인 대기</option>
-            </select>
           </div>
         </div>
 
@@ -595,6 +594,7 @@ const getBarStyle = (day) => {
   display: flex; justify-content: space-between; align-items: center;
 }
 .left-actions { display: flex; gap: 12px; align-items: center; }
+.right-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
 .filter-select { 
   padding: 8px 12px; border-radius: 6px; border: 1px solid var(--gray300); 
   font-size: 0.9rem; color: var(--gray700); cursor: pointer;

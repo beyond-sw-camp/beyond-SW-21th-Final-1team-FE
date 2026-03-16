@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">급여 관리</h1>
-        <p class="page-description">payroll 모듈의 실제 급여 계산, 대장, 설정, 보험요율 API를 관리합니다.</p>
       </div>
     </div>
 

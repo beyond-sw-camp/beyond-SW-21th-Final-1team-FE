@@ -2,9 +2,6 @@
   <div class="admin-attendance-page">
     <div class="page-header">
       <h1 class="page-title">근태 관리</h1>
-      <p class="page-description">
-        전사 근태 정책 및 기준을 설정합니다.
-      </p>
     </div>
 
     <div class="content-container">

@@ -8,7 +8,6 @@
         </div>
         <div class="header-text">
           <h2 class="page-title">근무 일정</h2>
-          <p class="page-desc">팀원들의 근무 일정과 휴가 현황을 확인하세요.</p>
         </div>
       </div>
       <div class="header-right">

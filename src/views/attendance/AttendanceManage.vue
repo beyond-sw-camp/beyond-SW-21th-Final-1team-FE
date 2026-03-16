@@ -4,7 +4,6 @@
     <div class="page-header">
       <div class="header-content">
         <h2 class="page-title">근태 관리</h2>
-        <p class="page-desc">팀원들의 근태 현황을 확인하고 관리할 수 있습니다.</p>
       </div>
     </div>
 

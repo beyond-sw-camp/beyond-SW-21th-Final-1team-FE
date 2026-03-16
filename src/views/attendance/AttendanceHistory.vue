@@ -21,7 +21,6 @@
       </div>
       <div class="header-text">
         <h2 class="page-title">신청 내역 조회</h2>
-        <p class="page-desc">휴가, 연장근무 등 각종 신청 내역을 확인하세요.</p>
       </div>
     </div>
 
