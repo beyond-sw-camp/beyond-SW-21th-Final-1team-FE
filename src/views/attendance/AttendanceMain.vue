@@ -15,7 +15,12 @@
       </div>
 
       <div class="mobile-clock card">
-        <div class="mobile-date">{{ currentDate }}</div>
+        <div class="mobile-clock-head">
+          <div class="mobile-date">{{ currentDate }}</div>
+          <button type="button" class="mobile-record-btn" @click="$router.push('/attendance/record')">
+            근태 현황
+          </button>
+        </div>
         <div class="mobile-time">{{ currentTime }}</div>
         <div class="mobile-location">서울, 대한민국</div>
 
@@ -32,12 +37,6 @@
 
         <button v-if="!isCheckedIn" class="btn-check-out btn-in" @click="handleCheckIn">출근하기</button>
         <button v-else class="btn-check-out" @click="handleCheckOut">퇴근하기</button>
-      </div>
-
-      <div class="mobile-actions">
-        <button type="button" class="mobile-action" @click="$router.push('/attendance/record')">
-          이번 달 기록 보기
-        </button>
       </div>
     </div>
 
@@ -204,7 +203,7 @@
                 }"
               >
                 {{ day.day }}
-                <div v-if="day.label" :class="day.variant === 'blue' ? 'bar-blue' : 'bar-orange'">
+                <div v-if="day.label" :class="`bar-${day.variant}`">
                   {{ day.label }}
                 </div>
               </div>
@@ -409,15 +408,27 @@ const monthBadgeLabel = computed(
   () => `${displayMonth.value.getFullYear()}.${String(displayMonth.value.getMonth() + 1).padStart(2, '0')}`,
 )
 
+const resolveCalendarTone = (event) => {
+  const title = String(event?.title || '')
+  const category = String(event?.category || '').toUpperCase()
+
+  if (title.includes('지각')) return 'tardy'
+  if (title.includes('조퇴')) return 'early_leave'
+  if (title.includes('결근')) return 'absent'
+  if (title.includes('휴가') || category === 'LEAVE') return 'vacation'
+  if (category === 'WEEKLY_SCHEDULE') return 'early_leave'
+  if (category === 'BUSINESS_TRIP') return 'absent'
+  return 'normal'
+}
+
 const eventLabelMap = computed(() => {
   const map = new Map()
   calendarEvents.value.forEach((event) => {
     if (!event.targetDate) return
     if (map.has(event.targetDate)) return
-    const blueCategories = ['ATTENDANCE', 'OVERTIME', 'WEEKLY_SCHEDULE']
     map.set(event.targetDate, {
       label: event.title,
-      variant: blueCategories.includes(event.category) ? 'blue' : 'orange',
+      variant: resolveCalendarTone(event),
     })
   })
   return map
@@ -444,7 +455,7 @@ const calendarWeeks = computed(() => {
         isToday: key === todayKey,
         isCurrentMonth: date.getMonth() === month,
         label: labelInfo?.label || '',
-        variant: labelInfo?.variant || 'blue',
+        variant: labelInfo?.variant || 'normal',
       }
     }),
   )
@@ -716,9 +727,32 @@ const handleBack = () => {
   gap: 10px;
 }
 
+.mobile-clock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .mobile-date {
   font-size: 0.88rem;
   color: var(--gray500);
+}
+
+.mobile-record-btn {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid #dbe4f3;
+  background: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--gray700);
+  cursor: pointer;
+}
+
+.mobile-record-btn:hover {
+  background: #f8fbff;
 }
 
 .mobile-time {
@@ -748,23 +782,6 @@ const handleBack = () => {
   font-size: 0.92rem;
   font-weight: 700;
   color: var(--gray800);
-}
-
-.mobile-actions {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.mobile-action {
-  padding: 12px 10px;
-  border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid #dbe4f3;
-  font-weight: 700;
-  color: var(--gray700);
-  cursor: pointer;
 }
 
 @media (max-width: 768px) {
@@ -1045,7 +1062,11 @@ const handleBack = () => {
   border-radius: 8px;
 }
 
-.bar-blue, .bar-orange {
+.bar-normal,
+.bar-tardy,
+.bar-early_leave,
+.bar-absent,
+.bar-vacation {
   margin-top: 6px;
   font-size: 0.7rem;
   padding: 2px 6px;
@@ -1053,18 +1074,18 @@ const handleBack = () => {
   width: 90%;
   text-align: center;
 }
-.bar-blue {
-  background: #E0F7FA;
-  color: var(--primary);
-}
-.bar-orange {
-
-  background: #FFF3E0;
-  color: var(--orange);
-}
-.today .bar-blue {
-   background: rgba(255,255,255,0.2);
-   color: #fff;
+.bar-normal { background: #DBEAFE; color: #1D4ED8; }
+.bar-tardy { background: #FED7AA; color: #C2410C; }
+.bar-early_leave { background: #FDE68A; color: #92400E; }
+.bar-absent { background: #E2E8F0; color: #475569; }
+.bar-vacation { background: #BBF7D0; color: #15803D; }
+.today .bar-normal,
+.today .bar-tardy,
+.today .bar-early_leave,
+.today .bar-absent,
+.today .bar-vacation {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
 }
 
 /* Quick Apps */
