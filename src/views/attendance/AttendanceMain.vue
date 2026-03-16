@@ -1,5 +1,46 @@
 <template>
   <div class="attendance-dashboard">
+    <div class="mobile-attendance">
+      <div class="mobile-head">
+        <button class="mobile-back" type="button" aria-label="뒤로가기" @click="handleBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <div class="mobile-head-content">
+          <h1>근태</h1>
+          <p>출퇴근 기록과 근태 현황을 확인합니다.</p>
+        </div>
+        <span class="status-badge" :class="workStatusClass">{{ workStatusLabel }}</span>
+      </div>
+
+      <div class="mobile-clock card">
+        <div class="mobile-date">{{ currentDate }}</div>
+        <div class="mobile-time">{{ currentTime }}</div>
+        <div class="mobile-location">서울, 대한민국</div>
+
+        <div class="mobile-times">
+          <div>
+            <div class="label">출근</div>
+            <div class="value">{{ checkInTime }}</div>
+          </div>
+          <div>
+            <div class="label">퇴근</div>
+            <div class="value">{{ checkOutTime }}</div>
+          </div>
+        </div>
+
+        <button v-if="!isCheckedIn" class="btn-check-out btn-in" @click="handleCheckIn">출근하기</button>
+        <button v-else class="btn-check-out" @click="handleCheckOut">퇴근하기</button>
+      </div>
+
+      <div class="mobile-actions">
+        <button type="button" class="mobile-action" @click="$router.push('/attendance/record')">
+          이번 달 기록 보기
+        </button>
+      </div>
+    </div>
+
     <!-- ═══ TOP ROW ═══ -->
     <div class="top-row">
       <!-- 1. 출퇴근 기록 카드 -->
@@ -174,47 +215,6 @@
 
       <!-- Right: Applications -->
       <div class="col-right">
-        <!-- Quick App renamed to Vacation App -->
-        <div class="card quick-card">
-          <div class="card-header-row mb-4">
-            <span class="card-title">휴가 신청</span>
-            <span class="more-link" @click="$router.push('/attendance/vacation')">더보기</span>
-          </div>
-          <div class="quick-list">
-            <div class="quick-item" @click="$router.push('/approval/draft')">
-              <div class="icon-circle blue-bg">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              </div>
-              <div class="quick-text">
-                <div class="main-text">연장근무 신청</div>
-                <div class="sub-text">야간 및 휴일 근무</div>
-              </div>
-              <span class="chevron">&gt;</span>
-            </div>
-             <div class="quick-item" @click="$router.push('/approval/draft')">
-              <div class="icon-circle purple-bg">
-                <!-- Business Trip: Briefcase -->
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-              </div>
-              <div class="quick-text">
-                <div class="main-text">외근/출장 신청</div>
-                <div class="sub-text">외부 일정 보고</div>
-              </div>
-              <span class="chevron">&gt;</span>
-            </div>
-             <div class="quick-item" @click="$router.push('/approval/draft')">
-              <div class="icon-circle red-bg">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-              </div>
-              <div class="quick-text">
-                <div class="main-text">휴가 신청</div>
-                <div class="sub-text">연차, 반차 등</div>
-              </div>
-              <span class="chevron">&gt;</span>
-            </div>
-          </div>
-        </div>
-
         <!-- My Applications -->
         <div class="card history-card" @click="$router.push('/attendance/history')">
            <div class="card-header-row mb-2">
@@ -250,11 +250,14 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+import { safeBack } from '@/utils/navigation'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import { storeToRefs } from 'pinia'
 import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
+const router = useRouter()
 const store = useAttendanceStore()
 
 const recentApplications = computed(() => {
@@ -562,6 +565,10 @@ watch(displayMonth, async (value) => {
 onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
+
+const handleBack = () => {
+  safeBack(router, '/')
+}
 </script>
 
 <style scoped>
@@ -657,6 +664,123 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+}
+
+.mobile-attendance {
+  display: none;
+  background: #f5f8fc;
+  border: 1px solid #eef2f7;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.mobile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-back{
+  width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
+  display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
+  flex-shrink: 0;
+}
+
+.mobile-head-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-badge {
+  flex-shrink: 0;
+}
+
+.mobile-head h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--gray800);
+}
+
+.mobile-head p {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  color: var(--gray500);
+}
+
+.mobile-clock {
+  margin-top: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-date {
+  font-size: 0.88rem;
+  color: var(--gray500);
+}
+
+.mobile-time {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--gray800);
+}
+
+.mobile-location {
+  font-size: 0.8rem;
+  color: var(--gray400);
+}
+
+.mobile-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.mobile-times .label {
+  font-size: 0.76rem;
+  color: var(--gray500);
+}
+
+.mobile-times .value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--gray800);
+}
+
+.mobile-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-action {
+  padding: 12px 10px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #dbe4f3;
+  font-weight: 700;
+  color: var(--gray700);
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .attendance-dashboard {
+    height: auto;
+    overflow: visible;
+  }
+
+  .mobile-attendance {
+    display: block;
+  }
+
+  .top-row,
+  .bottom-row {
+    display: none;
+  }
 }
 .time-item .label {
   font-size: 0.82rem;

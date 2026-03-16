@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" :class="{ 'mobile-simple': isMobileSimpleRoute }">
     <template v-if="showLayout">
       <Headerbar :active-nav="activeNav" @nav-click="handleNavClick" />
       <div class="app-body">
@@ -27,6 +27,15 @@ const route = useRoute()
 const perfStore = usePerformanceStore()
 const activeNav = ref('메인')
 const isPerformanceRoute = computed(() => route.path.startsWith('/performance'))
+const isMobileSimpleRoute = computed(() => {
+  const path = route.path
+  if (path === '/' || path === '/main') return true
+  if (path.startsWith('/notices')) return true
+  if (path.startsWith('/attendance')) return true
+  if (path.startsWith('/approval')) return true
+  if (path.startsWith('/hr/my')) return true
+  return false
+})
 
 // 로그인 페이지에서는 레이아웃 숨기기
 const showLayout = computed(() => route.path !== '/login')
