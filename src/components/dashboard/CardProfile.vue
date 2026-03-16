@@ -51,10 +51,9 @@ const displayOrgName = computed(() => profile.value.orgName || '-')
 const profileImageUrl = computed(() => profile.value.profileFileUrl || '')
 
 const handleCheckIn = () => {
-  const now = new Date()
-  const h = String(now.getHours()).padStart(2, '0')
-  const m = String(now.getMinutes()).padStart(2, '0')
-  store.setCheckInTime(`${h}:${m}`)
+  return store.clockIn().catch((error) => {
+    alert(error.response?.data?.message || '출근 처리에 실패했습니다.')
+  })
 }
 
 const handleCheckOut = async () => {

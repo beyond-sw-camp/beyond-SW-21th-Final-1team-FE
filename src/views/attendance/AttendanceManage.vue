@@ -440,7 +440,7 @@ const submitApprove = async () => {
   if (approveLoading.value) return
   approveLoading.value = true
   try {
-    await store.processLeaveRequests(selectedLeaveIds.value, true)
+    await store.processApprovalVacationRequests(selectedLeaveIds.value, true)
     selectedLeaveIds.value = []
     showApproveModal.value = false
   } catch (error) {
@@ -470,7 +470,7 @@ const submitReject = async () => {
 
   rejectLoading.value = true
   try {
-    await store.processLeaveRequests(selectedLeaveIds.value, false, rejectReason.value)
+    await store.processApprovalVacationRequests(selectedLeaveIds.value, false, rejectReason.value)
     selectedLeaveIds.value = []
     showRejectModal.value = false
     alert('반려 처리되었습니다.')

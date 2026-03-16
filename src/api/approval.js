@@ -19,6 +19,8 @@ const appendFiles = (formData, files = []) => {
 
 export const getApprovalDashboard = () => unwrap(api.get('/approval/dashboard'))
 export const getApprovalMainSummary = () => unwrap(api.get('/approval/main'))
+export const getAdminVacationList = (params = {}) =>
+  unwrap(api.get('/approval/admin/vacation-list', { params }))
 export const getApprovalReviews = (params = {}) => unwrap(api.get('/approval/review', { params }))
 export const getApprovalBoxes = (params = {}) => unwrap(api.get('/approval/boxes', { params }))
 export const getApprovalProgressOverview = (params = {}) =>

@@ -19,11 +19,24 @@
 </template>
 
 <script setup>
-const rows = [
-  { label: '총 연차', value: '15.0', highlight: true },
-  { label: '사용 연차', value: '3.5', highlight: false },
-  { label: '잔여 연차', value: '11.5', highlight: true },
-]
+import { computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useAttendanceStore } from '@/store/attendance'
+
+const store = useAttendanceStore()
+const { leaveBalance } = storeToRefs(store)
+
+const formatLeave = (value) => Number(value || 0).toFixed(1)
+
+const rows = computed(() => [
+  { label: '총 연차', value: formatLeave(leaveBalance.value.totalAnnualLeave), highlight: true },
+  { label: '사용 연차', value: formatLeave(leaveBalance.value.usedAnnualLeave), highlight: false },
+  { label: '잔여 연차', value: formatLeave(leaveBalance.value.remainingAnnualLeave), highlight: true },
+])
+
+onMounted(() => {
+  store.fetchLeaveBalance()
+})
 </script>
 
 <style scoped>
