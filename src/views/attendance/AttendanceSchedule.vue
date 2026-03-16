@@ -110,10 +110,10 @@
         <div class="sidebar-card legend-card">
           <h3 class="card-subtitle">범례</h3>
           <ul class="legend-list">
-            <li><span class="dot blue"></span>근태 기록</li>
-            <li><span class="dot pink"></span>휴가</li>
-            <li><span class="dot purple"></span>유연근무</li>
-            <li><span class="dot red"></span>출장/외근</li>
+            <li><span class="dot normal"></span>근태 기록</li>
+            <li><span class="dot vacation"></span>휴가</li>
+            <li><span class="dot early_leave"></span>유연근무</li>
+            <li><span class="dot absent"></span>출장/외근</li>
           </ul>
         </div>
       </aside>
@@ -165,7 +165,7 @@
                   v-for="event in getVisibleEventsForDate(day.fullDate)"
                   :key="event.id"
                   class="event-bar"
-                  :class="getEventColor(event.type)"
+                  :class="event.tone"
                 >
                   {{ getEventLabel(event) }}
                 </div>
@@ -214,7 +214,7 @@
                   v-for="event in getVisibleEventsForDate(day.fullDate)"
                   :key="event.id"
                   class="event-bar"
-                  :class="getEventColor(event.type)"
+                  :class="event.tone"
                 >
                   {{ getEventLabel(event) }}
                 </div>
@@ -249,7 +249,7 @@
               <div v-for="event in specialEvents" :key="event.id" class="list-row">
                  <div class="list-col-date">{{ event.targetDate.substring(5, 10).replace('-', '.') }}</div>
                  <div class="list-col-type">
-                   <span class="type-badge" :class="getEventColor(event.type)">{{ getTypeLabel(event.type) }}</span>
+                   <span class="type-badge" :class="event.tone">{{ getTypeLabel(event.type) }}</span>
                  </div>
                  <div class="list-col-title">{{ event.title }}</div>
                  <div class="list-col-memo">{{ event.memo || '-' }}</div>
@@ -418,10 +418,25 @@ const mapEventType = (event) => {
   return 'meeting'
 }
 
+const resolveEventTone = (event) => {
+  const title = String(event?.title || '')
+  const type = mapEventType(event)
+
+  if (title.includes('지각')) return 'tardy'
+  if (title.includes('조퇴')) return 'early_leave'
+  if (title.includes('결근')) return 'absent'
+  if (title.includes('휴가') || type === 'vacation') return 'vacation'
+  if (type === 'work_home' || type === 'remote') return 'early_leave'
+  if (type === 'trip') return 'absent'
+  if (type === 'meeting') return 'tardy'
+  return 'normal'
+}
+
 const normalizedEvents = computed(() =>
   calendarEvents.value.map((event) => ({
     ...event,
     type: mapEventType(event),
+    tone: resolveEventTone(event),
   })),
 )
 
@@ -446,14 +461,6 @@ const getHiddenEventCount = (date) => {
 const openDayList = (dateText) => {
   selectDate(dateText)
   currentView.value = 'week'
-}
-
-const getEventColor = (type) => {
-  if (type === 'work') return 'blue'
-  if (type === 'vacation') return 'pink'
-  if (type === 'work_home' || type === 'remote') return 'purple'
-  if (type === 'trip') return 'red'
-  return 'blue'
 }
 
 const getEventLabel = (event) => {
@@ -622,10 +629,11 @@ watch(selectedFilter, fetchCalendar)
 .legend-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .legend-list li { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--gray600); }
 .dot { width: 10px; height: 10px; border-radius: 50%; }
-.dot.blue { background: #3B82F6; }
-.dot.pink { background: #EC4899; }
-.dot.purple { background: #A855F7; }
-.dot.red { background: #EF4444; }
+.dot.normal { background: #1D4ED8; }
+.dot.tardy { background: #C2410C; }
+.dot.early_leave { background: #92400E; }
+.dot.absent { background: #475569; }
+.dot.vacation { background: #15803D; }
 
 
 /* Main Calendar */
@@ -693,10 +701,11 @@ watch(selectedFilter, fetchCalendar)
   font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;
   margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.event-bar.blue { background: #EFF6FF; color: #1E40AF; border: 1px solid #DBEAFE; }
-.event-bar.pink { background: #FDF2F8; color: #BE185D; border: 1px solid #FCE7F3; }
-.event-bar.purple { background: #FAF5FF; color: #7E22CE; border: 1px solid #F3E8FF; }
-.event-bar.red { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+.event-bar.normal { background: #DBEAFE; color: #1D4ED8; border: 1px solid #DBEAFE; }
+.event-bar.tardy { background: #FED7AA; color: #C2410C; border: 1px solid #FED7AA; }
+.event-bar.early_leave { background: #FDE68A; color: #92400E; border: 1px solid #FDE68A; }
+.event-bar.absent { background: #E2E8F0; color: #475569; border: 1px solid #E2E8F0; }
+.event-bar.vacation { background: #BBF7D0; color: #15803D; border: 1px solid #BBF7D0; }
 .event-more-btn {
   align-self: flex-start;
   border: none;
@@ -797,10 +806,11 @@ watch(selectedFilter, fetchCalendar)
 .type-badge {
   padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;
 }
-.type-badge.pink { background: #FCE7F3; color: #BE185D; }
-.type-badge.purple { background: #F3E8FF; color: #7E22CE; }
-.type-badge.red { background: #FEE2E2; color: #B91C1C; }
-.type-badge.blue { background: #DBEAFE; color: #1E40AF; }
+.type-badge.normal { background: #DBEAFE; color: #1D4ED8; }
+.type-badge.tardy { background: #FED7AA; color: #C2410C; }
+.type-badge.early_leave { background: #FDE68A; color: #92400E; }
+.type-badge.absent { background: #E2E8F0; color: #475569; }
+.type-badge.vacation { background: #BBF7D0; color: #15803D; }
 
 .no-data {
   padding: 40px; text-align: center; color: var(--gray400); font-size: 0.9rem;

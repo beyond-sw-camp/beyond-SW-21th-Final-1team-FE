@@ -19,7 +19,16 @@
             {{ type.label }}
           </option>
         </select>
-        <input v-model="keyword" type="text" class="keyword-input" placeholder="공지사항 제목 검색" />
+        <div class="mobile-search-row">
+          <input
+            v-model="keywordInput"
+            type="text"
+            class="keyword-input"
+            placeholder="공지사항 제목 검색"
+            @keyup.enter="applySearch"
+          />
+          <button type="button" class="search-btn" @click="applySearch">검색</button>
+        </div>
       </div>
 
       <div class="mobile-list">
@@ -61,7 +70,14 @@
             {{ type.label }}
           </option>
         </select>
-        <input v-model="keyword" type="text" class="keyword-input" placeholder="공지사항 제목 검색" />
+        <input
+          v-model="keywordInput"
+          type="text"
+          class="keyword-input"
+          placeholder="공지사항 제목 검색"
+          @input="applySearch"
+          @keyup.enter="applySearch"
+        />
       </div>
     </section>
 
@@ -109,6 +125,7 @@ import { NOTICE_TYPE_OPTIONS, normalizeNotice, sortNoticesByDateDesc } from '@/u
 
 const router = useRouter()
 const PAGE_SIZE = 10
+const keywordInput = ref('')
 const keyword = ref('')
 const selectedType = ref('ALL')
 const currentPage = ref(1)
@@ -162,6 +179,14 @@ const pagedNotices = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return filteredNotices.value.slice(start, start + PAGE_SIZE)
 })
+
+const handleBack = () => {
+  safeBack(router, '/')
+}
+
+const applySearch = () => {
+  keyword.value = keywordInput.value
+}
 
 const openDetailModal = (notice) => {
   selectedNotice.value = notice
@@ -265,6 +290,20 @@ onMounted(async () => {
   display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;
 }
 .mobile-search{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.mobile-search-row{display:flex;align-items:center;gap:8px}
+.mobile-search-row .keyword-input{flex:1;width:auto}
+.search-btn{
+  flex-shrink:0;
+  height:34px;
+  padding:0 14px;
+  border:none;
+  border-radius:10px;
+  background:#0f766e;
+  color:#fff;
+  font-size:.84rem;
+  font-weight:700;
+}
+.search-btn:hover{background:#115e59}
 .mobile-list{margin-top:14px;display:flex;flex-direction:column;gap:10px}
 .mobile-card{
   border:1px solid #dbe4f3;border-radius:14px;background:#fff;
