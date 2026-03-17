@@ -1,47 +1,14 @@
 <template>
   <section class="admin-page">
-    <header class="hero-card">
-      <div class="hero-copy">
-        <p class="hero-eyebrow">ADMIN PERFORMANCE SYSTEM</p>
-        <h1>성과 시스템 관리</h1>
-        <p class="hero-description">
-          각 팀마다 팀 성과와 개인 성과의 반영 비율을 저장합니다. 두 비율의 합은 항상 100%이며,
-          성과 점수 계산 시 즉시 반영됩니다.
-        </p>
-      </div>
-
-      <div class="hero-actions">
-        <span class="sync-chip" :class="`sync-chip--${persistenceSource}`">
-          {{ persistenceSourceLabel }}
-        </span>
-        <button
-          type="button"
-          class="btn-ghost"
-          :disabled="saving || !hasPendingChanges"
-          @click="revertAllChanges"
-        >
-          변경 취소
-        </button>
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="saving || !hasPendingChanges"
-          @click="saveAllChanges"
-        >
-          {{ saving ? '저장 중...' : `변경 ${pendingCount}건 저장` }}
-        </button>
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">성과 시스템 관리</h1>
+        <p class="page-desc">팀별 팀 성과 · 개인 성과 반영 비율을 설정합니다. 두 비율의 합은 항상 100%입니다.</p>
       </div>
     </header>
 
-    <section class="kpi-grid">
-      <article v-for="card in kpiCards" :key="card.label" class="kpi-card">
-        <p class="kpi-label">{{ card.label }}</p>
-        <strong class="kpi-value">{{ card.value }}</strong>
-        <span class="kpi-note">{{ card.note }}</span>
-      </article>
-    </section>
-
     <section v-if="loading" class="loading-card">
+      <div class="loading-spinner"></div>
       <strong>성과 반영 비율을 불러오는 중입니다.</strong>
       <p>조직 정보와 저장된 팀별 비율을 조회하고 있습니다.</p>
     </section>
@@ -202,7 +169,10 @@
           </div>
 
           <div class="guide-card">
-            <strong>운영 기준</strong>
+            <div class="guide-head">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <strong>운영 기준</strong>
+            </div>
             <p>팀 반영 비율이 높을수록 팀 단위 성과 기여도가, 개인 반영 비율이 높을수록 개인 목표 달성도가 최종 점수에 더 크게 반영됩니다.</p>
           </div>
 
@@ -304,7 +274,9 @@ const sortNodes = (nodes = []) => {
     if (a.level !== b.level) return a.level - b.level
     return String(a.name || '').localeCompare(String(b.name || ''), 'ko')
   })
-  nodes.forEach((node) => sortNodes(node.children))
+  nodes.forEach((node) => {
+    sortNodes(node.children)
+  })
 }
 
 const buildTreeFromFlat = (rows) => {
@@ -387,7 +359,9 @@ const extractTeams = (node, ancestors = [], bucket = []) => {
     })
   }
 
-  ;(node.children || []).forEach((child) => extractTeams(child, nextAncestors, bucket))
+  ;(node.children || []).forEach((child) => {
+    extractTeams(child,nextAncestors,bucket)
+  })
   return bucket
 }
 
@@ -666,80 +640,24 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-.hero-card {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 24px 26px;
-  border-radius: 24px;
-  color: #f8fafc;
-  background:
-    radial-gradient(circle at top right, rgba(92, 214, 255, 0.24), transparent 28%),
-    linear-gradient(135deg, #0f172a 0%, #10253f 52%, #0b5d7a 100%);
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+.page-header {
+  padding: 4px 2px 20px;
+  border-bottom: 1px solid var(--gray100);
 }
 
-.hero-copy { max-width: 720px; }
-
-.hero-eyebrow {
-  margin: 0 0 10px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: rgba(226, 232, 240, 0.8);
-}
-
-.hero-card h1 {
+.page-title {
   margin: 0;
-  font-size: 1.9rem;
-  line-height: 1.15;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--gray900);
 }
 
-.hero-description {
-  margin: 12px 0 0;
-  font-size: 0.98rem;
-  line-height: 1.6;
-  color: rgba(226, 232, 240, 0.88);
+.page-desc {
+  margin: 6px 0 0;
+  font-size: 0.875rem;
+  color: var(--gray500);
 }
 
-.hero-actions {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.sync-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.sync-chip--local {
-  color: #fef3c7;
-  background: rgba(245, 158, 11, 0.16);
-}
-
-.sync-chip--api {
-  color: #d1fae5;
-  background: rgba(16, 185, 129, 0.18);
-}
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.kpi-card,
 .loading-card,
 .list-panel,
 .editor-panel {
@@ -749,50 +667,47 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow);
 }
 
-.kpi-card {
-  padding: 18px 20px;
-}
-
-.kpi-label {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--gray500);
-}
-
-.kpi-value {
-  display: block;
-  margin-top: 10px;
-  font-size: 1.7rem;
-  color: var(--gray800);
-}
-
-.kpi-note {
-  display: block;
-  margin-top: 8px;
-  font-size: 0.8rem;
-  color: var(--gray500);
-}
-
 .loading-card {
   margin-top: 16px;
-  padding: 24px;
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--gray100);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 4px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .loading-card strong {
   display: block;
   color: var(--gray800);
+  font-size: 0.95rem;
 }
 
 .loading-card p {
-  margin: 8px 0 0;
+  margin: 0;
   color: var(--gray500);
+  font-size: 0.85rem;
 }
 
 .workspace {
   display: grid;
   grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
   gap: 16px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .list-panel,
@@ -806,18 +721,21 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gray100);
 }
 
 .panel-head h3 {
   margin: 0;
-  font-size: 1.1rem;
-  color: var(--gray800);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--gray900);
 }
 
 .panel-head p {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--gray500);
-  font-size: 0.88rem;
+  font-size: 0.83rem;
 }
 
 .list-controls {
@@ -858,31 +776,37 @@ onBeforeUnmount(() => {
 .team-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-top: 14px;
   max-height: 520px;
   overflow: auto;
   padding-right: 4px;
 }
 
+.team-list::-webkit-scrollbar { width: 4px; }
+.team-list::-webkit-scrollbar-thumb { background: var(--gray200); border-radius: 99px; }
+
 .team-card {
   width: 100%;
   text-align: left;
-  padding: 16px;
-  border: 1px solid #dbe4ee;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  padding: 14px 16px;
+  border: 1.5px solid var(--gray100);
+  border-radius: 14px;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  cursor: pointer;
 }
 
 .team-card:hover {
-  border-color: #7dd3fc;
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(8, 145, 178, 0.1);
   transform: translateY(-1px);
 }
 
 .team-card.active {
-  border-color: #0284c7;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+  border-color: var(--primary);
+  background: #f0fbff;
+  box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
 }
 
 .team-card-top,
@@ -936,12 +860,12 @@ onBeforeUnmount(() => {
 
 .ratio-segment--team,
 .preview-segment--team {
-  background: linear-gradient(90deg, #0284c7 0%, #0ea5e9 100%);
+  background: var(--primary);
 }
 
 .ratio-segment--personal,
 .preview-segment--personal {
-  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+  background: #a5d8e6;
 }
 
 .preview-segment {
@@ -970,23 +894,24 @@ onBeforeUnmount(() => {
 }
 
 .state-chip--default {
-  color: #64748b;
-  background: #e2e8f0;
+  color: var(--gray400);
+  background: var(--gray100);
 }
 
 .state-chip--customized {
-  color: #065f46;
-  background: #d1fae5;
+  color: var(--primary);
+  background: #e0f5f9;
 }
 
 .state-chip--changed {
-  color: #9a3412;
-  background: #ffedd5;
+  color: #b45309;
+  background: #fef3c7;
 }
 
 .panel-head--editor {
-  padding-bottom: 14px;
   border-bottom: 1px solid var(--gray100);
+  padding-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .team-type {
@@ -994,7 +919,7 @@ onBeforeUnmount(() => {
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #0284c7;
+  color: var(--primary);
   text-transform: uppercase;
 }
 
@@ -1015,24 +940,52 @@ onBeforeUnmount(() => {
   font-size: 0.86rem;
 }
 
-.preview-card,
-.guide-card {
+.preview-card {
   margin-top: 18px;
   padding: 18px;
-  border-radius: 18px;
-  border: 1px solid var(--gray200);
-  background: #f8fafc;
+  border-radius: 14px;
+  border: 1px solid var(--gray100);
+  background: #F8FAFC;
 }
 
-.preview-head strong,
-.guide-card strong {
+.guide-card {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid #cdeef5;
+  background: #f0fbff;
+}
+
+.guide-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.guide-head strong {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.preview-head strong {
   color: var(--gray800);
+  font-size: 0.88rem;
 }
 
 .preview-head span,
 .guide-card p {
   color: var(--gray500);
-  font-size: 0.84rem;
+  font-size: 0.83rem;
+}
+
+.guide-card p {
+  color: var(--gray600);
+  margin: 0;
+  font-size: 0.83rem;
+  line-height: 1.6;
 }
 
 .field-grid {
@@ -1044,9 +997,23 @@ onBeforeUnmount(() => {
 
 .ratio-field {
   padding: 16px;
-  border-radius: 18px;
-  border: 1px solid var(--gray200);
+  border-radius: 14px;
+  border: 1.5px solid var(--gray100);
   background: #fff;
+  transition: border-color 0.15s;
+}
+
+.ratio-field:first-child {
+  border-top: 2px solid var(--primary);
+}
+
+.ratio-field:last-child {
+  border-top: 2px solid #a5d8e6;
+}
+
+.ratio-field:hover {
+  border-color: var(--gray200);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .number-input {
@@ -1057,11 +1024,11 @@ onBeforeUnmount(() => {
 
 .range-input {
   width: 100%;
-  accent-color: #0284c7;
+  accent-color: var(--primary);
 }
 
 .range-input--personal {
-  accent-color: #10b981;
+  accent-color: #a5d8e6;
 }
 
 .preset-block {
@@ -1076,14 +1043,22 @@ onBeforeUnmount(() => {
 }
 
 .preset-btn {
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid #cbd5e1;
+  height: 34px;
+  padding: 0 14px;
+  border: 1.5px solid var(--gray200);
   border-radius: 999px;
   background: #fff;
-  color: var(--gray700);
-  font-size: 0.82rem;
-  font-weight: 700;
+  color: var(--gray600);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preset-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #f0fbff;
 }
 
 .guide-card p {
@@ -1094,6 +1069,59 @@ onBeforeUnmount(() => {
 .editor-actions {
   margin-top: 18px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-primary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border: 1.5px solid var(--primary);
+  box-shadow: 0 2px 6px rgba(8, 145, 178, 0.25);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  box-shadow: 0 4px 10px rgba(8, 145, 178, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: #fff;
+  color: var(--gray700);
+  border: 1.5px solid var(--gray200);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--gray50);
+  border-color: var(--gray300);
+  color: var(--gray900);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .empty-state {
@@ -1142,19 +1170,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 760px) {
-  .hero-card {
-    flex-direction: column;
-    padding: 20px;
-  }
-
-  .hero-actions {
-    justify-content: flex-start;
-  }
-
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
-
   .list-controls,
   .field-grid {
     grid-template-columns: 1fr;
