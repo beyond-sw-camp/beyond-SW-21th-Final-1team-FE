@@ -50,3 +50,60 @@ export const getPerformanceTeamStats = (params = {}) =>
 
 export const registerPerformance = (payload) =>
   api.post('/performance/register', payload)
+
+const clampRate = (value) => {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return 0
+  return Math.min(100, Math.max(0, Math.round(number)))
+}
+
+const normalizeWeightItem = (item = {}) => {
+  const orgId = Number(item.orgId)
+  const hasPersonalWeight = item.personalWeightRate !== null && item.personalWeightRate !== undefined
+  const hasTeamWeight = item.teamWeightRate !== null && item.teamWeightRate !== undefined
+  let normalizedPersonal = hasPersonalWeight
+    ? clampRate(item.personalWeightRate)
+    : 100 - clampRate(item.teamWeightRate)
+  let normalizedTeam = hasTeamWeight
+    ? clampRate(item.teamWeightRate)
+    : 100 - normalizedPersonal
+  if (normalizedPersonal + normalizedTeam !== 100) {
+    normalizedTeam = 100 - normalizedPersonal
+  }
+  return {
+    orgId,
+    personalWeightRate: normalizedPersonal,
+    teamWeightRate: normalizedTeam,
+    updatedAt: item.updatedAt || new Date().toISOString(),
+  }
+}
+
+const parseWeightItems = (payload) => {
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.weights)
+      ? payload.weights
+      : []
+  return items
+    .map(normalizeWeightItem)
+    .filter((item) => Number.isFinite(item.orgId) && item.orgId > 0)
+}
+
+export const getAdminPerformanceWeights = async () => {
+  const data = await unwrap(api.get('/performance/admin/weights'))
+  return { items: parseWeightItems(data), source: 'api' }
+}
+
+export const saveAdminPerformanceWeights = async (weights = []) => {
+  const items = parseWeightItems(weights)
+  const data = await unwrap(
+    api.patch('/performance/admin/weights', {
+      weights: items.map((item) => ({
+        orgId: item.orgId,
+        personalWeightRate: item.personalWeightRate,
+        teamWeightRate: item.teamWeightRate,
+      })),
+    }),
+  )
+  return { items: parseWeightItems(data), source: 'api' }
+}

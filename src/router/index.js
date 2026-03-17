@@ -69,6 +69,18 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true, section: 'admin' }
   },
   {
+    path: '/admin/performance',
+    name: 'admin-performance',
+    component: () => import('@/views/admin/AdminPerformanceView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      section: 'admin',
+      title: '성과 시스템 관리',
+      description: '팀별 팀 성과/개인 성과 반영 비율 관리'
+    }
+  },
+  {
     path: '/approval',
     meta: { requiresAuth: true },
     children: [
