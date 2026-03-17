@@ -273,6 +273,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Search, Filter, X, Upload, CheckCircle, AlertCircle, User } from 'lucide-vue-next'
 import { getPerformanceInquiryItems, getPerformanceInquiryTeamMembers, updatePerformanceResult } from '@/api/performance'
 import { AUTH_KEYS, USER_ROLES, isAdminRole, isEvaluatorRole, sessionRoleCodesRef, sessionRoleRef } from '@/utils/auth'
+import { filterVisiblePerformanceInquiryItems, normalizePerformanceInquiryItem } from '@/utils/performanceInquiry'
 
 const selectedItem = ref(null)
 const modalTab = ref('detail')
@@ -293,11 +294,6 @@ const searchField = ref('title')
 const currentPage = ref(1)
 const pageSize = 12
 
-const normalizeItem = (item) => ({
-  ...item,
-  type: item.type === 'TEAM' ? 'Team' : item.type === 'PERSONAL' ? 'Personal' : item.type,
-})
-
 const items = ref([])
 const teamMemberOptions = ref([])
 const loadError = ref('')
@@ -309,14 +305,11 @@ const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, userRole.value))
 const currentEmployeeId = computed(() => sessionStorage.getItem(AUTH_KEYS.employeeId) || '')
 
-const visibleItems = computed(() => {
-  if (isPerformanceManager.value) return items.value
-
-  return items.value.filter((item) => {
-    if (currentEmployeeId.value) return String(item.employeeId || '') === String(currentEmployeeId.value)
-    return item.employeeName === userName.value
-  })
-})
+const visibleItems = computed(() => filterVisiblePerformanceInquiryItems(items.value, {
+  isPerformanceManager: isPerformanceManager.value,
+  currentEmployeeId: currentEmployeeId.value,
+  userName: userName.value,
+}))
 
 const employeeOptions = computed(() => teamMemberOptions.value)
 
@@ -454,7 +447,7 @@ async function loadInquiryItems(sequence = ++inquiryRequestSeq) {
     }
     const response = await getPerformanceInquiryItems(params)
     if (sequence !== inquiryRequestSeq) return
-    items.value = Array.isArray(response) ? response.map((item) => normalizeItem(item)) : []
+    items.value = Array.isArray(response) ? response.map((item) => normalizePerformanceInquiryItem(item)) : []
   } catch (error) {
     if (sequence !== inquiryRequestSeq) return
     items.value = []

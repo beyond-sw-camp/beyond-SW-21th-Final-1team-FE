@@ -510,6 +510,7 @@ const adminMenus = [
   { label: '근태 관리', icon: ClockIcon, route: '/admin/attendance', viewCodes: ['ADMIN_ATTENDANCE'] },
   { label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
   { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
+  { label: '성과 시스템 관리', icon: SlidersIcon, route: '/admin/performance', viewCodes: [] },
 ]
 const filteredAdminMenus = computed(() =>
   adminMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
@@ -615,6 +616,7 @@ const adminOnlyShortcutOptions = [
   { key: 'admin-policies', label: '정책 관리', icon: ShieldIcon, route: '/admin/policies', viewCodes: ['ADMIN_POLICIES'] },
   { key: 'admin-notices', label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
   { key: 'admin-salary', label: '급여 관리(관리자)', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
+  { key: 'admin-performance', label: '성과 시스템 관리', icon: SlidersIcon, route: '/admin/performance', viewCodes: [] },
 ]
 
 const shortcutOptionsByUser = computed(() =>
