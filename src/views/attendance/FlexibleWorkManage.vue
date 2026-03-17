@@ -35,31 +35,11 @@
               <option value="pending">승인 대기</option>
             </select>
           </div>
-          <div class="right-actions">
-            <span class="selected-count" v-if="selectedIds.length > 0">
-              {{ selectedIds.length }}개 선택됨
-            </span>
-            <button 
-              class="btn-approve" 
-              :disabled="selectedIds.length === 0"
-              @click="handleBulkApprove"
-            >
-              승인
-            </button>
-            <button 
-              class="btn-reject" 
-              :disabled="selectedIds.length === 0"
-              @click="handleBulkReject"
-            >
-              반려
-            </button>
-          </div>
         </div>
 
         <table class="list-table">
           <thead>
             <tr>
-              <th width="40"><input type="checkbox" @change="toggleAll" :checked="isAllSelected" /></th>
               <th>신청자</th>
               <th>부서</th>
               <th>신청 기간</th>
@@ -70,14 +50,6 @@
           </thead>
           <tbody>
             <tr v-for="item in sortedPlanList" :key="item.id">
-              <td>
-                <input 
-                  type="checkbox" 
-                  :value="item.id" 
-                  v-model="selectedIds" 
-                  :disabled="item.status !== 'pending'"
-                />
-              </td>
               <td>
                  <div class="user-info">
                     <span class="name">{{ item.name }}</span>
@@ -103,7 +75,7 @@
               </td>
             </tr>
             <tr v-if="sortedPlanList.length === 0">
-              <td colspan="7" class="empty-cell">현재 같은 부서 팀원의 유연근무 신청 내역이 없습니다.</td>
+              <td colspan="6" class="empty-cell">현재 같은 부서 팀원의 유연근무 신청 내역이 없습니다.</td>
             </tr>
           </tbody>
         </table>
@@ -250,24 +222,10 @@
         </div>
       </div>
 
-      <div class="modal-actions" v-if="selectedPlan.status === 'pending'">
-        <button class="btn-reject" @click="handleModalReject">반려</button>
-        <button class="btn-approve" @click="handleModalApprove">승인</button>
-      </div>
-      <div class="modal-actions" v-else>
-         <button class="btn-close" @click="showDetailModal = false">닫기</button>
+      <div class="modal-actions">
+        <button class="btn-close" @click="showDetailModal = false">닫기</button>
       </div>
     </BaseModal>
-    <ActionConfirmModal
-      v-model="showActionModal"
-      :title="actionModalTitle"
-      :message="actionModalMessage"
-      :confirm-text="actionModalConfirmText"
-      :require-reason="actionRequiresReason"
-      :loading="actionLoading"
-      v-model:reason="actionReason"
-      @confirm="submitAction"
-    />
   </div>
 </template>
 
@@ -275,11 +233,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 import BaseModal from '@/components/common/BaseModal.vue'
-import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
 const store = useAttendanceStore()
 const currentTab = ref('list')
-const selectedIds = ref([])
 const selectedDayIndex = ref(0) // 0: Mon, 1: Tue ...
 const selectedFilter = ref('all') // 'all' or 'pending'
 const selectedWeek = ref('')
@@ -287,29 +243,10 @@ const selectedWeek = ref('')
 // Detail Modal State
 const showDetailModal = ref(false)
 const selectedPlan = ref(null)
-const showActionModal = ref(false)
-const actionReason = ref('')
-const actionMode = ref('')
-const actionIds = ref([])
-const actionLoading = ref(false)
 
 const handleViewDetail = (item) => {
   selectedPlan.value = item
   showDetailModal.value = true
-}
-
-const handleModalApprove = async () => {
-  actionMode.value = 'single-approve'
-  actionIds.value = [selectedPlan.value.id]
-  actionReason.value = ''
-  showActionModal.value = true
-}
-
-const handleModalReject = async () => {
-  actionMode.value = 'single-reject'
-  actionIds.value = [selectedPlan.value.id]
-  actionReason.value = ''
-  showActionModal.value = true
 }
 
 // Hours 08 ~ 20 (12 hours span)
@@ -326,11 +263,7 @@ const sortedPlanList = computed(() => {
     list = list.filter(item => item.status === 'pending')
   }
 
-  // Sorting (Pending first)
-  return list.sort((a, b) => {
-    if (a.status === 'pending' && b.status !== 'pending') return -1
-    return 0
-  })
+  return list
 })
 
 const parseIsoDate = (value) => {
@@ -446,70 +379,7 @@ const weekTitle = computed(() => {
 const selectedDayLabel = computed(() => days.value[selectedDayIndex.value]?.label || '')
 const selectedDayDateLabel = computed(() => days.value[selectedDayIndex.value]?.date || '')
 
-const isAllSelected = computed(() => {
-  const pendingItems = sortedPlanList.value.filter(i => i.status === 'pending')
-  return pendingItems.length > 0 && selectedIds.value.length === pendingItems.length
-})
-
-const toggleAll = (e) => {
-  if (e.target.checked) {
-    selectedIds.value = sortedPlanList.value.filter(i => i.status === 'pending').map(i => i.id)
-  } else {
-    selectedIds.value = []
-  }
-}
-
 const getStatusLabel = (s) => ({ pending: '승인 대기', approved: '승인됨', rejected: '반려됨' }[s])
-
-const handleBulkApprove = async () => {
-  actionMode.value = 'bulk-approve'
-  actionIds.value = [...selectedIds.value]
-  actionReason.value = ''
-  showActionModal.value = true
-}
-
-const handleBulkReject = async () => {
-  actionMode.value = 'bulk-reject'
-  actionIds.value = [...selectedIds.value]
-  actionReason.value = ''
-  showActionModal.value = true
-}
-
-const actionRequiresReason = computed(() => actionMode.value.includes('reject'))
-const actionModalTitle = computed(() => (actionRequiresReason.value ? '반려 처리' : '승인 처리'))
-const actionModalMessage = computed(() =>
-  actionMode.value.startsWith('bulk')
-    ? `${actionIds.value.length}건을 ${actionRequiresReason.value ? '반려' : '승인'}하시겠습니까?`
-    : `이 신청을 ${actionRequiresReason.value ? '반려' : '승인'}하시겠습니까?`,
-)
-const actionModalConfirmText = computed(() => (actionRequiresReason.value ? '반려하기' : '승인하기'))
-
-const submitAction = async () => {
-  if (actionLoading.value) return
-  if (actionRequiresReason.value && !actionReason.value.trim()) {
-    alert('반려 사유를 입력해주세요.')
-    return
-  }
-  actionLoading.value = true
-  try {
-    await store.processFlexiblePlans(
-      actionIds.value,
-      !actionRequiresReason.value,
-      actionRequiresReason.value ? actionReason.value.trim() : '',
-    )
-    showActionModal.value = false
-    if (actionMode.value.startsWith('bulk')) {
-      selectedIds.value = []
-    } else {
-      showDetailModal.value = false
-    }
-    alert(`신청이 ${actionRequiresReason.value ? '반려' : '승인'}되었습니다.`)
-  } catch (error) {
-    alert(error?.response?.data?.message || `${actionRequiresReason.value ? '반려' : '승인'} 처리에 실패했습니다.`)
-  } finally {
-    actionLoading.value = false
-  }
-}
 
 const refreshWeekOverview = async () => {
   const monday = weekValueToMonday(selectedWeek.value || formatWeekValue(new Date()))
@@ -591,30 +461,15 @@ const getBarStyle = (day) => {
 /* List View */
 .action-bar {
   padding: 20px 24px; border-bottom: 1px solid var(--gray100); background: #fff;
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: flex-start; align-items: center;
 }
 .left-actions { display: flex; gap: 12px; align-items: center; }
-.right-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
 .filter-select { 
   padding: 8px 12px; border-radius: 6px; border: 1px solid var(--gray300); 
   font-size: 0.9rem; color: var(--gray700); cursor: pointer;
   transition: border-color 0.2s;
 }
 .filter-select:hover { border-color: var(--gray400); }
-
-.btn-approve, .btn-reject {
-  padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none;
-  transition: all 0.2s; display: flex; align-items: center; gap: 4px;
-}
-.btn-approve { background: var(--primary); color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.btn-approve:hover { background: #4338ca; transform: translateY(-1px); }
-.btn-approve:disabled { background: var(--gray300); cursor: not-allowed; box-shadow: none; transform: none; }
-
-.btn-reject { background: #fff; border: 1px solid var(--gray300); color: var(--red); }
-.btn-reject:hover { background: #FEF2F2; border-color: #FECACA; }
-.btn-reject:disabled { color: var(--gray400); border-color: var(--gray200); background: #fff; cursor: not-allowed; }
-
-.selected-count { font-size: 0.9rem; font-weight: 600; color: var(--primary); margin-right: 8px; background: #EEF2FF; padding: 4px 12px; border-radius: 20px; }
 
 .list-table { width: 100%; border-collapse: collapse; }
 .list-table th { 
