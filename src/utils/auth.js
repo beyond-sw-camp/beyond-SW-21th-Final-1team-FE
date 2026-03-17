@@ -157,6 +157,16 @@ export const isEvaluatorRole = (roleCodes = sessionRoleCodesRef.value) =>
 export const isAppraiseeRole = (roleCodes = sessionRoleCodesRef.value) =>
   hasAnyRoleCode(roleCodes, APPRAISEE_ROLE_CODES)
 export const getAccessToken = () => readSessionItem(AUTH_KEYS.accessToken)
+export const getAccessTokenPayload = () => {
+  const token = getAccessToken()
+  if (!token || typeof window === 'undefined') return null
+  return decodeJwtPayload(token)
+}
+export const getAccessTokenRemainingSeconds = () => {
+  const payload = getAccessTokenPayload()
+  if (!payload?.exp) return 0
+  return Math.max(0, payload.exp - Math.floor(Date.now() / 1000))
+}
 export const getLoginSession = () => ({
   loggedIn: sessionStorage.getItem(AUTH_KEYS.loggedIn) === 'true',
   userId: sessionStorage.getItem(AUTH_KEYS.userId) || '',
@@ -209,7 +219,14 @@ export const setLoginSession = ({
   dispatchSessionStorageChanged()
 }
 
+export const updateAccessToken = (accessToken) => {
+  if (typeof window === 'undefined') return
+  sessionStorage.setItem(AUTH_KEYS.accessToken, accessToken || '')
+  dispatchSessionStorageChanged()
+}
+
 export const clearLoginSession = () => {
+  if (typeof window === 'undefined') return
   sessionStorage.setItem(AUTH_KEYS.loggedIn, 'false')
   sessionStorage.removeItem(AUTH_KEYS.userId)
   sessionStorage.removeItem(AUTH_KEYS.employeeId)
@@ -225,4 +242,36 @@ export const clearLoginSession = () => {
   sessionStorage.removeItem(AUTH_KEYS.lastLoginAt)
   syncSessionAuthState()
   dispatchSessionStorageChanged()
+}
+
+export const authExpiredModalVisible = ref(false)
+export const authExpiredMessage = ref('인증이 필요합니다.')
+
+let isAuthRedirectInProgress = false
+
+export const expireSessionAndRedirectToLogin = (message = '인증이 필요합니다.') => {
+  if (typeof window === 'undefined' || isAuthRedirectInProgress) return
+  isAuthRedirectInProgress = true
+  clearLoginSession()
+  authExpiredMessage.value = message
+
+  const currentPath = window.location.pathname || ''
+  if (currentPath === '/login') {
+    isAuthRedirectInProgress = false
+    return
+  }
+
+  authExpiredModalVisible.value = true
+}
+
+export const confirmAuthExpiredRedirect = () => {
+  if (typeof window === 'undefined') return
+  authExpiredModalVisible.value = false
+  window.location.href = '/login'
+}
+
+export const resetAuthExpiredRedirectState = () => {
+  authExpiredModalVisible.value = false
+  authExpiredMessage.value = '인증이 필요합니다.'
+  isAuthRedirectInProgress = false
 }

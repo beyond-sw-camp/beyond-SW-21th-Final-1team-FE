@@ -270,7 +270,8 @@ onMounted(() => {
 .profile-contacts span{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--gray500)}
 .profile-contacts svg{color:var(--gray400)}
 .profile-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-.mobile-mypage{display:none;background:#f5f8fc;border:1px solid #eef2f7;border-radius:18px;padding:18px}
+.desktop-tabs{display:block}
+.mobile-mypage{display:none !important;background:#f5f8fc;border:1px solid #eef2f7;border-radius:18px;padding:18px}
 .mobile-head{display:flex;gap:14px;align-items:center}
 .mobile-back{
   width:32px;height:32px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;
@@ -287,8 +288,8 @@ onMounted(() => {
 .mobile-row .value{color:var(--gray800);text-align:right}
 
 @media (max-width: 768px){
-  .breadcrumb,.profile-header,.desktop-tabs{display:none}
-  .mobile-mypage{display:block}
+  .breadcrumb,.profile-header,.desktop-tabs{display:none !important}
+  .mobile-mypage{display:block !important}
 }
 .last-login{font-size:.75rem;color:var(--gray400)}
 
