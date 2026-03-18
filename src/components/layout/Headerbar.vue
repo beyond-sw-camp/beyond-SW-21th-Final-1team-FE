@@ -143,7 +143,7 @@ const NAV_CONFIG = [
       'ATTENDANCE_TEAM',
     ],
   },
-  { label: '급여', viewCodes: ['ADMIN_SALARY'] },
+  { label: '급여', viewCodes: ['MAIN'] },
   { label: '성과', viewCodes: ['PERFORMANCE'] },
   {
     label: '전자결재',
