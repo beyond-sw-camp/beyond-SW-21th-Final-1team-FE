@@ -76,12 +76,18 @@ const mapAttendanceStatus = (value) => {
 }
 
 const formatLeaveTypeLabel = (value) => {
-  const normalized = String(value || '').toUpperCase()
+  const raw = String(value || '').trim()
+  if (!raw) return '휴가'
+
+  const normalized = raw.toUpperCase()
   if (normalized === 'ANNUAL') return '연차'
   if (normalized === 'HALF') return '반차'
   if (normalized === 'SICK') return '병가'
   if (normalized === 'ETC') return '기타'
-  return value || '휴가'
+  if (raw === '연차' || raw === '반차' || raw === '병가' || raw === '기타' || raw === '휴가') {
+    return raw
+  }
+  return '기타'
 }
 
 const mapAdminAttendanceRecord = (record) => ({
