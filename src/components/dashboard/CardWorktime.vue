@@ -4,9 +4,6 @@
       <div class="wt-tabs">
         <div v-for="tab in tabs" :key="tab.key" class="wt-tab" :class="{active:activeTab===tab.key}" @click="activeTab=tab.key">{{tab.label}}</div>
       </div>
-      <span class="icon-refresh">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-      </span>
     </div>
     <div class="card-body">
       <div class="wt-week">{{ periodLabel }}</div>
@@ -34,7 +31,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
 
 const activeTab = ref('weekly')
@@ -44,6 +41,15 @@ const tabs = [
 ]
 
 const store = useAttendanceStore()
+
+onMounted(async () => {
+  const now = new Date()
+  try {
+    await store.fetchMonthlyRecords(now.getFullYear(), now.getMonth() + 1)
+  } catch (error) {
+    console.error('Failed to load worktime data on dashboard.', error)
+  }
+})
 
 const parseDateKey = (dateText) => {
   const [y, m, d] = String(dateText || '').split('-').map(Number)
@@ -180,8 +186,6 @@ const chartAreaPoints = computed(() => `${chartLinePoints.value} 290,100 10,100`
   transition:all var(--transition);
 }
 .wt-tab.active{color:var(--gray800);border-bottom-color:var(--gray800)}
-.icon-refresh{color:var(--gray400);cursor:pointer;display:flex}
-.icon-refresh:hover{color:var(--gray600)}
 .wt-week{font-size:0.78rem;color:var(--gray400);margin-bottom:2px}
 .wt-num{font-size:2.5rem;font-weight:800;color:var(--gray800);line-height:1}
 .wt-unit{font-size:1rem;font-weight:400;color:var(--secondary);margin-left:2px}

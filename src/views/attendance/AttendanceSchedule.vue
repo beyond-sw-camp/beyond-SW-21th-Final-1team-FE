@@ -272,6 +272,8 @@ import { useAttendanceStore } from '@/store/attendance'
 
 const currentView = ref('month')
 const selectedFilter = ref('ALL')
+const appliedFilter = ref('ALL')
+const calendarFetchSeq = ref(0)
 const store = useAttendanceStore()
 const { calendarEvents } = storeToRefs(store)
 
@@ -442,8 +444,19 @@ const normalizedEvents = computed(() =>
 const getEventsForDate = (date) => {
   return normalizedEvents.value.filter((event) => {
     if (event.targetDate !== date) return false
-    if (selectedFilter.value === 'ATTENDANCE') return event.category === 'ATTENDANCE'
-    if (selectedFilter.value === 'REQUEST') return event.category !== 'ATTENDANCE'
+
+    // Team month view: hide only normal attendance rows, but keep them in week view.
+    if (
+      appliedFilter.value === 'ALL' &&
+      currentView.value === 'month' &&
+      event.category === 'ATTENDANCE' &&
+      event.tone === 'normal'
+    ) {
+      return false
+    }
+
+    if (appliedFilter.value === 'ATTENDANCE') return event.category === 'ATTENDANCE'
+    if (appliedFilter.value === 'REQUEST') return event.category !== 'ATTENDANCE'
     return true
   })
 }
@@ -476,8 +489,8 @@ const specialEvents = computed(() => {
   return normalizedEvents.value
     .filter(e => e.type !== 'work')
     .filter((event) => {
-      if (selectedFilter.value === 'ATTENDANCE') return false
-      if (selectedFilter.value === 'REQUEST') return event.category !== 'ATTENDANCE'
+      if (appliedFilter.value === 'ATTENDANCE') return false
+      if (appliedFilter.value === 'REQUEST') return event.category !== 'ATTENDANCE'
       return true
     })
     .sort((a, b) => String(a.targetDate).localeCompare(String(b.targetDate)))
@@ -491,26 +504,30 @@ const visibleDateKeys = computed(() => {
 })
 
 const hasVisibleEvents = computed(() => {
-  for (const event of normalizedEvents.value) {
-    if (!visibleDateKeys.value.has(event.targetDate)) continue
-    if (selectedFilter.value === 'ATTENDANCE' && event.category !== 'ATTENDANCE') continue
-    if (selectedFilter.value === 'REQUEST' && event.category === 'ATTENDANCE') continue
-    return true
+  for (const dateKey of visibleDateKeys.value) {
+    if (getEventsForDate(dateKey).length > 0) {
+      return true
+    }
   }
   return false
 })
 
-const fetchCalendar = async () => {
-  const scope = selectedFilter.value === 'ALL' ? 'TEAM' : 'SELF'
+const fetchCalendar = async (targetFilter = selectedFilter.value) => {
+  const requestSeq = ++calendarFetchSeq.value
+  const scope = targetFilter === 'ALL' ? 'TEAM' : 'SELF'
   await store.fetchAttendanceCalendar(currentDate.value.year, currentDate.value.month, scope)
+  if (requestSeq !== calendarFetchSeq.value) return
+  appliedFilter.value = targetFilter
 }
 
-onMounted(fetchCalendar)
+onMounted(() => fetchCalendar(selectedFilter.value))
 watch(() => [currentDate.value.year, currentDate.value.month], async () => {
   syncSelectedDayToMonth()
-  await fetchCalendar()
+  await fetchCalendar(selectedFilter.value)
 })
-watch(selectedFilter, fetchCalendar)
+watch(selectedFilter, async (nextFilter) => {
+  await fetchCalendar(nextFilter)
+})
 </script>
 
 <style scoped>
