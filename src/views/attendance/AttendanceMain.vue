@@ -203,11 +203,11 @@
                   sat: day.dayOfWeek === 6,
                   today: day.isToday,
                   'other-month': !day.isCurrentMonth,
-                  'has-schedule': day.label,
+                  'has-schedule': day.isCurrentMonth && day.label,
                 }"
               >
-                {{ day.day }}
-                <div v-if="day.label" :class="`bar-${day.variant}`">
+                <span v-if="day.isCurrentMonth">{{ day.day }}</span>
+                <div v-if="day.isCurrentMonth && day.label" :class="`bar-${day.variant}`">
                   {{ day.label }}
                 </div>
               </div>
@@ -464,7 +464,7 @@ const calendarWeeks = computed(() => {
   start.setDate(1 - firstDay.getDay())
   const todayKey = toDateKey(new Date())
 
-  return Array.from({ length: 6 }, (_, weekIndex) =>
+  const weeks = Array.from({ length: 6 }, (_, weekIndex) =>
     Array.from({ length: 7 }, (_, dayIndex) => {
       const date = new Date(start)
       date.setDate(start.getDate() + weekIndex * 7 + dayIndex)
@@ -481,6 +481,9 @@ const calendarWeeks = computed(() => {
       }
     }),
   )
+
+  // Keep only weeks that contain at least one day of the displayed month.
+  return weeks.filter((week) => week.some((day) => day.isCurrentMonth))
 })
 
 const formatHistoryDate = (value) => String(value || '').slice(5, 10).replace('-', '.')
@@ -635,7 +638,7 @@ const handleBack = () => {
 .period-info {
   font-size: 0.85rem;
   color: var(--gray500);
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 /* ── Top Row ── */
@@ -645,10 +648,10 @@ const handleBack = () => {
 }
 .top-row > .card {
   flex: 1;
-  min-height: 180px;
+  min-height: 164px;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 16px;
 }
 
 /* 1. Clock Card */
@@ -673,7 +676,7 @@ const handleBack = () => {
 .status-badge.before { background: #F3F4F6; color: #4B5563; }
 .clock-display {
   text-align: center;
-  margin: 16px 0;
+  margin: 12px 0;
 }
 .time-main {
   font-size: 3.2rem;
@@ -693,11 +696,11 @@ const handleBack = () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .time-item {
   min-width: 0;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid #dbe4f0;
   background: linear-gradient(180deg, #fbfdff 0%, #f2f6fb 100%);
@@ -850,7 +853,7 @@ const handleBack = () => {
 }
 .btn-check-out {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   background: var(--gray800);
   color: #fff;
   border: none;
@@ -869,7 +872,7 @@ const handleBack = () => {
 
 /* 2. Weekly Card */
 .weekly-stat {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .hours-display {
   display: flex;
@@ -893,7 +896,7 @@ const handleBack = () => {
   justify-content: space-between;
   font-size: 0.8rem;
   color: var(--gray500);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .progress-info .percent {
   color: var(--primary);
@@ -915,7 +918,7 @@ const handleBack = () => {
   display: flex;
   justify-content: space-between;
   background: var(--gray50);
-  padding: 16px;
+  padding: 12px;
   border-radius: 10px;
 }
 .bd-item {
@@ -946,14 +949,14 @@ const handleBack = () => {
 .monthly-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
   align-items: stretch;
 }
 .m-item {
   background: var(--gray50);
   border-radius: 12px;
-  padding: 18px;
+  padding: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -962,8 +965,8 @@ const handleBack = () => {
   width: 100%;
   max-width: 112px;
   display: grid;
-  grid-template-rows: 44px minmax(64px, auto);
-  gap: 12px;
+  grid-template-rows: 40px minmax(56px, auto);
+  gap: 8px;
   align-content: start;
   justify-items: center;
 }

@@ -3,37 +3,23 @@
     <!-- Header -->
     <div class="page-header">
       <div class="header-content">
-        <h2 class="page-title">근태 관리</h2>
+        <h2 class="page-title">팀 근태 관리</h2>
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs-container">
-      <button 
-        class="tab-btn" 
-        :class="{ active: currentTab === 'daily' }"
-        @click="currentTab = 'daily'"
-      >
-        일별 근태 현황
-      </button>
-      <button 
-        class="tab-btn" 
-        :class="{ active: currentTab === 'approval' }"
-        @click="currentTab = 'approval'"
-      >
-        휴가 승인 관리
-      </button>
-    </div>
-
-    <!-- Tab 1: Daily Attendance Grid -->
-    <div v-show="currentTab === 'daily'" class="tab-content">
+    <!-- Daily Attendance Grid -->
+    <div class="tab-content">
       <!-- Filters -->
       <div class="filter-card">
         <div class="filter-row">
 
           <div class="filter-group">
-            <label>날짜</label>
-            <input type="date" v-model="filters.date" class="date-input" />
+            <label>시작일</label>
+            <input type="date" v-model="filters.startDate" class="date-input" />
+          </div>
+          <div class="filter-group">
+            <label>종료일</label>
+            <input type="date" v-model="filters.endDate" class="date-input" />
           </div>
           <div class="filter-group">
             <label>근태 상태</label>
@@ -108,84 +94,6 @@
       </div>
     </div>
 
-    <!-- Tab 2: Leave Approval -->
-    <div v-show="currentTab === 'approval'" class="tab-content">
-      <div class="data-card">
-        <div class="card-header">
-          <h3 class="card-subtitle">휴가 신청 내역</h3>
-          <div class="actions">
-            <!-- Bulk Actions -->
-            <button 
-              class="btn-approve" 
-              :disabled="selectedLeaveIds.length === 0"
-              @click="handleBulkLeaveApprove"
-            >
-              승인
-            </button>
-            <button 
-              class="btn-reject" 
-              :disabled="selectedLeaveIds.length === 0"
-              @click="handleBulkLeaveReject"
-            >
-              반려
-            </button>
-          </div>
-        </div>
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th width="40"><input type="checkbox" @change="toggleAllLeave" :checked="isAllLeaveSelected"/></th>
-                <th>사원명</th>
-                <th>부서</th>
-                <th>신청 휴가</th>
-                <th>기간</th>
-                <th>일수</th>
-                <th>사유</th>
-                <th>상태</th>
-                <th>신청일</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="leave in sortedLeaveList" :key="leave.id">
-                <td>
-                   <input 
-                    type="checkbox" 
-                    :value="leave.id" 
-                    v-model="selectedLeaveIds" 
-                    :disabled="leave.status !== 'pending'"
-                  />
-                </td>
-                <td>
-                  <div class="user-cell">
-                    <div class="avatar blue">{{ leave.name[0] }}</div>
-                    <div class="user-info">
-                      <span class="name">{{ leave.name }}</span>
-                      <span class="position">{{ leave.position }}</span>
-                    </div>
-                  </div>
-                </td>
-                <td>{{ leave.deptName }}</td>
-                <td><span class="tag-gray">{{ leave.type }}</span></td>
-                <td>{{ leave.period }}</td>
-                <td>{{ leave.days }}일</td>
-                <td>{{ leave.reason }}</td>
-                <td>
-                  <span class="status-badge" :class="getApprStatusClass(leave.status)">
-                    {{ getApprStatusLabel(leave.status) }}
-                  </span>
-                </td>
-                <td>{{ leave.appliedAt }}</td>
-              </tr>
-              <tr v-if="sortedLeaveList.length === 0">
-                <td colspan="9" class="empty-cell">현재 같은 부서 팀원의 휴가 신청 내역이 없습니다.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
     <!-- Edit Modal (Daily) -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
       <div class="modal-content">
@@ -235,59 +143,26 @@
       </div>
     </div>
 
-     <!-- Reject Modal (Leave) -->
-    <div v-if="showRejectModal" class="modal-overlay" @click.self="closeRejectModal">
-      <div class="modal-content sm">
-        <div class="modal-header">
-          <h3>반려 사유 입력</h3>
-          <button class="close-btn" :disabled="rejectLoading" @click="closeRejectModal">×</button>
-        </div>
-        <div class="modal-body">
-           <div class="info-text mb-4">
-             선택하신 {{ selectedLeaveIds.length }}건의 휴가 신청을 반려합니다.
-           </div>
-           <div class="form-group">
-            <label class="required">반려 사유</label>
-            <textarea v-model="rejectReason" :disabled="rejectLoading" rows="3" placeholder="반려 사유를 입력하세요."></textarea>
-           </div>
-        </div>
-        <div class="modal-footer">
-           <button class="btn-cancel" :disabled="rejectLoading" @click="closeRejectModal">취소</button>
-           <button class="btn-save red-btn" :disabled="rejectLoading" @click="submitReject">
-             {{ rejectLoading ? '처리 중...' : '반려하기' }}
-           </button>
-        </div>
-      </div>
-    </div>
-    <ActionConfirmModal
-      v-model="showApproveModal"
-      title="휴가 승인"
-      :message="`${selectedLeaveIds.length}건의 휴가 신청을 승인하시겠습니까?`"
-      confirm-text="승인하기"
-      :loading="approveLoading"
-      @confirm="submitApprove"
-    />
-
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useAttendanceStore } from '@/store/attendance'
-import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 
 const store = useAttendanceStore()
-const currentTab = ref('daily')
 
 // --- State (Daily) ---
 const filters = ref({
   dept: '',
-  date: '',
+  startDate: '',
+  endDate: '',
   status: ''
 })
 
 const appliedFilters = ref({
-  date: '',
+  startDate: '',
+  endDate: '',
   status: ''
 })
 
@@ -301,22 +176,12 @@ const editForm = ref({
 })
 const errors = ref({})
 
-// --- State (Leave) ---
-const selectedLeaveIds = ref([])
-const showRejectModal = ref(false)
-const showApproveModal = ref(false)
-const rejectReason = ref('')
-const approveLoading = ref(false)
-const rejectLoading = ref(false)
-
 // --- Computed (Daily) ---
 const filteredList = computed(() => {
   return store.dailyAttendance.filter(item => {
     // Status Filter
     if (appliedFilters.value.status && item.status !== appliedFilters.value.status) return false
-    
-    if (appliedFilters.value.date && item.date !== appliedFilters.value.date) return false
-    
+
     return true
   })
 })
@@ -333,38 +198,29 @@ const getStatusClass = (status) => {
   return map[status] || ''
 }
 
-// --- Computed (Leave) ---
-// Sort by pending first for better admin UX
-const sortedLeaveList = computed(() => {
-  return [...store.leaveRequests].sort((a, b) => {
-    if (a.status === 'pending' && b.status !== 'pending') return -1
-    if (a.status !== 'pending' && b.status === 'pending') return 1
-    return 0
-  })
-})
-
-const getApprStatusLabel = (s) => ({ pending: '대기', approved: '승인', rejected: '반려' }[s])
-const getApprStatusClass = (s) => ({ pending: 'badge-warning', approved: 'badge-green', rejected: 'badge-red' }[s])
-
-const isAllLeaveSelected = computed(() => {
-  const pending = sortedLeaveList.value.filter(l => l.status === 'pending')
-  return pending.length > 0 && selectedLeaveIds.value.length === pending.length
-})
-
 const today = new Date()
 const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
   today.getDate(),
 ).padStart(2, '0')}`
 
-filters.value.date = currentDate
+filters.value.startDate = currentDate
+filters.value.endDate = currentDate
 appliedFilters.value = { ...filters.value }
 
 // --- Methods (Daily) ---
 const fetchData = async () => {
   appliedFilters.value = { ...filters.value }
+  if (
+    appliedFilters.value.startDate &&
+    appliedFilters.value.endDate &&
+    appliedFilters.value.startDate > appliedFilters.value.endDate
+  ) {
+    alert('시작일은 종료일보다 늦을 수 없습니다.')
+    return
+  }
   await store.fetchAdminDailyAttendanceList({
-    startDate: appliedFilters.value.date || null,
-    endDate: appliedFilters.value.date || null,
+    startDate: appliedFilters.value.startDate || null,
+    endDate: appliedFilters.value.endDate || null,
     status: appliedFilters.value.status || null,
   })
 }
@@ -422,80 +278,8 @@ const saveChanges = async () => {
   }
 }
 
-// --- Methods (Leave) ---
-const toggleAllLeave = (e) => {
-  if (e.target.checked) {
-    selectedLeaveIds.value = sortedLeaveList.value.filter(l => l.status === 'pending').map(l => l.id)
-  } else {
-    selectedLeaveIds.value = []
-  }
-}
-
-const handleBulkLeaveApprove = async () => {
-  showApproveModal.value = true
-}
-
-const submitApprove = async () => {
-  if (approveLoading.value) return
-  approveLoading.value = true
-  try {
-    await store.processApprovalVacationRequests(selectedLeaveIds.value, true)
-    selectedLeaveIds.value = []
-    showApproveModal.value = false
-  } catch (error) {
-    if (Array.isArray(error?.successIds) && error.successIds.length > 0) {
-      selectedLeaveIds.value = selectedLeaveIds.value.filter(
-        (id) => !error.successIds.includes(id),
-      )
-    }
-    const message = error?.response?.data?.message || '승인 처리에 실패했습니다. 다시 시도해 주세요.'
-    alert(message)
-  } finally {
-    approveLoading.value = false
-  }
-}
-
-const handleBulkLeaveReject = () => {
-  rejectReason.value = ''
-  showRejectModal.value = true
-}
-
-const closeRejectModal = () => {
-  if (rejectLoading.value) return
-  showRejectModal.value = false
-}
-
-const submitReject = async () => {
-  if (rejectLoading.value) return
-  if (!rejectReason.value.trim()) {
-    alert('반려 사유를 입력해주세요.')
-    return
-  }
-
-  rejectLoading.value = true
-  try {
-    await store.processApprovalVacationRequests(selectedLeaveIds.value, false, rejectReason.value)
-    selectedLeaveIds.value = []
-    showRejectModal.value = false
-    alert('반려 처리되었습니다.')
-  } catch (error) {
-    if (Array.isArray(error?.successIds) && error.successIds.length > 0) {
-      selectedLeaveIds.value = selectedLeaveIds.value.filter(
-        (id) => !error.successIds.includes(id),
-      )
-    }
-    const message = error?.response?.data?.message || '반려 처리에 실패했습니다. 다시 시도해 주세요.'
-    alert(message)
-  } finally {
-    rejectLoading.value = false
-  }
-}
-
 onMounted(async () => {
-  await Promise.all([
-    fetchData(),
-    store.fetchAdminLeaveRequestsList(),
-  ])
+  await fetchData()
 })
 </script>
 
