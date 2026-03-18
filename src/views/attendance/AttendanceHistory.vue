@@ -188,19 +188,76 @@ const formatDate = (value) => {
   return `${year}.${month}.${day}`
 }
 
+const mapType = (type) => {
+  const raw = String(type || '').trim()
+  const normalized = raw.toUpperCase()
+  if (normalized === 'VACATION' || normalized === 'ANNUAL' || normalized === 'HALF' || normalized === 'SICK') return '휴가'
+  if (normalized === 'OVERTIME') return '연장근무'
+  if (normalized === 'FLEXIBLE' || normalized === 'REMOTE' || normalized === 'WORK_FROM_HOME') return '재택근무'
+  if (normalized === 'TRIP' || normalized === 'BUSINESS_TRIP' || normalized === 'OUTING') return '외근/출장'
+  if (raw.includes('휴가')) return '휴가'
+  if (raw.includes('연장')) return '연장근무'
+  if (raw.includes('재택') || raw.includes('유연')) return '재택근무'
+  if (raw.includes('출장') || raw.includes('외근')) return '외근/출장'
+  return raw || '신청'
+}
+
+const mapLeaveTypeWord = (value) => {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (normalized === 'ANNUAL') return '연차'
+  if (normalized === 'HALF') return '반차'
+  if (normalized === 'SICK') return '병가'
+  if (normalized === 'ETC') return '기타'
+  return null
+}
+
+const mapTitle = (title, fallbackType) => {
+  const raw = String(title || '').trim()
+  if (!raw) return `${fallbackType} 신청`
+
+  const mappedDirect = mapLeaveTypeWord(raw)
+  if (mappedDirect) return `${mappedDirect} 신청`
+
+  const matched = raw.match(/^([A-Za-z_]+)\s*신청$/)
+  if (matched) {
+    const mapped = mapLeaveTypeWord(matched[1])
+    if (mapped) return `${mapped} 신청`
+  }
+
+  return raw
+}
+
+const mapStatus = (status) => {
+  const raw = String(status || '').trim()
+  const normalized = raw.toUpperCase()
+  if (normalized === 'PENDING' || normalized === 'HOLD') return '대기'
+  if (normalized === 'APPROVED' || normalized === 'COMPLETE' || normalized === 'DELEGATED') return '승인'
+  if (normalized === 'REJECTED') return '반려'
+  if (normalized === 'CANCELLED' || normalized === 'WITHDRAWN') return '취소'
+  if (normalized === 'TEMP') return '임시저장'
+  if (raw === 'pending') return '대기'
+  if (raw === 'approved') return '승인'
+  if (raw === 'rejected') return '반려'
+  if (raw === 'cancelled') return '취소'
+  return raw || '-'
+}
+
 const historyList = computed(() => {
   return [...store.requestHistory]
-    .map(item => ({
-    id: item.id,
-    rawAppliedAt: item.appliedAt,
-    date: formatDateTime(item.appliedAt),
-    type: item.type,
-    title: item.title || `${item.type} 신청`,
-    targetDate: item.targetDate ? formatDate(item.targetDate) : item.period,
-    approver: item.approver || '-',
-    status: mapStatus(item.status),
-    rejectReason: item.rejectReason || item.rejectionReason || '',
-  }))
+    .map(item => {
+      const mappedType = mapType(item.type)
+      return {
+        id: item.id,
+        rawAppliedAt: item.appliedAt,
+        date: formatDateTime(item.appliedAt),
+        type: mappedType,
+        title: mapTitle(item.title, mappedType),
+        targetDate: item.targetDate ? formatDate(item.targetDate) : item.period,
+        approver: item.approver || '-',
+        status: mapStatus(item.status),
+        rejectReason: item.rejectReason || item.rejectionReason || '',
+      }
+    })
     .sort((a, b) => new Date(b.rawAppliedAt).getTime() - new Date(a.rawAppliedAt).getTime())
 })
 
@@ -250,11 +307,6 @@ const paginatedHistoryList = computed(() => {
   return filteredHistoryList.value.slice(start, start + pageSize)
 })
 
-const mapStatus = (status) => {
-  const map = { pending: '대기', approved: '승인', rejected: '반려' }
-  return map[status] || status
-}
-
 const stats = computed(() => {
   return {
     pending: store.requestCounts.pending,
@@ -265,8 +317,8 @@ const stats = computed(() => {
 
 const getTypeColor = (type) => {
   if (type === '휴가') return 'pink'
-  if (type === '연장') return 'blue'
-  if (type === '외근' || type === '출장') return 'gray'
+  if (type === '연장' || type === '연장근무') return 'blue'
+  if (type === '외근' || type === '출장' || type === '외근/출장') return 'gray'
   if (type === '재택' || type === '재택근무') return 'purple'
   return 'gray'
 }

@@ -36,19 +36,6 @@
         </div>
       </div>
 
-      <div class="card summary-card pending">
-        <div class="card-icon amber-bg">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-        </div>
-        <div class="card-info">
-          <span class="label">결재중 연차</span>
-          <span class="value">{{ leaveBalance.pendingAnnualLeave.toFixed(1) }}</span>
-        </div>
-      </div>
-
       <div class="card summary-card remaining">
         <div class="card-icon green-bg">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -264,7 +251,7 @@ onMounted(async () => {
 /* Summary Cards */
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
