@@ -601,7 +601,7 @@ const baseShortcutOptions = [
     route: '/attendance/vacation',
     viewCodes: ['ATTENDANCE_VACATION'],
   },
-  { key: 'salary-my', label: '급여 조회', icon: CreditCardIcon, route: '/salary/my', viewCodes: ['ADMIN_SALARY'] },
+  { key: 'salary-my', label: '급여 조회', icon: CreditCardIcon, route: '/salary/my', viewCodes: ['MAIN'] },
   { key: 'approval-dashboard', label: '전자결재 대시보드', icon: DashboardIcon, route: '/approval', viewCodes: ['APPROVAL_MAIN'] },
   { key: 'approval-draft', label: '전자결재 기안', icon: PlusIcon, route: '/approval/draft', viewCodes: ['APPROVAL_DRAFT'] },
   { key: 'approval-status', label: '전자결재 현황', icon: SearchIcon, route: '/approval/status', viewCodes: ['APPROVAL_STATUS'] },
@@ -728,7 +728,7 @@ const attendanceMenus = computed(() => {
 
 // --- 급여 모드 데이터 ---
 const salaryMenus = [
-  { label: '급여 조회', icon: CreditCardIcon, route: '/salary/my', viewCodes: ['ADMIN_SALARY'] },
+  { label: '급여 조회', icon: CreditCardIcon, route: '/salary/my', viewCodes: ['MAIN'] },
 ]
 const filteredSalaryMenus = computed(() =>
   salaryMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
