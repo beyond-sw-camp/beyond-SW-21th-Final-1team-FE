@@ -75,6 +75,15 @@ const mapAttendanceStatus = (value) => {
   return 'normal'
 }
 
+const formatLeaveTypeLabel = (value) => {
+  const normalized = String(value || '').toUpperCase()
+  if (normalized === 'ANNUAL') return '연차'
+  if (normalized === 'HALF') return '반차'
+  if (normalized === 'SICK') return '병가'
+  if (normalized === 'ETC') return '기타'
+  return value || '휴가'
+}
+
 const mapAdminAttendanceRecord = (record) => ({
   id: record.attendanceId,
   attendanceId: record.attendanceId,
@@ -106,7 +115,7 @@ const mapLeaveRequest = (item) => ({
   leaveRequestId: item.leaveRequestId,
   ...employeeLabel(item.employeeId),
   type: '휴가',
-  title: `${item.leaveType || '휴가'} 신청`,
+  title: `${formatLeaveTypeLabel(item.leaveType)} 신청`,
   period:
     item.startDate && item.endDate && item.startDate !== item.endDate
       ? `${formatDate(item.startDate)} ~ ${formatDate(item.endDate)}`
@@ -118,7 +127,7 @@ const mapLeaveRequest = (item) => ({
   appliedAt: formatDate(item.startDate),
   targetDate: formatDate(item.startDate),
   approver: '-',
-  leaveType: item.leaveType,
+  leaveType: formatLeaveTypeLabel(item.leaveType),
   startDate: formatDate(item.startDate),
   endDate: formatDate(item.endDate),
   applyDate: formatDate(item.startDate),
@@ -130,7 +139,7 @@ const mapVacationHistoryItem = (item) => ({
   id: item.id,
   leaveRequestId: null,
   type: '휴가',
-  title: `${item.leaveType || '휴가'} 신청`,
+  title: `${formatLeaveTypeLabel(item.leaveType)} 신청`,
   period: `${item.startDate} ~ ${item.endDate}`,
   days: Number(item.usedDays || 0),
   usedDays: Number(item.usedDays || 0),
@@ -139,7 +148,7 @@ const mapVacationHistoryItem = (item) => ({
   appliedAt: item.applyDate,
   targetDate: item.startDate,
   approver: '-',
-  leaveType: item.leaveType,
+  leaveType: formatLeaveTypeLabel(item.leaveType),
   startDate: item.startDate,
   endDate: item.endDate,
   applyDate: item.applyDate,
@@ -156,8 +165,8 @@ const mapAdminApprovalVacation = (item) => ({
   position: '직원',
   deptName: item.departmentName || '-',
   dept: item.departmentName || '-',
-  type: item.vacationType || '휴가',
-  title: `${item.vacationType || '휴가'} 신청`,
+  type: formatLeaveTypeLabel(item.vacationType),
+  title: `${formatLeaveTypeLabel(item.vacationType)} 신청`,
   period:
     item.startDate && item.endDate && formatDate(item.startDate) !== formatDate(item.endDate)
       ? `${formatDate(item.startDate)} ~ ${formatDate(item.endDate)}`
@@ -169,7 +178,7 @@ const mapAdminApprovalVacation = (item) => ({
   appliedAt: formatDate(item.draftDate),
   targetDate: formatDate(item.startDate),
   approver: '-',
-  leaveType: item.vacationType || '휴가',
+  leaveType: formatLeaveTypeLabel(item.vacationType),
   startDate: formatDate(item.startDate),
   endDate: formatDate(item.endDate),
   applyDate: formatDate(item.draftDate),
