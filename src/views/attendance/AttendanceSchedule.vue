@@ -273,6 +273,7 @@ import { useAttendanceStore } from '@/store/attendance'
 const currentView = ref('month')
 const selectedFilter = ref('ALL')
 const appliedFilter = ref('ALL')
+const calendarFetchSeq = ref(0)
 const store = useAttendanceStore()
 const { calendarEvents } = storeToRefs(store)
 
@@ -503,18 +504,19 @@ const visibleDateKeys = computed(() => {
 })
 
 const hasVisibleEvents = computed(() => {
-  for (const event of normalizedEvents.value) {
-    if (!visibleDateKeys.value.has(event.targetDate)) continue
-    if (appliedFilter.value === 'ATTENDANCE' && event.category !== 'ATTENDANCE') continue
-    if (appliedFilter.value === 'REQUEST' && event.category === 'ATTENDANCE') continue
-    return true
+  for (const dateKey of visibleDateKeys.value) {
+    if (getEventsForDate(dateKey).length > 0) {
+      return true
+    }
   }
   return false
 })
 
 const fetchCalendar = async (targetFilter = selectedFilter.value) => {
+  const requestSeq = ++calendarFetchSeq.value
   const scope = targetFilter === 'ALL' ? 'TEAM' : 'SELF'
   await store.fetchAttendanceCalendar(currentDate.value.year, currentDate.value.month, scope)
+  if (requestSeq !== calendarFetchSeq.value) return
   appliedFilter.value = targetFilter
 }
 
