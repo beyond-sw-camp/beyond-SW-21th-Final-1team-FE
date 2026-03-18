@@ -55,7 +55,6 @@
     <template v-else-if="isAttendanceMode">
       <div class="sidebar-header">
         <span>근태 관리</span>
-        <span v-if="['manager', 'admin'].includes(userRank)" class="sidebar-role-badge sidebar-role-badge--manager">관리자</span>
       </div>
 
       <div
@@ -686,11 +685,6 @@ const filteredHrMenus = computed(() =>
   hrMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),
 )
 
-// --- 전자결재 모드 데이터 ---
-const userRank = computed(() => {
-  return isAttendanceManager.value || isAdminUser.value ? 'manager' : 'user'
-})
-
 // --- 근태 모드 데이터 ---
 const attendanceDashboardMenu = { label: '근태 대쉬보드', icon: DashboardIcon, route: '/attendance/my' }
 
@@ -939,18 +933,6 @@ const handleNavigate = (route) => {
 }
 
 /* ── Performance sidebar ── */
-.sidebar-role-badge {
-  font-size: 0.65rem;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: var(--gray100);
-  color: var(--gray500);
-  font-weight: 600;
-}
-.sidebar-role-badge--manager {
-  background: var(--accent);
-  color: var(--primary);
-}
 .sidebar-section-label {
   font-size: 0.68rem;
   font-weight: 600;
