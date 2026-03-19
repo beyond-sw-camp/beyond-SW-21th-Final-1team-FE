@@ -82,9 +82,10 @@ async function loadStatusSearch() {
 
 const openModal = async (item) => {
   try {
-    if (!item.isRead) {
+    if (item.readDate == null) {
       try {
         await markApprovalAsRead(item.approvalId)
+        item.readDate = new Date().toISOString()
         item.isRead = true
       } catch (_error) {
       }
@@ -192,7 +193,7 @@ watch([activeTab, searchQuery], loadStatusSearch)
           @click="openModal(item)"
         >
           <div class="mobile-title-row">
-            <span class="title">{{ item.title }}</span>
+            <span class="title" :class="{ 'title-read': item.readDate != null }">{{ item.title }}</span>
             <span class="status-badge" :class="getStatusClass(item.status)">{{ item.status }}</span>
           </div>
           <div class="mobile-meta">
@@ -271,7 +272,7 @@ watch([activeTab, searchQuery], loadStatusSearch)
               <td class="col-id">{{ item.id }}</td>
               <td class="col-tpl">{{ item.templateName }}</td>
               <td class="col-title">
-                <span class="title-text">{{ item.title }}</span>
+                <span class="title-text" :class="{ 'title-read': item.readDate != null }">{{ item.title }}</span>
               </td>
               <td class="col-date">{{ item.draftDate }}</td>
               <td class="col-status">
@@ -482,6 +483,7 @@ watch([activeTab, searchQuery], loadStatusSearch)
 .col-id { color: #868e96; font-family: monospace; }
 .col-title { font-weight: 500; }
 .title-text:hover { color: #339af0; text-decoration: underline; cursor: pointer; }
+.title-read { color: #339af0; text-decoration: underline; }
 
 .status-badge {
   padding: 4px 10px;
