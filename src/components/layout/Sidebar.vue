@@ -511,6 +511,7 @@ const adminMenus = [
   { label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
   { label: '급여 관리', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
   { label: '성과 시스템 관리', icon: SlidersIcon, route: '/admin/performance', viewCodes: ['ADMIN_MAIN'] },
+  { label: '인사고과 관리', icon: StarIcon, route: '/admin/evaluation', viewCodes: ['ADMIN_MAIN'] },
 ]
 const filteredAdminMenus = computed(() =>
   adminMenus.filter((item) => hasAnyAllowedViews(item.viewCodes)),

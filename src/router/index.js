@@ -81,6 +81,12 @@ const routes = [
     }
   },
   {
+    path: '/admin/evaluation',
+    name: 'admin-evaluation',
+    component: () => import('@/views/admin/AdminEvalView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, section: 'admin' }
+  },
+  {
     path: '/approval',
     meta: { requiresAuth: true },
     children: [

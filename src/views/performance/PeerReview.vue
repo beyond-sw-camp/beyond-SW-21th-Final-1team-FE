@@ -97,7 +97,7 @@
           <!-- 코멘트 -->
           <div class="comment-section">
             <label class="comment-label">
-              <MessageSquare :size="14" /> 종합 코멘트 <span>(선택사항)</span>
+              <MessageSquare :size="14" /> 종합 코멘트 <span class="required-mark">(필수)</span>
             </label>
             <textarea
               v-model="comment"
@@ -186,7 +186,7 @@ const criteria = [
   { id: 5, label: '조직 문화 기여도' },
 ]
 
-const isFormValid = computed(() => criteria.every(c => scores[c.id]))
+const isFormValid = computed(() => criteria.every(c => scores[c.id]) && comment.value.trim().length > 0)
 const hasSubmittedForPeer = computed(() => Boolean(selectedColleague.value?.evaluated))
 const reviewPeriod = computed(() =>
   selectedColleague.value?.reviewPeriod ||
@@ -718,6 +718,11 @@ onMounted(loadPeerReviewTargets)
   font-weight: 400;
   color: var(--gray400);
   font-size: 0.78rem;
+}
+
+.comment-label .required-mark {
+  color: #ef4444;
+  font-weight: 600;
 }
 
 .comment-textarea {
