@@ -103,8 +103,8 @@ export const getAdminEvalMembers = (orgId) =>
 export const getAdminEvalData = (employeeId) =>
   unwrap(api.get(`/performance/admin/evaluation/${employeeId}`))
 
-export const saveAdminEvalScore = (employeeId, finalScore) =>
-  unwrap(api.post(`/performance/admin/evaluation/${employeeId}`, { finalScore }))
+export const saveAdminEvalScore = (employeeId, grade) =>
+  api.post(`/performance/admin/evaluation/${employeeId}`, { grade })
 
 export const saveAdminPerformanceWeights = async (weights = []) => {
   const items = parseWeightItems(weights)
