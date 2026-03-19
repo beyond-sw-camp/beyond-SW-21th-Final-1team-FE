@@ -52,6 +52,12 @@ const handleClose = () => {
 .modal-leave-active {
   transition: all 0.25s ease;
 }
+
+/* Closing overlay should not eat clicks while fading out. */
+.modal-leave-active {
+  pointer-events: none;
+}
+
 .modal-enter-active .modal-container,
 .modal-leave-active .modal-container {
   transition: all 0.25s ease;
