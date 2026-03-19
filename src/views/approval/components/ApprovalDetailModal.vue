@@ -24,7 +24,7 @@
       <div class="modal-footer">
         <div class="footer-left">
           <template v-if="isDrafter">
-            <button v-if="item.status === '임시저장'" class="btn btn-danger-ghost" @click="handleAction('cancel')">기안 취소</button>
+            <button v-if="item.status === '진행중'" class="btn btn-danger-ghost" @click="handleAction('cancel')">기안 취소</button>
             <button v-if="item.status === '반려'" class="btn btn-primary" @click="handleAction('redraft')">재상신 하기</button>
             <button v-if="item.status === '임시저장'" class="btn btn-primary" @click="handleAction('draft')">상신</button>
             <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>

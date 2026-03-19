@@ -24,6 +24,7 @@ const warningMessage = ref('');
 const modalMode = ref('approval'); // 'approval' | 'receiver' | 'referrer'
 const templateSelectorRef = ref(null);
 const attachmentInputRef = ref(null);
+const isAttachmentDragOver = ref(false);
 
 const loginSession = getLoginSession()
 const currentUser = {
@@ -445,17 +446,21 @@ const toDateTimeTimestamp = (date, time = '00:00') => {
 const getDateValidationMessage = () => {
   if (['vacation', 'leave'].includes(activeTemplate.value)) {
     if (!docInfo.startDate || !docInfo.endDate) return '';
-    const start =
-      activeTemplate.value === 'vacation' && docInfo.vacationType === '반차'
-        ? toDateTimeTimestamp(docInfo.startDate, docInfo.startTime)
-        : toDateTimestamp(docInfo.startDate);
-    const end =
-      activeTemplate.value === 'vacation' && docInfo.vacationType === '반차'
-        ? toDateTimeTimestamp(docInfo.endDate, docInfo.endTime)
-        : toDateTimestamp(docInfo.endDate);
+    const isHalfVacation = activeTemplate.value === 'vacation' && docInfo.vacationType === '반차';
+    const start = isHalfVacation
+      ? toDateTimeTimestamp(docInfo.startDate, docInfo.startTime)
+      : toDateTimestamp(docInfo.startDate);
+    const end = isHalfVacation
+      ? toDateTimeTimestamp(docInfo.endDate, docInfo.endTime)
+      : toDateTimestamp(docInfo.endDate);
 
     if (Number.isFinite(start) && Number.isFinite(end) && end < start) {
-      return '종료일자는 시작일자보다 이전일 수 없습니다.';
+      return isHalfVacation
+        ? '종료일시는 시작일시보다 이전일 수 없습니다.'
+        : '종료일자는 시작일자보다 이전일 수 없습니다.';
+    }
+    if (isHalfVacation && Number.isFinite(start) && Number.isFinite(end) && end === start) {
+      return '종료일시는 시작일시와 같을 수 없습니다.';
     }
     return '';
   }
@@ -467,6 +472,9 @@ const getDateValidationMessage = () => {
     if (Number.isFinite(start) && Number.isFinite(end) && end < start) {
       return '종료일시는 시작일시보다 이전일 수 없습니다.';
     }
+    if (Number.isFinite(start) && Number.isFinite(end) && end === start) {
+      return '종료일시는 시작일시와 같을 수 없습니다.';
+    }
   }
 
   return '';
@@ -474,12 +482,8 @@ const getDateValidationMessage = () => {
 
 const inlineDateValidationMessage = computed(() => getDateValidationMessage());
 
-const openAttachmentPicker = () => {
-  attachmentInputRef.value?.click();
-};
-
-const onAttachmentChange = (event) => {
-  const selectedFiles = Array.from(event?.target?.files || []);
+const addAttachments = (incomingFiles = []) => {
+  const selectedFiles = Array.from(incomingFiles || []);
   if (selectedFiles.length === 0) return;
 
   const existing = Array.isArray(docInfo.attachments) ? docInfo.attachments : [];
@@ -493,7 +497,28 @@ const onAttachmentChange = (event) => {
   );
 
   docInfo.attachments = [...existing, ...uniqueFiles];
+};
+
+const openAttachmentPicker = () => {
+  attachmentInputRef.value?.click();
+};
+
+const onAttachmentChange = (event) => {
+  addAttachments(event?.target?.files || []);
   event.target.value = '';
+};
+
+const onAttachmentDragOver = () => {
+  isAttachmentDragOver.value = true;
+};
+
+const onAttachmentDragLeave = () => {
+  isAttachmentDragOver.value = false;
+};
+
+const onAttachmentDrop = (event) => {
+  isAttachmentDragOver.value = false;
+  addAttachments(event?.dataTransfer?.files || []);
 };
 
 const removeAttachment = (index) => {
@@ -1010,7 +1035,13 @@ const vacationDurationLabel = computed(() => {
         </table>
 
         <!-- Attachments -->
-        <div class="attachments-area">
+        <div
+          class="attachments-area"
+          :class="{ 'is-drag-over': isAttachmentDragOver }"
+          @dragover.prevent="onAttachmentDragOver"
+          @dragleave.prevent="onAttachmentDragLeave"
+          @drop.prevent="onAttachmentDrop"
+        >
           <span class="label">첨부파일</span>
           <button type="button" class="btn-sm" @click="openAttachmentPicker">파일 찾기</button>
           <input
@@ -1664,6 +1695,12 @@ const vacationDurationLabel = computed(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.attachments-area.is-drag-over {
+  border-color: #0066cc;
+  background: #eef6ff;
 }
 
 .attachments-area .label {
