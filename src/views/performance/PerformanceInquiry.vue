@@ -4,7 +4,7 @@
     <div class="inq-card">
       <div class="filter-bar">
         <div class="filter-left">
-          <div v-if="isPerformanceManager" class="filter-select-wrap">
+          <div v-if="isTeamLeader" class="filter-select-wrap">
             <User :size="14" class="filter-icon" />
             <select v-model="filterEmployee" class="filter-select">
               <option value="">전체 팀원</option>
@@ -28,8 +28,8 @@
           </div>
           <input v-model="filterMonth" type="month" class="filter-month" />
         </div>
-        <div class="filter-search-wrap" :class="{ 'filter-search-wrap--manager': isPerformanceManager }">
-          <select v-if="isPerformanceManager" v-model="searchField" class="filter-search-mode">
+        <div class="filter-search-wrap" :class="{ 'filter-search-wrap--manager': isTeamLeader }">
+          <select v-if="isTeamLeader" v-model="searchField" class="filter-search-mode">
             <option value="title">제목</option>
             <option value="coreTask">핵심 업무</option>
           </select>
@@ -37,7 +37,7 @@
           <input
             v-model="searchText"
             type="text"
-            :placeholder="isPerformanceManager && searchField === 'coreTask' ? '핵심 업무 검색' : '성과 제목 검색'"
+            :placeholder="isTeamLeader && searchField === 'coreTask' ? '핵심 업무 검색' : '성과 제목 검색'"
             class="filter-search"
           />
         </div>
@@ -273,7 +273,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Search, Filter, X, Upload, CheckCircle, AlertCircle, User } from 'lucide-vue-next'
 import { getPerformanceInquiryItems, getPerformanceInquiryTeamMembers, updatePerformanceResult } from '@/api/performance'
 import { AUTH_KEYS, USER_ROLES, isAdminRole, isEvaluatorRole, sessionRoleCodesRef, sessionRoleRef } from '@/utils/auth'
-import { filterVisiblePerformanceInquiryItems, normalizePerformanceInquiryItem } from '@/utils/performanceInquiry'
+import { normalizePerformanceInquiryItem } from '@/utils/performanceInquiry'
 
 const selectedItem = ref(null)
 const modalTab = ref('detail')
@@ -303,13 +303,21 @@ const userName = computed(() => sessionStorage.getItem(AUTH_KEYS.userName) || ''
 const userRole = computed(() => sessionRoleRef.value || USER_ROLES.user)
 const isPerformanceManager = computed(() =>
   isEvaluatorRole(sessionRoleCodesRef.value) || isAdminRole(sessionRoleCodesRef.value, userRole.value))
+
+// ROLE_EVALUATOR 없어도 팀원이 있으면 팀장으로 간주
+const isTeamLeader = computed(() => isPerformanceManager.value || teamMemberOptions.value.length > 0)
 const currentEmployeeId = computed(() => sessionStorage.getItem(AUTH_KEYS.employeeId) || '')
 
-const visibleItems = computed(() => filterVisiblePerformanceInquiryItems(items.value, {
-  isPerformanceManager: isPerformanceManager.value,
-  currentEmployeeId: currentEmployeeId.value,
-  userName: userName.value,
-}))
+const visibleItems = computed(() => {
+  // 필터로 직원 선택 시 → 해당 직원 데이터만
+  const targetId = isTeamLeader.value && filterEmployee.value
+    ? filterEmployee.value
+    : currentEmployeeId.value
+  if (targetId) {
+    return items.value.filter((item) => String(item.employeeId ?? '') === String(targetId))
+  }
+  return items.value.filter((item) => item.employeeName === userName.value)
+})
 
 const employeeOptions = computed(() => teamMemberOptions.value)
 
@@ -442,12 +450,25 @@ async function loadInquiryItems(sequence = ++inquiryRequestSeq) {
   try {
     loadError.value = ''
     const params = {}
-    if (isPerformanceManager.value && filterEmployee.value) {
+    if (isTeamLeader.value && filterEmployee.value) {
       params.targetEmployeeId = filterEmployee.value
     }
     const response = await getPerformanceInquiryItems(params)
     if (sequence !== inquiryRequestSeq) return
-    items.value = Array.isArray(response) ? response.map((item) => normalizePerformanceInquiryItem(item)) : []
+    if (Array.isArray(response)) {
+      const seen = new Set()
+      items.value = response
+        .map((item) => normalizePerformanceInquiryItem(item))
+        .filter((item) => {
+          const key = item.id ?? item.performanceId
+          if (key == null) return true
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+    } else {
+      items.value = []
+    }
   } catch (error) {
     if (sequence !== inquiryRequestSeq) return
     items.value = []
@@ -471,21 +492,14 @@ async function loadTeamMembers() {
   } catch (_error) {
     console.error('Failed to load team members for performance inquiry.', _error)
     teamMemberOptions.value = []
-    alert(_error?.response?.data?.error?.message || '팀원 목록을 불러오지 못했습니다.')
   }
 }
 
 watch(filterEmployee, () => {
-  if (!isPerformanceManager.value) return
+  if (!isTeamLeader.value) return
   inquiryRequestSeq += 1
   currentPage.value = 1
   loadInquiryItems(inquiryRequestSeq)
-})
-
-watch(isPerformanceManager, (isManager) => {
-  if (!isManager) return
-  loadTeamMembers()
-  loadInquiryItems()
 })
 
 watch([filterStatus, filterMonth, searchText, searchField], () => {
