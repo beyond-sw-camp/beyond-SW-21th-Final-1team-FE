@@ -89,7 +89,7 @@
                 <td>
                   <div class="title-cell">
                     <span class="tag">{{ item.templateName }}</span>
-                    <span class="title-text">{{ item.title }}</span>
+                    <span class="title-text" :class="{ 'title-read': item.readDate != null }">{{ item.title }}</span>
                   </div>
                 </td>
                 <td class="text-gray text-center">{{ item.drafter }}</td>
@@ -236,9 +236,10 @@ async function loadDashboard() {
 
 const openPendingReview = async (item) => {
   try {
-    if (!item.isRead) {
+    if (item.readDate == null) {
       try {
         await markApprovalAsRead(item.approvalId)
+        item.readDate = new Date().toISOString()
         item.isRead = true
       } catch (_error) {
       }
@@ -745,6 +746,11 @@ onMounted(loadDashboard)
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+.title-read {
+  color: #339af0;
+  text-decoration: underline;
 }
 
 .new-dot {

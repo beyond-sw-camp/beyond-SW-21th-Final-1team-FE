@@ -24,7 +24,7 @@
       <div class="modal-footer">
         <div class="footer-left">
           <template v-if="isDrafter">
-            <button v-if="item.status === '진행중'" class="btn btn-danger-ghost" @click="handleAction('cancel')">기안 취소</button>
+            <button v-if="canWithdrawDraft" class="btn btn-danger-ghost" @click="handleAction('cancel')">기안 회수</button>
             <button v-if="item.status === '반려'" class="btn btn-primary" @click="handleAction('redraft')">재상신 하기</button>
             <button v-if="item.status === '임시저장'" class="btn btn-primary" @click="handleAction('draft')">상신</button>
             <button v-if="item.status === '임시저장'" class="btn btn-danger" @click="handleAction('delete')">삭제</button>
@@ -65,6 +65,13 @@ const canReview = computed(() => {
   if (typeof props.item.canReview === 'boolean') return props.item.canReview;
   return props.item.status === '진행중' && !isDrafter.value;
 });
+
+const hasApprovalProgress = computed(() => {
+  const lines = Array.isArray(props.item.approvalLine) ? props.item.approvalLine : [];
+  return lines.some((line) => ['승인', '반려', '전결', '보류', '확인'].includes(line?.status));
+});
+
+const canWithdrawDraft = computed(() => props.item.status === '진행중' && !hasApprovalProgress.value);
 
 const statusClass = computed(() => {
   switch (props.item.status) {
