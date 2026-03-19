@@ -103,6 +103,7 @@
       :message="resultMessage"
       confirm-text="확인"
       :hide-cancel="true"
+      @confirm="isResultModalOpen = false"
     />
   </div>
 </template>

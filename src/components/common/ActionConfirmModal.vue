@@ -25,11 +25,12 @@
     <div class="modal-actions">
       <button
         v-if="!hideCancel"
+        type="button"
         class="btn-cancel"
         :disabled="loading"
         @click="emit('update:modelValue', false)"
       >{{ cancelText }}</button>
-      <button class="btn-confirm" :disabled="loading || confirmDisabled" @click="emit('confirm')">
+      <button type="button" class="btn-confirm" :disabled="loading || confirmDisabled" @click="emit('confirm')">
         {{ loading ? '처리 중...' : confirmText }}
       </button>
     </div>
