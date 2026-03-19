@@ -16,7 +16,12 @@
                 v-model="searchQuery" 
                 placeholder="이름/부서 검색..."
               />
-              <span class="search-icon">🔍</span>
+              <span class="search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="7"></circle>
+                  <line x1="16.65" y1="16.65" x2="21" y2="21"></line>
+                </svg>
+              </span>
             </div>
           </div>
           <div class="tree-view">
@@ -370,10 +375,16 @@ const loadOrganizationData = async () => {
 .search-icon {
   position: absolute;
   right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
   color: var(--gray400);
-  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-icon svg {
+  display: block;
 }
 
 .clear-all {

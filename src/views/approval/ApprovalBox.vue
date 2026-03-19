@@ -137,8 +137,10 @@ const openDetail = async (item) => {
 }
 
 const handleModalAction = async (action) => {
-  if (action.type === 'redraft' || action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
+  if (action.type === 'redraft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box', action: 'redraft' } })
+  } else if (action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box', action: 'draft' } })
   } else if (action.type === 'delete' || action.type === 'cancel') {
     try {
       await deleteApproval(action.id)

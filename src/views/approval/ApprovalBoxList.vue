@@ -54,7 +54,12 @@
       <div class="header-right">
         <div class="search-bar">
           <input type="text" v-model="searchQuery" placeholder="문서 제목, 기안자 검색..." class="search-input">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="16.65" y1="16.65" x2="21" y2="21"></line>
+            </svg>
+          </span>
         </div>
       </div>
     </div>
@@ -240,9 +245,9 @@ const openDetail = async (item) => {
 
 const handleModalAction = async (action) => {
   if (action.type === 'redraft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box', action: 'redraft' } })
   } else if (action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box', action: 'draft' } })
   } else if (action.type === 'delete' || action.type === 'cancel') {
     try {
       await deleteApproval(action.id)
@@ -369,8 +374,18 @@ onMounted(loadBoxList)
 .search-input:focus { outline: none; border-color: #339af0; box-shadow: 0 0 0 3px rgba(51, 154, 240, 0.12); }
 
 .search-icon {
-  position: absolute; left: 14px; top: 12px;
-  color: #adb5bd; font-size: 0.95rem;
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  color: #adb5bd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-icon svg {
+  display: block;
 }
 
 .filter-section {

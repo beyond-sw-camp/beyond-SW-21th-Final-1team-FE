@@ -7,6 +7,7 @@ import {
 } from '@/utils/approvalData';
 import OrgChartModal from './components/OrgChartModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue';
 import { useRoute } from 'vue-router';
 import { getLoginSession } from '@/utils/auth';
 import { draftApproval, getApprovalDetail, redraftApproval, tempApproval } from '@/api/approval';
@@ -18,8 +19,11 @@ const activeTemplate = ref('vacation');
 const showTemplateMenu = ref(false);
 const isModalOpen = ref(false);
 const isConfirmModalOpen = ref(false);
+const isWarningModalOpen = ref(false);
+const warningMessage = ref('');
 const modalMode = ref('approval'); // 'approval' | 'receiver' | 'referrer'
 const templateSelectorRef = ref(null);
+const attachmentInputRef = ref(null);
 
 const loginSession = getLoginSession()
 const currentUser = {
@@ -52,6 +56,17 @@ const receivers = ref([]);
 const referrers = ref([]);
 const isSubmitting = ref(false);
 const sourceApprovalStatus = ref('');
+
+const routeAction = computed(() => String(route.query.action || '').toLowerCase());
+const isRedraftIntent = computed(() => routeAction.value === 'redraft' || routeAction.value === 'resubmit');
+const sourceIsRedraftStatus = computed(
+  () => sourceApprovalStatus.value === 'TEMP' || sourceApprovalStatus.value === 'REJECTED',
+);
+const targetApprovalId = computed(() => Number(route.query.from));
+const canUseRedraftApi = computed(
+  () => Number.isFinite(targetApprovalId.value) && targetApprovalId.value > 0 && (isRedraftIntent.value || sourceIsRedraftStatus.value),
+);
+const submitActionLabel = computed(() => (canUseRedraftApi.value ? '재상신' : '상신'));
 
 // Derived State
 const currentTemplateName = computed(() => {
@@ -403,8 +418,105 @@ const submitApproval = () => {
       alert('결재선은 최소 1명 이상 지정해야 합니다.');
       return;
   }
+
+  const dateValidationMessage = getDateValidationMessage();
+  if (dateValidationMessage) {
+    warningMessage.value = dateValidationMessage;
+    isWarningModalOpen.value = true;
+    return;
+  }
   
   isConfirmModalOpen.value = true;
+};
+
+const toDateTimestamp = (date) => {
+  if (!date) return NaN;
+  const time = new Date(`${date}T00:00:00`).getTime();
+  return Number.isFinite(time) ? time : NaN;
+};
+
+const toDateTimeTimestamp = (date, time = '00:00') => {
+  if (!date) return NaN;
+  const normalizedTime = String(time || '00:00').length === 5 ? `${time}:00` : time;
+  const value = new Date(`${date}T${normalizedTime}`).getTime();
+  return Number.isFinite(value) ? value : NaN;
+};
+
+const getDateValidationMessage = () => {
+  if (['vacation', 'leave'].includes(activeTemplate.value)) {
+    if (!docInfo.startDate || !docInfo.endDate) return '';
+    const start =
+      activeTemplate.value === 'vacation' && docInfo.vacationType === '반차'
+        ? toDateTimeTimestamp(docInfo.startDate, docInfo.startTime)
+        : toDateTimestamp(docInfo.startDate);
+    const end =
+      activeTemplate.value === 'vacation' && docInfo.vacationType === '반차'
+        ? toDateTimeTimestamp(docInfo.endDate, docInfo.endTime)
+        : toDateTimestamp(docInfo.endDate);
+
+    if (Number.isFinite(start) && Number.isFinite(end) && end < start) {
+      return '종료일자는 시작일자보다 이전일 수 없습니다.';
+    }
+    return '';
+  }
+
+  if (['flexible', 'businessTrip'].includes(activeTemplate.value)) {
+    if (!docInfo.startDate || !docInfo.endDate) return '';
+    const start = toDateTimeTimestamp(docInfo.startDate, docInfo.startTime);
+    const end = toDateTimeTimestamp(docInfo.endDate, docInfo.endTime);
+    if (Number.isFinite(start) && Number.isFinite(end) && end < start) {
+      return '종료일시는 시작일시보다 이전일 수 없습니다.';
+    }
+  }
+
+  return '';
+};
+
+const inlineDateValidationMessage = computed(() => getDateValidationMessage());
+
+const openAttachmentPicker = () => {
+  attachmentInputRef.value?.click();
+};
+
+const onAttachmentChange = (event) => {
+  const selectedFiles = Array.from(event?.target?.files || []);
+  if (selectedFiles.length === 0) return;
+
+  const existing = Array.isArray(docInfo.attachments) ? docInfo.attachments : [];
+  const uniqueFiles = selectedFiles.filter(
+    (file) => !existing.some(
+      (attached) =>
+        attached?.name === file.name &&
+        attached?.size === file.size &&
+        attached?.lastModified === file.lastModified,
+    ),
+  );
+
+  docInfo.attachments = [...existing, ...uniqueFiles];
+  event.target.value = '';
+};
+
+const removeAttachment = (index) => {
+  if (!Array.isArray(docInfo.attachments)) {
+    docInfo.attachments = [];
+    return;
+  }
+  docInfo.attachments.splice(index, 1);
+};
+
+const formatFileSize = (size = 0) => {
+  if (!Number.isFinite(size) || size <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = size;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const formatted = value >= 10 || unitIndex === 0 ? Math.round(value) : Number(value.toFixed(1));
+  return `${formatted} ${units[unitIndex]}`;
 };
 
 const toNullable = (value) => {
@@ -510,23 +622,34 @@ const submitDraft = async (mode = 'pending') => {
     alert('결재선은 최소 1명 이상 지정해야 합니다.');
     return;
   }
+  if (mode === 'pending') {
+    const dateValidationMessage = getDateValidationMessage();
+    if (dateValidationMessage) {
+      warningMessage.value = dateValidationMessage;
+      isWarningModalOpen.value = true;
+      return;
+    }
+  }
 
   try {
     isSubmitting.value = true;
     const payload = buildDraftPayload();
     const files = Array.isArray(docInfo.attachments) ? docInfo.attachments : [];
-    const approvalId = Number(route.query.from);
-    const canRedraftTemp =
-      Number.isFinite(approvalId) && approvalId > 0 && sourceApprovalStatus.value === 'TEMP';
+    const approvalId = targetApprovalId.value;
+    const shouldRedraft = mode === 'pending' && canUseRedraftApi.value;
 
-    if (canRedraftTemp) {
+    if (shouldRedraft) {
       await redraftApproval({ approvalId, payload, files });
     } else if (mode === 'temp') {
       await tempApproval({ payload, files });
     } else {
       await draftApproval({ payload, files });
     }
-    alert(mode === 'temp' ? '임시 저장되었습니다.' : `[${currentTemplateName.value}] 기안이 상신되었습니다.`);
+    alert(
+      mode === 'temp'
+        ? '임시 저장되었습니다.'
+        : `[${currentTemplateName.value}] 기안이 ${shouldRedraft ? '재상신' : '상신'}되었습니다.`,
+    );
     router.push(mode === 'temp' ? '/approval/box' : '/approval/status');
   } catch (error) {
     alert(error?.response?.data?.error?.message || '전자결재 저장에 실패했습니다.');
@@ -541,7 +664,7 @@ const finalizeSubmission = async () => {
 };
 
 const confirmMessage = computed(() => {
-  return '선택하신 결재선 정보로 기안서를 상신하시겠습니까?';
+  return `선택하신 결재선 정보로 기안서를 ${submitActionLabel.value}하시겠습니까?`;
 });
 
 const reasonLabel = computed(() => {
@@ -619,7 +742,7 @@ const vacationDurationLabel = computed(() => {
       </div>
       <div class="toolbar-right">
         <button class="btn btn-secondary" @click="tempSave">임시저장</button>
-        <button class="btn btn-primary" @click="submitApproval">상신</button>
+        <button class="btn btn-primary" @click="submitApproval">{{ submitActionLabel }}</button>
       </div>
     </header>
 
@@ -857,6 +980,15 @@ const vacationDurationLabel = computed(() => {
               </td>
             </tr>
 
+            <tr
+              v-if="['vacation', 'flexible', 'businessTrip', 'leave'].includes(activeTemplate) && inlineDateValidationMessage"
+            >
+              <td class="label"></td>
+              <td>
+                <p class="inline-error">{{ inlineDateValidationMessage }}</p>
+              </td>
+            </tr>
+
             <tr v-if="activeTemplate === 'reinstatement'">
               <td class="label">복직일</td>
               <td>
@@ -880,9 +1012,23 @@ const vacationDurationLabel = computed(() => {
         <!-- Attachments -->
         <div class="attachments-area">
           <span class="label">첨부파일</span>
-          <button class="btn-sm">파일 찾기</button>
+          <button type="button" class="btn-sm" @click="openAttachmentPicker">파일 찾기</button>
+          <input
+            ref="attachmentInputRef"
+            type="file"
+            multiple
+            class="hidden-file-input"
+            @change="onAttachmentChange"
+          />
           <span class="hint">파일을 마우스로 끌어놓으세요.</span>
         </div>
+        <ul v-if="docInfo.attachments.length > 0" class="attachment-list">
+          <li v-for="(file, index) in docInfo.attachments" :key="`${file.name}-${file.lastModified}-${index}`" class="attachment-item">
+            <span class="attachment-name">{{ file.name }}</span>
+            <span class="attachment-size">{{ formatFileSize(file.size) }}</span>
+            <button type="button" class="attachment-remove" @click="removeAttachment(index)">삭제</button>
+          </li>
+        </ul>
       </div>
     </main>
 
@@ -898,11 +1044,20 @@ const vacationDurationLabel = computed(() => {
     <!-- Confirm Modal -->
     <ConfirmModal
       :is-open="isConfirmModalOpen"
-      title="상신 확인"
+      :title="`${submitActionLabel} 확인`"
       :message="confirmMessage"
-      confirm-text="상신"
+      :confirm-text="submitActionLabel"
       @close="isConfirmModalOpen = false"
       @confirm="finalizeSubmission"
+    />
+
+    <ActionConfirmModal
+      v-model="isWarningModalOpen"
+      title="입력값 확인"
+      :message="warningMessage"
+      confirm-text="확인"
+      :hide-cancel="true"
+      @confirm="isWarningModalOpen = false"
     />
   </div>
 </template>
@@ -1449,6 +1604,13 @@ const vacationDurationLabel = computed(() => {
   margin-left: 5px;
 }
 
+.inline-error {
+  margin: 2px 0 0;
+  color: #d1242f;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .inline-duration {
   margin-left: 8px;
   white-space: nowrap;
@@ -1521,6 +1683,59 @@ const vacationDurationLabel = computed(() => {
 
 .btn-sm:hover {
   background: #eee;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.attachment-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #ccc;
+  border-top: none;
+  background: #fff;
+}
+
+.attachment-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.attachment-item:first-child {
+  border-top: none;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  color: #333;
+}
+
+.attachment-size {
+  font-size: 0.82rem;
+  color: #666;
+}
+
+.attachment-remove {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: #555;
+}
+
+.attachment-remove:hover {
+  background: #f7f7f7;
 }
 
 @media (max-width: 1200px) {
