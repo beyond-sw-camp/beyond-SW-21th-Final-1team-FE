@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
 import {
   getApprovalDetail,
   getApprovalProgressOverview,
+  deleteApproval,
   markApprovalAsRead,
   searchApprovalProgress,
 } from '@/api/approval'
@@ -18,6 +19,8 @@ const isModalOpen = ref(false)
 const selectedItem = ref({})
 const visibleStatusDocs = ref([])
 const statusCounts = ref({ allCount: 0, draftCount: 0, inProgressCount: 0, rejectedCount: 0 })
+const toastMessage = ref('')
+let toastTimer = null
 
 const isDrafting = (status) => status === '기안중';
 const isPending = (status) => status === '진행중';
@@ -98,22 +101,46 @@ const closeModal = () => {
   isModalOpen.value = false
 }
 
+const showToast = (message) => {
+  toastMessage.value = message
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastMessage.value = ''
+  }, 2500)
+}
+
 const handleModalAction = (action) => {
   if (action.type === 'redraft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } })
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status', action: 'redraft' } })
   } else if (action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status' } })
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'status', action: 'draft' } })
+  } else if (action.type === 'delete' || action.type === 'cancel') {
+    deleteApproval(action.id)
+      .then(async () => {
+        showToast('기안이 취소되었습니다.')
+        await loadStatusOverview()
+        if (searchQuery.value || activeTab.value !== 'all') {
+          await loadStatusSearch()
+        }
+      })
+      .catch((error) => {
+        alert(error?.response?.data?.error?.message || '기안 취소에 실패했습니다.')
+      })
   }
   isModalOpen.value = false
 }
 
 const handleRedraft = (item) => {
-  router.push({ name: 'approval-draft', query: { from: item.approvalId, source: 'status' } })
+  router.push({ name: 'approval-draft', query: { from: item.approvalId, source: 'status', action: 'redraft' } })
 }
 
 const handleBack = () => {
   safeBack(router, '/')
 }
+
+onBeforeUnmount(() => {
+  if (toastTimer) clearTimeout(toastTimer)
+})
 
 onMounted(loadStatusOverview)
 watch([activeTab, searchQuery], loadStatusSearch)
@@ -188,7 +215,12 @@ watch([activeTab, searchQuery], loadStatusSearch)
 
       <div class="search-box">
         <div class="search-input-wrapper">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="16.65" y1="16.65" x2="21" y2="21"></line>
+            </svg>
+          </span>
           <input
             v-model="searchQuery"
             type="text"
@@ -287,6 +319,13 @@ watch([activeTab, searchQuery], loadStatusSearch)
       @close="closeModal"
       @action="handleModalAction"
     />
+    <div
+      v-if="toastMessage"
+      class="toast"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >{{ toastMessage }}</div>
   </div>
 </template>
 
@@ -330,10 +369,16 @@ watch([activeTab, searchQuery], loadStatusSearch)
 .search-icon {
   position: absolute;
   left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
   color: #adb5bd;
-  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-icon svg {
+  display: block;
 }
 
 .search-input {
@@ -609,6 +654,22 @@ watch([activeTab, searchQuery], loadStatusSearch)
   font-size: 0.8rem;
   color: #6c757d;
   margin-bottom: 4px;
+}
+
+.toast {
+  position: fixed;
+  right: 24px;
+  top: 86px;
+  z-index: 1400;
+  min-width: 220px;
+  border-radius: 10px;
+  border: 1px solid #BFE8CA;
+  background: #ECFDF3;
+  color: #166534;
+  padding: 10px 14px;
+  font-size: .84rem;
+  font-weight: 700;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .12);
 }
 
 @media (max-width: 768px) {

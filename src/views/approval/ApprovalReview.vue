@@ -96,6 +96,14 @@
       @close="isModalOpen = false"
       @action="handleReviewAction"
     />
+
+    <ActionConfirmModal
+      v-model="isResultModalOpen"
+      title="처리 완료"
+      :message="resultMessage"
+      confirm-text="확인"
+      :hide-cancel="true"
+    />
   </div>
 </template>
 
@@ -104,6 +112,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { safeBack } from '@/utils/navigation'
 import ReviewModal from './components/ReviewModal.vue'
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 import {
   getApprovalDetail,
   getApprovalReviews,
@@ -115,6 +124,8 @@ import { mapApprovalDetailToItem, mapReviewItem } from '@/utils/approvalMapper'
 const reviewList = ref([])
 const isModalOpen = ref(false)
 const selectedItem = ref({})
+const isResultModalOpen = ref(false)
+const resultMessage = ref('')
 const router = useRouter()
 
 async function loadReviewList() {
@@ -151,6 +162,8 @@ const handleReviewAction = async (data) => {
       reason: data.reason || null,
     })
     isModalOpen.value = false
+    resultMessage.value = isApprove ? '승인 처리되었습니다.' : '반려 처리되었습니다.'
+    isResultModalOpen.value = true
     await loadReviewList()
   } catch (error) {
     alert(error?.response?.data?.error?.message || '결재 처리에 실패했습니다.')

@@ -129,7 +129,7 @@
                   </div>
                 </td>
                 <td class="text-center">
-                  <span class="status-badge" :class="item.status === '완료' ? 'completed' : 'ongoing'">
+                  <span class="status-badge" :class="getMyDraftStatusClass(item.status)">
                     {{ item.status }}
                   </span>
                 </td>
@@ -153,6 +153,14 @@
       @close="isDetailModalOpen = false"
       @action="handleDetailAction"
     />
+
+    <ActionConfirmModal
+      v-model="isResultModalOpen"
+      title="처리 완료"
+      :message="resultMessage"
+      confirm-text="확인"
+      :hide-cancel="true"
+    />
   </div>
 </template>
 
@@ -161,6 +169,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { safeBack } from '@/utils/navigation'
 import ReviewModal from './components/ReviewModal.vue'
+import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 import ApprovalDetailModal from './components/ApprovalDetailModal.vue'
 import {
   deleteApproval,
@@ -187,6 +196,30 @@ const isReviewModalOpen = ref(false)
 const isDetailModalOpen = ref(false)
 const selectedReviewItem = ref({})
 const selectedDetailItem = ref({})
+const isResultModalOpen = ref(false)
+const resultMessage = ref('')
+
+const getMyDraftStatusClass = (status) => {
+  switch (status) {
+    case '완료':
+      return 'completed'
+    case '보류':
+      return 'hold'
+    case '회수':
+      return 'withdrawn'
+    case '반려':
+      return 'rejected'
+    case '전결':
+      return 'delegated'
+    case '취소':
+      return 'cancelled'
+    case '임시저장':
+      return 'temp'
+    case '진행중':
+    default:
+      return 'ongoing'
+  }
+}
 
 async function loadDashboard() {
   try {
@@ -235,6 +268,8 @@ const handleReviewAction = async (data) => {
       reason: data.reason || null,
     })
     isReviewModalOpen.value = false
+    resultMessage.value = isApprove ? '승인 처리되었습니다.' : '반려 처리되었습니다.'
+    isResultModalOpen.value = true
     await loadDashboard()
   } catch (error) {
     alert(error?.response?.data?.error?.message || '결재 처리에 실패했습니다.')
@@ -242,8 +277,10 @@ const handleReviewAction = async (data) => {
 }
 
 const handleDetailAction = async (action) => {
-  if (action.type === 'redraft' || action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'main' } })
+  if (action.type === 'redraft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'main', action: 'redraft' } })
+  } else if (action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'main', action: 'draft' } })
   } else if (action.type === 'delete' || action.type === 'cancel') {
     try {
       await deleteApproval(action.id)
@@ -770,6 +807,37 @@ onMounted(loadDashboard)
   background: #f2fcf5;
   color: #40c057;
   border-color: #d3f9d8;
+}
+
+.status-badge.hold {
+  background: #fff9db;
+  color: #e67700;
+  border-color: #ffe066;
+}
+
+.status-badge.withdrawn {
+  background: #f1f3f5;
+  color: #495057;
+  border-color: #dee2e6;
+}
+
+.status-badge.rejected {
+  background: #fff5f5;
+  color: #e03131;
+  border-color: #ffc9c9;
+}
+
+.status-badge.delegated {
+  background: #eef2ff;
+  color: #3b5bdb;
+  border-color: #dbe4ff;
+}
+
+.status-badge.cancelled,
+.status-badge.temp {
+  background: #f8f9fa;
+  color: #495057;
+  border-color: #e9ecef;
 }
 
 .text-center {
