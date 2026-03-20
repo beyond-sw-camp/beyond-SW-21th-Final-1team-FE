@@ -702,8 +702,8 @@ const closePwModal = () => { showChangePw.value = false }
 
 /* Skill Table */
 .skill-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.skill-table th{text-align:left;padding:10px 20px;font-weight:600;color:var(--gray500);border-bottom:1px solid var(--gray200);font-size:.78rem}
-.skill-table td{padding:10px 20px;border-bottom:1px solid var(--gray100);color:var(--gray700)}
+.skill-table th{text-align:center;padding:10px 20px;font-weight:600;color:var(--gray500);border-bottom:1px solid var(--gray200);font-size:.78rem}
+.skill-table td{padding:10px 20px;border-bottom:1px solid var(--gray100);color:var(--gray700);text-align:center}
 .skill-table tr:last-child td{border-bottom:none}
 .skill-table-wrap{height:320px;overflow:auto;min-height:0}
 .skill-table thead th{position:sticky;top:0;background:#fff;z-index:1}
@@ -726,8 +726,8 @@ const closePwModal = () => { showChangePw.value = false }
 
 /* Career Table */
 .career-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.career-table th{text-align:left;padding:10px 20px;font-weight:600;color:var(--gray500);border-bottom:1px solid var(--gray200);font-size:.78rem}
-.career-table td{padding:10px 20px;border-bottom:1px solid var(--gray100);color:var(--gray700)}
+.career-table th{text-align:center;padding:10px 20px;font-weight:600;color:var(--gray500);border-bottom:1px solid var(--gray200);font-size:.78rem}
+.career-table td{padding:10px 20px;border-bottom:1px solid var(--gray100);color:var(--gray700);text-align:center}
 .career-table tr:last-child td{border-bottom:none}
 .career-table-wrap{height:320px;overflow:auto;min-height:0}
 .career-table thead th{position:sticky;top:0;background:#fff;z-index:1}
