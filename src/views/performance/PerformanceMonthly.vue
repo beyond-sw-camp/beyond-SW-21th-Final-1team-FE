@@ -61,7 +61,7 @@
         </div>
       </div>
       <div class="chart-wrap">
-        <Bar :data="chartData" :options="chartOptions" />
+        <Bar :key="chartRenderKey" :data="chartData" :options="chartOptions" />
       </div>
     </div>
 
@@ -227,8 +227,10 @@ const createEmptyMonthlyData = () => ({
 const monthlyData = ref(createEmptyMonthlyData())
 const currentOffset = ref(0)
 
-const adjustedDate = computed(() =>
-  new Date((monthlyData.value?.initialYear || new Date().getFullYear()), ((monthlyData.value?.initialMonth || 1) - 1) + currentOffset.value, 1))
+const adjustedDate = computed(() => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth() + currentOffset.value, 1)
+})
 const adjustedYear = computed(() => adjustedDate.value.getFullYear())
 const adjustedMonth = computed(() => adjustedDate.value.getMonth() + 1)
 const lastDay = computed(() => new Date(adjustedYear.value, adjustedMonth.value, 0).getDate())
@@ -241,9 +243,13 @@ function nextMonth() {
   currentOffset.value += 1
 }
 
-const recentChartLabels = computed(() => (monthlyData.value.chartLabels || []).slice(-TREND_MONTH_COUNT))
-const recentMyScores = computed(() => (monthlyData.value.myScores || []).slice(-TREND_MONTH_COUNT))
-const recentTeamScores = computed(() => (monthlyData.value.teamScores || []).slice(-TREND_MONTH_COUNT))
+const trendLabels = ref([])
+const trendMyScores = ref([])
+const trendTeamScores = ref([])
+
+const recentChartLabels = computed(() => trendLabels.value)
+const recentMyScores = computed(() => trendMyScores.value)
+const recentTeamScores = computed(() => trendTeamScores.value)
 const personalLegendLabel = computed(() => {
   if (!isPerformanceManager.value || !selectedMember.value) return '내 점수'
   return `${selectedMember.value.name} 점수`
@@ -299,6 +305,8 @@ const stats = computed(() => {
   ]
 })
 
+const chartRenderKey = computed(() => recentChartLabels.value.join('|') || 'empty')
+
 const chartData = computed(() => ({
   labels: recentChartLabels.value,
   datasets: [
@@ -332,8 +340,8 @@ const chartOptions = {
     y: {
       grid: { color: '#F1F5F9' },
       ticks: { font: { size: 12 }, color: '#94A3B8' },
-      beginAtZero: false,
-      min: 60,
+      beginAtZero: true,
+      min: 0,
     },
   },
   plugins: {
@@ -409,7 +417,7 @@ async function loadMemberOptions() {
   }
 }
 
-async function loadMonthly() {
+async function loadMonthly({ updateTrend = true } = {}) {
   const requestSeq = ++monthlyRequestSeq
   try {
     if (requestSeq === monthlyRequestSeq) {
@@ -421,7 +429,23 @@ async function loadMonthly() {
     }
     const response = await getPerformanceMonthlyReport(params)
     if (requestSeq !== monthlyRequestSeq) return
-    monthlyData.value = response || createEmptyMonthlyData()
+    const data = response || createEmptyMonthlyData()
+    if (Array.isArray(data.detailItems)) {
+      const seen = new Set()
+      data.detailItems = data.detailItems.filter((item) => {
+        const key = item.id ?? item.performanceId
+        if (key == null) return true
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    }
+    if (updateTrend) {
+      trendLabels.value = (data.chartLabels || []).slice(-TREND_MONTH_COUNT)
+      trendMyScores.value = (data.myScores || []).slice(-TREND_MONTH_COUNT)
+      trendTeamScores.value = (data.teamScores || []).slice(-TREND_MONTH_COUNT)
+    }
+    monthlyData.value = data
   } catch (error) {
     if (requestSeq !== monthlyRequestSeq) return
     console.error('Failed to load monthly performance report.', error)
@@ -465,10 +489,17 @@ watch(isPerformanceManager, (isManager, wasManager) => {
   initializeMonthlyState()
 })
 
-// selectedMemberId/currentOffset 변경 시 리포트를 다시 불러오고 상세 목록 페이지를 첫 페이지로 되돌린다.
-watch([selectedMemberId, currentOffset], () => {
+// 팀원 변경 시: 차트 추이 포함 전체 갱신
+watch(selectedMemberId, () => {
   if (isInitializingState.value) return
-  loadMonthly()
+  loadMonthly({ updateTrend: true })
+  detailCurrentPage.value = 1
+})
+
+// 월 이동 시: 상세 항목만 갱신, 차트 추이는 최근 6개월로 고정
+watch(currentOffset, () => {
+  if (isInitializingState.value) return
+  loadMonthly({ updateTrend: false })
   detailCurrentPage.value = 1
 })
 

@@ -91,21 +91,7 @@ const handleAction = (type) => {
     alert('반려 사유를 입력해주세요.');
     return;
   }
-  
-  let message = '';
-  const reviewerName = '이팀장'; 
-  const reviewerPos = '팀장';
-  
-  switch(type) {
-    case 'approve':
-      message = props.item.step === 3 ? `해당 결재건이 최종 승인되었습니다. (${reviewerName} ${reviewerPos})` : `${props.item.step}차 승인 되었습니다. (${reviewerName} ${reviewerPos})`;
-      break;
-    case 'reject':
-      message = `반려 되었습니다. 사유 : ${rejectReason.value} (${reviewerName} ${reviewerPos})`;
-      break;
-  }
-  
-  alert(`[알림/이메일 전송]\n${message}`);
+
   emit('action', { type, id: props.item.approvalId || props.item.id, reason: rejectReason.value });
   close();
 };

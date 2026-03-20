@@ -28,7 +28,7 @@
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
             </svg>
           </div>
-          <div class="approval-title">{{ item.title }}</div>
+          <div class="approval-title" :class="{ 'approval-title-read': item.type === 'pending' && item.readDate != null }">{{ item.title }}</div>
           <div class="approval-meta">
             <span>{{ item.who }}</span>
             <span>{{ item.date }}</span>
@@ -46,23 +46,41 @@
     @close="isDetailOpen = false"
     @action="handleModalAction"
   />
+  <ReviewModal
+    :is-open="isReviewOpen"
+    :item="selectedItem"
+    @close="isReviewOpen = false"
+    @action="handleReviewAction"
+  />
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ApprovalDetailModal from '@/views/approval/components/ApprovalDetailModal.vue'
-import { getApprovalDetail, getApprovalMainSummary, markApprovalAsRead } from '@/api/approval'
+import ReviewModal from '@/views/approval/components/ReviewModal.vue'
+import { getApprovalDetail, getApprovalMainSummary, markApprovalAsRead, processApproval } from '@/api/approval'
 import { mapApprovalDetailToItem, mapMainSummaryItem } from '@/utils/approvalMapper'
 
 const router = useRouter()
 const activeTab = ref('pending')
 const sortOrder = ref('desc')
 const sourceItems = ref([])
+const serverPendingCount = ref(0)
+const serverProgressCount = ref(0)
 const isDetailOpen = ref(false)
+const isReviewOpen = ref(false)
 const selectedItem = ref({})
-const pendingCount = computed(() => sourceItems.value.filter((item) => item.type === 'pending').length)
-const progressCount = computed(() => sourceItems.value.filter((item) => item.type === 'progress').length)
+const pendingCount = computed(() => {
+  return Number.isFinite(serverPendingCount.value) && serverPendingCount.value > 0
+    ? serverPendingCount.value
+    : sourceItems.value.filter((item) => item.type === 'pending').length
+})
+const progressCount = computed(() => {
+  return Number.isFinite(serverProgressCount.value) && serverProgressCount.value > 0
+    ? serverProgressCount.value
+    : sourceItems.value.filter((item) => item.type === 'progress').length
+})
 const tabs = computed(() => ([
   { key: 'pending', label: `결재 대기 문서 ${pendingCount.value}건` },
   { key: 'progress', label: `결재 진행 문서 ${progressCount.value}건` },
@@ -86,11 +104,19 @@ const toggleSortOrder = () => {
 const refreshItems = async () => {
   try {
     const response = await getApprovalMainSummary()
+    serverPendingCount.value = Number(
+      response?.counts?.pendingReviewCount ?? response?.pendingReviewCount ?? response?.pendingCount ?? 0,
+    )
+    serverProgressCount.value = Number(
+      response?.counts?.inProgressCount ?? response?.inProgressCount ?? response?.progressCount ?? 0,
+    )
     sourceItems.value = [
       ...(response?.pendingDocuments || []).map((item) => mapMainSummaryItem(item, 'pending')),
       ...(response?.inProgressDocuments || []).map((item) => mapMainSummaryItem(item, 'progress')),
     ]
   } catch (_error) {
+    serverPendingCount.value = 0
+    serverProgressCount.value = 0
     sourceItems.value = []
   }
 }
@@ -105,20 +131,46 @@ const goToStatus = () => {
 
 const openDetail = async (item) => {
   try {
-    await markApprovalAsRead(item.approvalId)
+    if (item.type === 'pending' && item.readDate == null) {
+      await markApprovalAsRead(item.approvalId)
+      item.readDate = new Date().toISOString()
+      item.isRead = true
+    }
     const detail = await getApprovalDetail(item.approvalId)
     selectedItem.value = mapApprovalDetailToItem(detail)
-    isDetailOpen.value = true
+    if (item.type === 'pending' && selectedItem.value?.canReview) {
+      isReviewOpen.value = true
+    } else {
+      isDetailOpen.value = true
+    }
   } catch (error) {
     alert(error?.response?.data?.error?.message || '결재 상세 조회에 실패했습니다.')
   }
 }
 
+const handleReviewAction = async (action) => {
+  const isApprove = action.type === 'approve'
+  try {
+    await processApproval(action.id, {
+      approve: isApprove,
+      reason: action.reason || null,
+    })
+    isReviewOpen.value = false
+    await refreshItems()
+  } catch (error) {
+    alert(error?.response?.data?.error?.message || '결재 처리에 실패했습니다.')
+  }
+}
+
 const handleModalAction = (action) => {
-  if (action.type === 'redraft' || action.type === 'draft') {
-    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box' } })
+  if (action.type === 'redraft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box', action: 'redraft' } })
+  } else if (action.type === 'draft') {
+    router.push({ name: 'approval-draft', query: { from: action.id, source: 'box', action: 'draft' } })
   } else if (action.type === 'review') {
-    router.push({ name: 'approval-review' })
+    isDetailOpen.value = false
+    isReviewOpen.value = true
+    return
   }
   isDetailOpen.value = false
 }
@@ -139,6 +191,7 @@ onMounted(refreshItems)
   display:flex;align-items:center;justify-content:center;color:var(--gray400);flex-shrink:0;
 }
 .approval-title{flex:1;font-size:0.88rem;font-weight:500;color:var(--gray700)}
+.approval-title-read{color:#339af0;text-decoration:underline}
 .approval-meta{display:flex;gap:10px;font-size:0.78rem;color:var(--gray400);white-space:nowrap}
 .approval-footer{
   text-align:center;padding-top:10px;border-top:1px solid var(--gray100);margin-top:4px;

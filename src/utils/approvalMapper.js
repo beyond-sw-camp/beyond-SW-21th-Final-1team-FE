@@ -201,7 +201,8 @@ export const mapProgressItem = (item) => ({
   status: toStatusLabel(item.approvalStatus),
   currentApprover: item.currentApproverName || '-',
   progress: item.progressPercent || 0,
-  isRead: !!item.readDate,
+  readDate: item.readDate ?? null,
+  isRead: item.readDate !== null && item.readDate !== undefined,
 })
 
 export const mapBoxItem = (item) => ({
@@ -225,7 +226,8 @@ export const mapDashboardPendingItem = (item) => ({
   templateName: toDocTypeLabel(item.docType),
   drafter: item.drafterName,
   draftDate: formatApprovalDate(item.draftDate),
-  isRead: !!item.readDate,
+  readDate: item.readDate ?? null,
+  isRead: item.readDate !== null && item.readDate !== undefined,
 })
 
 export const mapDashboardDraftItem = (item) => ({
@@ -244,4 +246,6 @@ export const mapMainSummaryItem = (item, type) => ({
   title: item.title,
   who: item.drafterName,
   date: formatApprovalDate(item.draftDate),
+  readDate: item.readDate ?? null,
+  isRead: item.readDate !== null && item.readDate !== undefined,
 })

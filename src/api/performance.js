@@ -18,13 +18,14 @@ export const getPerformanceInquiryTeamMembers = () =>
 
 export const updatePerformanceResult = async (performanceId, request, files = []) => {
   const form = new FormData()
-  Object.entries(request || {}).forEach(([key, value]) => {
-    form.append(key, value ?? '')
-  })
+  form.append(
+    'request',
+    new Blob([JSON.stringify(request ?? {})], { type: 'application/json' }),
+  )
   files.forEach((file) => {
     form.append('files', file)
   })
-  return api.post(`/performance/result/${performanceId}`, form)
+  return api.post(`/performance/result/${performanceId}`, form, { timeout: 60000 })
 }
 
 export const getPerformanceApprovalItems = () => unwrap(api.get('/performance/approvals'))
@@ -93,6 +94,17 @@ export const getAdminPerformanceWeights = async () => {
   const data = await unwrap(api.get('/performance/admin/weights'))
   return { items: parseWeightItems(data), source: 'api' }
 }
+
+export const getAdminEvalTeams = () => unwrap(api.get('/performance/admin/evaluation/teams'))
+
+export const getAdminEvalMembers = (orgId) =>
+  unwrap(api.get(`/performance/admin/evaluation/teams/${orgId}/members`))
+
+export const getAdminEvalData = (employeeId) =>
+  unwrap(api.get(`/performance/admin/evaluation/${employeeId}`))
+
+export const saveAdminEvalScore = (employeeId, grade) =>
+  api.post(`/performance/admin/evaluation/${employeeId}`, { grade })
 
 export const saveAdminPerformanceWeights = async (weights = []) => {
   const items = parseWeightItems(weights)
