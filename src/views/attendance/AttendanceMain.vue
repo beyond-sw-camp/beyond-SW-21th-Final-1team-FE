@@ -292,7 +292,11 @@ const mapLeaveTypeWord = (value) => {
 
 const normalizeApplicationTitle = (title, type) => {
   const raw = String(title || '').trim()
-  if (!raw) return `${type || '신청'} 신청`
+  if (!raw) {
+    const mappedType = mapLeaveTypeWord(type)
+    const typeLabel = (mappedType || String(type || '').trim()).replace(/\s*신청$/, '')
+    return typeLabel ? `${typeLabel} 신청` : '신청'
+  }
 
   const mapped = mapLeaveTypeWord(raw)
   if (mapped) return `${mapped} 신청`
