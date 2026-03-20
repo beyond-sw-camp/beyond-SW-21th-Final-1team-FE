@@ -411,7 +411,10 @@ const applyHrChanges = async () => {
 }
 
 const resetEditForm = () => {
-  syncFormFromCurrentInfo()
+  selectedEmployeeId.value = null
+  selectedEmployeeSummary.value = null
+  currentInfo.value = null
+  resetEditFormValues()
 }
 
 watch(selectedHistoryType, () => {
