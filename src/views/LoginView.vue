@@ -598,6 +598,16 @@ const submitResetPassword = async () => {
     flex-direction: column;
   }
 
+  .demo-account-btn {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .demo-account-credentials {
+    white-space: normal;
+    word-break: break-all;
+  }
+
   .login-right {
     display: none;
   }

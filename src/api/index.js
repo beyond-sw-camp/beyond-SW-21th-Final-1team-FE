@@ -27,11 +27,16 @@ api.interceptors.response.use(
   (error) => {
     if (error?.response?.status === 401) {
       const requestUrl = String(error?.config?.url || '')
+      const currentAccessToken = getAccessToken()
+      const authHeader =
+        error?.config?.headers?.Authorization || error?.config?.headers?.authorization || ''
+      const usesCurrentAccessToken =
+        Boolean(currentAccessToken) && authHeader === `Bearer ${currentAccessToken}`
       const remainingSeconds = getAccessTokenRemainingSeconds()
       const shouldForceLogout =
         requestUrl.includes('/auth/refresh') ||
         requestUrl.includes('/auth/logout') ||
-        remainingSeconds <= 0
+        (usesCurrentAccessToken && remainingSeconds <= 0)
 
       if (!shouldForceLogout) {
         return Promise.reject(error)
