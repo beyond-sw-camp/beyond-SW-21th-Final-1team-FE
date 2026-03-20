@@ -242,7 +242,7 @@ async function submitReview() {
       responsibilityScore: scores[3],
       teamContributionScore: scores[4],
       cultureContributionScore: scores[5],
-      comment: comment.value,
+      comment: comment.value.trim(),
     })
     markSelectedColleagueEvaluated(appraiseeId)
     showModal.value = true

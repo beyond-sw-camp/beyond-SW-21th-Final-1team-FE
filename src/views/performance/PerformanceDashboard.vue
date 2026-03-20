@@ -234,6 +234,7 @@ const chartOptions = {
       ticks: { font: { size: 12 }, color: '#6b7280' },
     },
     y: {
+      min: 0,
       grid: { color: '#f3f4f6' },
       ticks: { font: { size: 12 }, color: '#6b7280' },
     },

@@ -123,6 +123,8 @@
                   type="button"
                   class="grade-btn"
                   :class="[`grade-btn--${g.label.toLowerCase()}`, { active: selectedGrade === g.label }]"
+                  :aria-pressed="selectedGrade === g.label"
+                  :aria-label="`${g.label}등급 선택 (${g.range})`"
                   @click="selectedGrade = g.label"
                 >
                   <span class="grade-btn-label">{{ g.label }}</span>
@@ -194,9 +196,9 @@
             </div>
 
             <!-- 가중 평균 미리보기 -->
-            <div v-if="weightedAvg !== null" class="weighted-preview">
+            <div v-if="averageScore !== null" class="weighted-preview">
               <span class="weighted-label">산출 평균</span>
-              <span class="weighted-value">{{ weightedAvg.toFixed(1) }}점</span>
+              <span class="weighted-value">{{ averageScore.toFixed(1) }}점</span>
               <span class="weighted-hint">(등록 점수와 다를 수 있습니다)</span>
             </div>
           </template>
@@ -207,7 +209,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import {
   getAdminEvalTeams,
   getAdminEvalMembers,
@@ -268,6 +270,9 @@ const selectedGrade = ref(null)
 const saving = ref(false)
 const saveSuccess = ref(false)
 const saveError = ref('')
+let saveSuccessTimer = null
+
+onUnmounted(() => { clearTimeout(saveSuccessTimer) })
 
 async function selectMember(member) {
   selectedMember.value = member
@@ -296,10 +301,11 @@ async function saveScore() {
   try {
     await saveAdminEvalScore(selectedMember.value.employeeId, selectedGrade.value)
     saveSuccess.value = true
-    const m = members.value.find((m) => m.employeeId === selectedMember.value.employeeId)
-    if (m) { m.hasFinalScore = true; m.finalGrade = selectedGrade.value }
+    const found = members.value.find((member) => member.employeeId === selectedMember.value.employeeId)
+    if (found) { found.hasFinalScore = true; found.finalGrade = selectedGrade.value }
     if (evalData.value) evalData.value.finalGrade = selectedGrade.value
-    setTimeout(() => { saveSuccess.value = false }, 3000)
+    clearTimeout(saveSuccessTimer)
+    saveSuccessTimer = setTimeout(() => { saveSuccess.value = false }, 3000)
   } catch (e) {
     saveError.value = e?.response?.data?.error?.message || '저장에 실패했습니다.'
   } finally {
@@ -316,7 +322,7 @@ const gradeGuide = [
   { label: 'D', range: '59점 이하' },
 ]
 
-const weightedAvg = computed(() => {
+const averageScore = computed(() => {
   if (!evalData.value) return null
   const { teamEvalScore, peerReviewScore, systemScore } = evalData.value
   const scores = [teamEvalScore, peerReviewScore, systemScore].filter((v) => v != null)
