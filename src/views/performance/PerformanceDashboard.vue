@@ -44,7 +44,7 @@
       <div class="metric-card">
         <div class="metric-deco purple"></div>
         <div class="metric-body">
-          <h3 class="metric-label">이번 달 핵심 목표 진행률</h3>
+          <h3 class="metric-label">올해 핵심 목표 진행률</h3>
           <div class="metric-value-row">
             <span class="metric-num">{{ monthlyCoreGoalProgressRate }}%</span>
             <span class="metric-change purple">
@@ -234,6 +234,7 @@ const chartOptions = {
       ticks: { font: { size: 12 }, color: '#6b7280' },
     },
     y: {
+      min: 0,
       grid: { color: '#f3f4f6' },
       ticks: { font: { size: 12 }, color: '#6b7280' },
     },

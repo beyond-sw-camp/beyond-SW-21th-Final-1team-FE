@@ -309,12 +309,16 @@ const isTeamLeader = computed(() => isPerformanceManager.value || teamMemberOpti
 const currentEmployeeId = computed(() => sessionStorage.getItem(AUTH_KEYS.employeeId) || '')
 
 const visibleItems = computed(() => {
-  // 필터로 직원 선택 시 → 해당 직원 데이터만
-  const targetId = isTeamLeader.value && filterEmployee.value
-    ? filterEmployee.value
-    : currentEmployeeId.value
-  if (targetId) {
-    return items.value.filter((item) => String(item.employeeId ?? '') === String(targetId))
+  if (isTeamLeader.value) {
+    // 팀장/평가자: 팀원 선택 시 해당 팀원만, 전체 선택 시 전체 반환
+    if (filterEmployee.value) {
+      return items.value.filter((item) => String(item.employeeId ?? '') === String(filterEmployee.value))
+    }
+    return items.value
+  }
+  // 일반 사용자: 본인 데이터만
+  if (currentEmployeeId.value) {
+    return items.value.filter((item) => String(item.employeeId ?? '') === String(currentEmployeeId.value))
   }
   return items.value.filter((item) => item.employeeName === userName.value)
 })

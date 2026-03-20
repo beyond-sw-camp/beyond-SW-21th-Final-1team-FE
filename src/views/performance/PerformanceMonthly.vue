@@ -427,12 +427,18 @@ async function loadMonthly({ updateTrend = true } = {}) {
     if (isPerformanceManager.value && selectedMemberId.value) {
       params.targetEmployeeId = selectedMemberId.value
     }
+    if (updateTrend && requestSeq === monthlyRequestSeq) {
+      trendLabels.value = []
+      trendMyScores.value = []
+      trendTeamScores.value = []
+    }
     const response = await getPerformanceMonthlyReport(params)
     if (requestSeq !== monthlyRequestSeq) return
     const data = response || createEmptyMonthlyData()
     if (Array.isArray(data.detailItems)) {
       const seen = new Set()
       data.detailItems = data.detailItems.filter((item) => {
+        if (item.id == null && item.performanceId != null) item.id = item.performanceId
         const key = item.id ?? item.performanceId
         if (key == null) return true
         if (seen.has(key)) return false
@@ -450,6 +456,11 @@ async function loadMonthly({ updateTrend = true } = {}) {
     if (requestSeq !== monthlyRequestSeq) return
     console.error('Failed to load monthly performance report.', error)
     monthlyLoadError.value = '월별 성과 리포트를 불러오지 못했습니다.'
+    if (updateTrend) {
+      trendLabels.value = []
+      trendMyScores.value = []
+      trendTeamScores.value = []
+    }
     monthlyData.value = createEmptyMonthlyData()
   }
 }

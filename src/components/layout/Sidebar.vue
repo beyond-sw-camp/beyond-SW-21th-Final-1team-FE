@@ -618,6 +618,7 @@ const adminOnlyShortcutOptions = [
   { key: 'admin-notices', label: '공지사항 관리', icon: BellIcon, route: '/admin/notices', viewCodes: ['ADMIN_NOTICES'] },
   { key: 'admin-salary', label: '급여 관리(관리자)', icon: CreditCardIcon, route: '/admin/salary', viewCodes: ['ADMIN_SALARY'] },
   { key: 'admin-performance', label: '성과 시스템 관리', icon: SlidersIcon, route: '/admin/performance', viewCodes: ['ADMIN_MAIN'] },
+  { key: 'admin-evaluation', label: '인사고과 관리', icon: StarIcon, route: '/admin/evaluation', viewCodes: ['ADMIN_MAIN'] },
 ]
 
 const shortcutOptionsByUser = computed(() => {

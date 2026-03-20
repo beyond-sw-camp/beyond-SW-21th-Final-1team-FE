@@ -25,6 +25,7 @@ export const VIEW_CATALOG = [
   { viewCode: 'ADMIN_ATTENDANCE', routeName: 'admin-attendance', viewName: '근태 관리(관리자)', viewDesc: '관리자 근태 화면' },
   { viewCode: 'ADMIN_SALARY', routeName: 'admin-salary', viewName: '급여 관리(관리자)', viewDesc: '관리자 급여 화면' },
   { viewCode: null, routeName: 'admin-performance', viewName: '성과 시스템 관리', viewDesc: '관리자 성과 반영 비율 관리 화면' },
+  { viewCode: null, routeName: 'admin-evaluation', viewName: '인사고과 관리', viewDesc: '관리자 인사고과 관리 화면' },
   { viewCode: 'APPROVAL_MAIN', routeName: 'approval-main', viewName: '전자결재 메인', viewDesc: '전자결재 메인 화면' },
   { viewCode: 'APPROVAL_DRAFT', routeName: 'approval-draft', viewName: '결재 작성', viewDesc: '전자결재 작성 화면' },
   { viewCode: 'APPROVAL_STATUS', routeName: 'approval-status', viewName: '결재 상태', viewDesc: '전자결재 상태 화면' },

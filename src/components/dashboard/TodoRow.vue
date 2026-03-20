@@ -24,6 +24,8 @@ defineProps({
 }
 .todo-row:last-child { border-bottom: none; }
 .todo-title {
+  flex: 1;
+  min-width: 0;
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--gray700);
