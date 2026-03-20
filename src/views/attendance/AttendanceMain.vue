@@ -281,8 +281,41 @@ import ActionConfirmModal from '@/components/common/ActionConfirmModal.vue'
 const router = useRouter()
 const store = useAttendanceStore()
 
+const mapLeaveTypeWord = (value) => {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (normalized === 'ANNUAL') return '연차'
+  if (normalized === 'HALF') return '반차'
+  if (normalized === 'SICK') return '병가'
+  if (normalized === 'ETC') return '기타'
+  return null
+}
+
+const normalizeApplicationTitle = (title, type) => {
+  const raw = String(title || '').trim()
+  if (!raw) {
+    const mappedType = mapLeaveTypeWord(type)
+    const typeLabel = (mappedType || String(type || '').trim()).replace(/\s*신청$/, '')
+    return typeLabel ? `${typeLabel} 신청` : '신청'
+  }
+
+  const mapped = mapLeaveTypeWord(raw)
+  if (mapped) return `${mapped} 신청`
+
+  const matched = raw.match(/^([A-Za-z_]+)\s*신청$/)
+  if (matched) {
+    const mappedWord = mapLeaveTypeWord(matched[1])
+    if (mappedWord) return `${mappedWord} 신청`
+  }
+
+  return raw
+}
+
 const recentApplications = computed(() => {
   return [...store.requestHistory]
+    .map((app) => ({
+      ...app,
+      title: normalizeApplicationTitle(app.title, app.type),
+    }))
     .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0))
     .slice(0, 3)
 })
