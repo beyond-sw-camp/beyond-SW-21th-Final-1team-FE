@@ -304,6 +304,7 @@ async function saveScore() {
     const found = members.value.find((member) => member.employeeId === selectedMember.value.employeeId)
     if (found) { found.hasFinalScore = true; found.finalGrade = selectedGrade.value }
     if (evalData.value) evalData.value.finalGrade = selectedGrade.value
+    clearTimeout(saveSuccessTimer)
     saveSuccessTimer = setTimeout(() => { saveSuccess.value = false }, 3000)
   } catch (e) {
     saveError.value = e?.response?.data?.error?.message || '저장에 실패했습니다.'

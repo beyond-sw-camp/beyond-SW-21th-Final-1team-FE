@@ -437,14 +437,15 @@ async function loadMonthly({ updateTrend = true } = {}) {
     const data = response || createEmptyMonthlyData()
     if (Array.isArray(data.detailItems)) {
       const seen = new Set()
-      data.detailItems = data.detailItems.filter((item) => {
-        if (item.id == null && item.performanceId != null) item.id = item.performanceId
-        const key = item.id ?? item.performanceId
-        if (key == null) return true
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      })
+      data.detailItems = data.detailItems
+        .map((item) => ({ ...item, id: item.id ?? item.performanceId }))
+        .filter((item) => {
+          const key = item.id
+          if (key == null) return true
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
     }
     if (updateTrend) {
       trendLabels.value = (data.chartLabels || []).slice(-TREND_MONTH_COUNT)

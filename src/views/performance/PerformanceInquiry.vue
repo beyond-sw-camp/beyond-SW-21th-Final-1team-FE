@@ -310,9 +310,13 @@ const currentEmployeeId = computed(() => sessionStorage.getItem(AUTH_KEYS.employ
 
 const visibleItems = computed(() => {
   if (isTeamLeader.value) {
-    // 팀장/평가자: 팀원 선택 시 해당 팀원만, 전체 선택 시 전체 반환
+    // 팀장/평가자: 팀원 선택 시 해당 팀원만, 전체 선택 시 알려진 팀원 ID로 방어 필터
     if (filterEmployee.value) {
       return items.value.filter((item) => String(item.employeeId ?? '') === String(filterEmployee.value))
+    }
+    const allowedIds = new Set(employeeOptions.value.map((e) => String(e.employeeId)))
+    if (allowedIds.size > 0) {
+      return items.value.filter((item) => allowedIds.has(String(item.employeeId ?? '')))
     }
     return items.value
   }
