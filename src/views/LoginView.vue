@@ -125,11 +125,11 @@ import BaseModal from '@/components/common/BaseModal.vue'
 import { getRoleCodesFromToken, getRoleFromToken, setLoginSession } from '@/utils/auth'
 
 const demoAccounts = [
-  { label: '피평가자', employeeNo: '2502180007', password: 'test1' },
-  { label: '평가자', employeeNo: '2502130003', password: 'test1' },
   { label: '인사관리자-총괄', employeeNo: '2502120001', password: 'test1' },
   { label: '인사관리자-급여', employeeNo: '2502120002', password: 'test1' },
   { label: '인사관리자-기본', employeeNo: '2502120003', password: 'test1' },
+  { label: '평가자', employeeNo: '2502130003', password: 'test1' },
+  { label: '피평가자', employeeNo: '2502180007', password: 'test1' },
 ]
 
 const router = useRouter()
