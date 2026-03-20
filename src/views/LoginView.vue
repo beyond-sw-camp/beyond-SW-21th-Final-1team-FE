@@ -39,15 +39,21 @@
 
           <p v-if="loginError" class="login-error">{{ loginError }}</p>
 
-          <p class="test-account-info">
-            총괄 데모: 사번 <strong>2502120001</strong> / 비밀번호 <strong>test1</strong>
-          </p>
-          <p class="test-account-info">
-            급여 데모: 사번 <strong>2502120002</strong> / 비밀번호 <strong>test1</strong>
-          </p>
-          <p class="test-account-info">
-            관리기본 데모: 사번 <strong>2502120003</strong> / 비밀번호 <strong>test1</strong>
-          </p>
+          <div class="demo-account-panel">
+            <p class="demo-account-title">데모 계정</p>
+            <div class="demo-account-list">
+              <button
+                v-for="account in demoAccounts"
+                :key="account.employeeNo"
+                type="button"
+                class="demo-account-btn"
+                @click="fillDemoAccount(account)"
+              >
+                <span class="demo-account-role">{{ account.label }}</span>
+                <span class="demo-account-credentials">{{ account.employeeNo }} / {{ account.password }}</span>
+              </button>
+            </div>
+          </div>
 
         </div>
 
@@ -118,6 +124,14 @@ import PasswordResetModal from '@/components/user/PasswordResetModal.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { getRoleCodesFromToken, getRoleFromToken, setLoginSession } from '@/utils/auth'
 
+const demoAccounts = [
+  { label: '인사관리자-총괄', employeeNo: '2502120001', password: 'test1' },
+  { label: '인사관리자-급여', employeeNo: '2502120002', password: 'test1' },
+  { label: '인사관리자-기본', employeeNo: '2502120003', password: 'test1' },
+  { label: '평가자', employeeNo: '2502130003', password: 'test1' },
+  { label: '피평가자', employeeNo: '2502180007', password: 'test1' },
+]
+
 const router = useRouter()
 const username = ref('')
 const password = ref('')
@@ -141,6 +155,13 @@ const completeLogin = (sessionPayload) => {
 const clearLoginError = () => {
   loginError.value = ''
 }
+
+const fillDemoAccount = (account) => {
+  username.value = account.employeeNo
+  password.value = account.password
+  clearLoginError()
+}
+
 const validateResetPassword = () => {
   resetPasswordError.value = ''
 }
@@ -284,6 +305,10 @@ const submitResetPassword = async () => {
 .login-form-wrap {
   width: 100%;
   max-width: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: calc(100vh - 80px);
 }
 
 .login-logo {
@@ -393,11 +418,61 @@ const submitResetPassword = async () => {
   line-height: 1.4;
 }
 
-.test-account-info {
-  margin: 0;
-  font-size: 0.78rem;
+.demo-account-panel {
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  background: #F8FAFC;
+}
+
+.demo-account-title {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.demo-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.demo-account-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  text-align: left;
+}
+
+.demo-account-btn:hover {
+  border-color: #67E8F9;
+  background: #ECFEFF;
+}
+
+.demo-account-btn:active {
+  transform: translateY(1px);
+}
+
+.demo-account-role {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.demo-account-credentials {
+  font-size: 0.76rem;
   color: #64748B;
-  line-height: 1.5;
+  white-space: nowrap;
 }
 .force-desc {
   margin: 0 0 16px;
@@ -448,7 +523,7 @@ const submitResetPassword = async () => {
 }
 
 .login-footer {
-  margin-top: 40px;
+  margin-top: 28px;
   font-size: 0.78rem;
   color: #94A3B8;
 }
@@ -521,6 +596,16 @@ const submitResetPassword = async () => {
 @media (max-width: 768px) {
   .login-page {
     flex-direction: column;
+  }
+
+  .demo-account-btn {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .demo-account-credentials {
+    white-space: normal;
+    word-break: break-all;
   }
 
   .login-right {
