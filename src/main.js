@@ -15,4 +15,7 @@ router
   .catch((error) => {
     console.error('Router initialization failed. Mounting app anyway.', error)
     app.mount('#app')
+
+
   })
+
